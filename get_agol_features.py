@@ -115,7 +115,6 @@ def get_agol_features_job():
     token = return_token(service_url, username, password, request_url)
     
     for id in range(4):
-        id = 3 #Это нужно не забыть убрать!!! 
         log('Syncing for table №%s...'%(id))
         n = 0
         is_repeat = True
