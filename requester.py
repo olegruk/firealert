@@ -164,6 +164,101 @@ def make_reqst_table(conn,cursor,src_tab,crit_or_peat,limit, from_time, period, 
     cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
     return cursor.fetchone()[0]
 
+#Создаем таблицу для выгрузки подписчикам
+def make_reqst_for_circle(conn,cursor,src_tab,crit_or_peat,limit, from_time, period, circle, whom):
+    falogging.log("Creating table of points in circle for subs_id:%s..." %whom)
+    subs_tab = 'for_%s' %str(whom)
+#    period = '%s hours' %period
+    cent_x = circle[0]
+    cent_y = circle[1]
+    radius = circle[2]
+    statements = (
+    """
+	DROP TABLE IF EXISTS %s
+	"""%(subs_tab),
+	"""
+	CREATE TABLE %s (
+            name VARCHAR(30),
+            description VARCHAR(500),
+            acq_date VARCHAR(10),
+			acq_time VARCHAR(5),
+			latitude NUMERIC,
+			longitude NUMERIC,
+            sat_sensor VARCHAR(5),
+            region  VARCHAR(100),
+			peat_district VARCHAR(254),
+			peat_id VARCHAR(256),
+			peat_class SMALLINT,
+			peat_fire SMALLINT,
+			critical SMALLINT,
+            geog GEOGRAPHY(POINT, 4326)
+	)
+	"""%(subs_tab),
+    """
+    INSERT INTO %(w)s (name,acq_date,acq_time,latitude,longitude,sat_sensor,region,critical,peat_id,peat_district,peat_class,peat_fire,geog)
+        SELECT
+            %(s)s.name,
+            %(s)s.acq_date,
+            %(s)s.acq_time,
+            %(s)s.latitude,
+            %(s)s.longitude,
+            %(s)s.satellite,
+            %(s)s.region,
+            %(s)s.critical,
+            %(s)s.peat_id,
+            %(s)s.peat_district,
+            %(s)s.peat_class,
+            %(s)s.peat_fire,
+            %(s)s.geog
+        FROM %(s)s
+        WHERE date_time > TIMESTAMP '%(t)s' - INTERVAL '%(p)s' AND "date_time" <= TIMESTAMP '%(t)s' AND %(c)s >= %(l)s AND 
+        ST_DWithin(%(s)s.geog, ST_GeogFromText('SRID=4326;POINT(%(x)s %(y)s)'), %(r)s)
+    """%{'w':subs_tab,'s':src_tab, 't':from_time,'p':period,'c':crit_or_peat,'l':limit,'x':cent_x,'y':cent_y,'r':radius},
+    """
+	UPDATE %s
+		SET sat_sensor = 'VIIRS'
+        WHERE sat_sensor = 'N'
+    """%(subs_tab),
+    """
+	UPDATE %s
+		SET sat_sensor = 'MODIS'
+        WHERE sat_sensor <> 'VIIRS'
+    """%(subs_tab),
+    """
+	UPDATE %s
+		SET description =
+        'Дата: ' || acq_date || '\n' ||
+        'Время: ' || acq_time || '\n' ||
+        'Сенсор: ' || sat_sensor || '\n' ||
+        'Регион: ' || region || '\n' ||
+        'Район: ' || peat_district || '\n' ||
+        'Торфяник (ID): ' || peat_id || '\n' ||
+        'Класс осушки: ' || peat_class || '\n' ||
+        'Горимость торфяника: ' || peat_fire || '\n' ||
+        'Критичность точки: ' || critical
+    """%(subs_tab),
+    """
+	UPDATE %s
+		SET description =
+        'Дата: ' || acq_date || '\n' ||
+        'Время: ' || acq_time || '\n' ||
+        'Сенсор: ' || sat_sensor || '\n' ||
+        'Регион: ' || region
+        WHERE peat_id IS NULL
+    """%(subs_tab)
+    )
+
+    try:
+        for sql_stat in statements:
+            cursor.execute(sql_stat)
+            conn.commit()
+        falogging.log('The table created: subs_id:%s'%(whom))
+    except IOError as e:
+        falogging.log('Error creating subscribers tables: $s'%e)
+    cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
+    return cursor.fetchone()[0]
+
+
 # Сохраняем созданную таблицу в kml-файл для последующей отправки подписчикам
 def write_to_kml(dbserver,dbport,dbname,dbuser,dbpass,dst_file,whom):
     subs_tab = 'for_%s' %str(whom)
@@ -193,7 +288,7 @@ def make_file_name(period, date, whom, result_dir,iter):
         suff = ''
     else:
         suff = '_inc%s' %str(iter)
-    if period == 24:
+    if period == '24 hours':
         dst_file_name = '%(d)s_%(s)s%(i)s.kml'%{'d': date, 's': whom, 'i':suff}
     else:
         period_mod = period
@@ -228,4 +323,29 @@ def request_data(whom, lim_for, limit, from_time, period, regions, result_dir):
     cursor.close
     conn.close
 
-    return dst_file
+    return dst_file, num_points
+
+def request_for_circle(whom, lim_for, limit, from_time, period, circle, result_dir):
+
+    currtime = time.localtime()
+    date = time.strftime('%Y-%m-%d',currtime)
+
+    # extract params from config
+    [dbserver,dbport,dbname,dbuser,dbpass] = faconfig.get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
+    [year_tab] = faconfig.get_config("tables", ["year_tab"])
+
+    #connecting to database
+    conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
+    cursor = conn.cursor(cursor_factory=NamedTupleCursor)
+
+    num_points = make_reqst_for_circle(conn,cursor,year_tab,lim_for,limit,from_time,period,circle,whom)
+    dst_file_name = make_file_name(period, date, whom, result_dir,0)
+    dst_file = os.path.join(result_dir,dst_file_name)
+    write_to_kml(dbserver,dbport,dbname,dbuser,dbpass,dst_file,whom)
+    drop_whom_table(conn,cursor,whom)
+
+
+    cursor.close
+    conn.close
+
+    return dst_file, num_points

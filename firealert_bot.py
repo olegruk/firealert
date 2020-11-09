@@ -39,15 +39,19 @@ command_list = ['',
 
 def parse_data_req(req):
     central_region = "('Москва','Московская область','Тверская область','Ярославская область','Ивановская область','Владимирская область','Рязанская область','Тульская область','Калужская область','Брянская область','Смоленская область')"
-    req_params = {'lim_for':'critical', 'limit':'0', 'from_time':'NOW', 'period':'24', 'regions':central_region}
+    circle = ['', '', ''] 
+    req_params = {'lim_for':'critical', 'limit':'0', 'from_time':'NOW', 'period':'24 hours', 'regions':central_region, 'circle':circle}
+
     c_lim = re.search(r'[c,C]\d{1,3}', req)
     if c_lim:
         req_params['lim_for'] = 'critical'
         req_params['limit'] = c_lim[0][1:]
+
     f_lim = re.search(r'[f,F]\d{1,3}', req)
     if f_lim:
         req_params['lim_for'] = 'peat_fire'
         req_params['limit'] = f_lim[0][1:]
+
     dat = re.search(r'\d\d-\d\d', req)
     tme = re.search(r'\d\d:\d\d', req)
     if dat and tme:
@@ -62,12 +66,36 @@ def parse_data_req(req):
         currtime = time.localtime()
         currdate = time.strftime('%Y-%m-%d',currtime)
         req_params['from_time'] = currdate + ' ' + tme[0]
-    per = re.search(r'\d{1,3}[h,H]', req)
-    if per:
-        req_params['period'] = per[0][0:-1]
+
+    per = ''
+    yy = re.search(r'\d{1,2} year[s]{0,1}', req)
+    mm = re.search(r'\d{1,2} month', req)
+    dd = re.search(r'\d{1,2} day[s]{0,1}', req)
+    hh = re.search(r'\d{1,2} hour[s]{0,1}', req)
+    if not(hh):
+        hh = re.search(r'\d{1,2}[hH]', req)
+    mi = re.search(r'\d{1,2} minutes', req)
+    for xx in [yy, mm, dd, hh, mi]:
+        if xx:
+            per = per + xx[0] + ' '
+    if per != '':
+        req_params['period'] = per
+    
     reg = re.search(r'\((\'\w+ ?\w* ?\w*\'\,? ?)+\)', req)
     if reg:
         req_params['regions'] = reg[0]
+
+    y = re.search(r'\(\d{1,2}.\d{1,8},', req)
+    if y:
+        circle[1] = y[0][1:-1]
+    x = re.search(r', \d{1,2}.\d{1,8},', req)
+    if x:
+        circle[0] = x[0][2:-1]
+    r = re.search(r', \d{1,8}\)', req)
+    if r:
+        circle[2] = r[0][2:-1]
+    req_params['circle'] = circle
+
     return req_params
 
 def get_path(root_path,folder):
@@ -210,11 +238,35 @@ def get_data(bot, update):
     message = update.message.text
 
     req_params = parse_data_req(message)
-    dst_file = requester.request_data(telegram_id, req_params['lim_for'], req_params['limit'], req_params['from_time'], req_params['period'], req_params['regions'], result_dir)
+    dst_file, nump = requester.request_data(telegram_id, req_params['lim_for'], req_params['limit'], req_params['from_time'], req_params['period'], req_params['regions'], result_dir)
 
     #drop_temp_files(result_dir)
     doc = open(dst_file, 'rb')
     send_doc_to_telegram(url, telegram_id, doc)
+    update.message.reply_text('В файле %s точек.' %nump)
+
+def get_around(bot, update):
+    [data_root,temp_folder] = faconfig.get_config("path", ["data_root", "temp_folder"])
+    #Создаем каталог для записи временных файлов
+    result_dir = get_path(data_root,temp_folder)
+
+    telegram_id = update.message.from_user.id
+    message = update.message.text
+
+    req_params = parse_data_req(message)
+    dst_file, nump = requester.request_for_circle(telegram_id, req_params['lim_for'], req_params['limit'], req_params['from_time'], req_params['period'], req_params['circle'], result_dir)
+
+    #drop_temp_files(result_dir)
+    doc = open(dst_file, 'rb')
+    send_doc_to_telegram(url, telegram_id, doc)
+    str_nump = str(nump)
+    if str_nump[-1] == '1':
+        tail = 'точка'
+    elif str_nump[-1] in ['2','3','4']:
+        tail = 'точки'
+    else:
+        tail = 'точек'
+    update.message.reply_text('В файле %(p)s %(t)s.' %{'p':str_nump, 't':tail})
 
 def help(bot, update):
     """Send a message when the command /help is issued."""
@@ -244,7 +296,9 @@ def help(bot, update):
                               '/show_conf - \n'
                               'показать параметры моей рассылки; \n'
                               '/get_data - \n'
-                              'запросить точки (подробнее - /help_get_data).')
+                              'запросить точки (подробнее - /help_get_data); \n'
+                              '/get_arround - \n'
+                              'запросить точки в радиусе (подробнее - /help_get_around).')
 
 def help_get_data(bot, update):
     """Send a message when the command /help_get_data is issued."""
@@ -264,6 +318,24 @@ def help_get_data(bot, update):
                               'Если нужны точки по всей Росии, то указываем (\'Россия\') \n'
                               'Порядок параметров несущественен, скобки и кавычки - необходимы. \n'
                               'Просто запрос /get_data без параметров вернет все точки по ЦР за последние 24 часа.')
+
+def help_get_around(bot, update):
+    """Send a message when the command /help_get_around is issued."""
+    update.message.reply_text('Строка запроса термоточек в радиусе от заданной выглядит так: \n'
+                              '/get_around c120 10-19 18:00 36h (55.66173821, 41.37139873, 10000) \n'
+                              'Такой запрос вернет точки с критичностью не ниже 120, \n'
+                              'начиная с 18:00 19 октября, за 36 часов ("в прошлое"), \n'
+                              'в радиусе 10 километров (10000 метров) от точки с координатами (55.66173821, 41.37139873). \n'
+                              'Можно заменить букву "с" буквой "f", например - "f32," \n'
+                              'это будет означать точки, попавшие в области торфяников с горимостью не ниже 32. \n'
+                              'Если не указаны ни "c", ни "f", то предполагается значение "c0", \n'
+                              'если не указано время, то оно будет 23:59, \n'
+                              'если не указана дата, то дата бедет сегодняшняя. \n'
+                              'Если не указаны ни время, ни дата, то отсчет будет от текущего момента. \n'
+                              'Если не указан период, то точки будут отбираться за 24 часа. \n'
+                              'Координаты точки и радиус указывать обязательно. \n'
+                              'Порядок параметров несущественен, скобки и кавычки - необходимы. \n'
+                              'Просто запрос /get_around (55.66173821, 41.37139873, 10000) вернет точки за последние 24 часа.')
 
 def echo(bot, update):
      """Echo the user message."""
@@ -290,6 +362,8 @@ def main():
     disp.add_handler(CommandHandler("show_conf", show_conf))
     disp.add_handler(CommandHandler("get_data", get_data))
     disp.add_handler(CommandHandler("help_get_data", help_get_data))
+    disp.add_handler(CommandHandler("get_around", get_around))
+    disp.add_handler(CommandHandler("help_get_around", help_get_around))
     disp.add_handler(CommandHandler("help", help))
     disp.add_handler(MessageHandler(Filters.text, echo))
     updater.start_polling()
