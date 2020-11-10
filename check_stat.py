@@ -109,7 +109,7 @@ def new_alerts(conn, cursor, clust_view, alert_tab, period, cur_date):
     log("Adding alerts...")
     statements = (
         """
-        INSERT INTO %(a)s (object_id, alert_date, point_count, base_image, cluster)
+        INSERT INTO %(a)s (object_id, alert_date, point_count, satellite_base, cluster)
             SELECT
                 peat_id,
                 date_time,
