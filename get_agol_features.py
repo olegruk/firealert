@@ -126,7 +126,7 @@ def get_agol_features_job():
             with open(dst_file, 'w') as outfile:
                 json.dump(response, outfile)
             if n < 1000:
-                command = """ogr2ogr -overwrite -append -t_srs "+proj=longlat +datum=WGS84 +no_defs" -f "PostgreSQL"  PG:"host=%(h)s user=%(u)s dbname=%(b)s password=%(w)s port=%(p)s" %(s)s -nln %(d)s"""%{'s':dst_file,'d':'oopt_reg_zones','h':dbserver,'u':dbuser,'b':dbname,'w':dbpass,'p':dbport}
+                command = """ogr2ogr -overwrite -append -t_srs "+proj=longlat +datum=WGS84 +no_defs" -f "PostgreSQL"  PG:"host=%(h)s user=%(u)s dbname=%(b)s password=%(w)s port=%(p)s" %(s)s -nln %(d)s"""%{'s':dst_file,'d':dst_tabs[id],'h':dbserver,'u':dbuser,'b':dbname,'w':dbpass,'p':dbport}
             else:
                 command = """ogr2ogr -append -t_srs "+proj=longlat +datum=WGS84 +no_defs" -f "PostgreSQL"  PG:"host=%(h)s user=%(u)s dbname=%(b)s password=%(w)s port=%(p)s" %(s)s -nln %(d)s"""%{'s':dst_file,'d':dst_tabs[id],'h':dbserver,'u':dbuser,'b':dbname,'w':dbpass,'p':dbport}
             os.system(command)
