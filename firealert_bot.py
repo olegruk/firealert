@@ -135,8 +135,11 @@ def start(bot, update):
     #send = f"User {user} started your bot. \n User ID:{user.id}"
     #bot.send_message(chat_id=user_id, text=send)
     telegram_id = update.message.from_user.id
-    subsconf.add_tlg_user(telegram_id)
-    update.message.reply_text('Вы включены в список подписчиков.')
+    res = subsconf.add_tlg_user(telegram_id)
+    if not(res):
+        update.message.reply_text('Мы с вами уже знакомы.\nПовторно давать команду /start нет необходимости.')
+    else:
+        update.message.reply_text('Вы включены в список подписчиков.')
 
 def test(bot, update):
     """Send a test reply message when the command /test is issued."""

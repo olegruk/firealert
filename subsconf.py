@@ -68,8 +68,15 @@ def close_conn(conn, cursor):
 
 def add_tlg_user(telegram_id):
     conn, cursor, subs_table = get_cursor()
-    cursor.execute("INSERT INTO %(s)s (telegramm) VALUES (%(i)s)" %{'s':subs_table,'i':telegram_id})
+    cursor.execute("SELECT telegramm FROM %s" %subs_table)
+    cursor.fetchall()
+    if len( cursor.fetchall()) = 0:
+        cursor.execute("INSERT INTO %(s)s (telegramm) VALUES (%(i)s)" %{'s':subs_table,'i':telegram_id})
+        res = True
+    else:
+        res = False
     close_conn(conn, cursor)
+    return res
 
 def set_teleg_stat(telegram_id):
     conn, cursor, subs_table = get_cursor()
