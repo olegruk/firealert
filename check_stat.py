@@ -172,7 +172,7 @@ def check_stat_job():
     fdate=time.strftime('%d-%m-%Y',currtime)
 
     # extract params from config
-    [dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
+    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
     [year_tab] = get_config("tables", ["year_tab"])
     [url, chat_id] = get_config("telegramm", ["url", "wrk_chat_id"])
     [period, critical_limit] = get_config("statistic", ["period", "critical_limit"])
@@ -182,8 +182,7 @@ def check_stat_job():
     #reg_list_cr = ['Ярославская область','Тверская область','Смоленская область','Рязанская область','Московская область','Москва','Калужская область','Ивановская область','Владимирская область','Брянская область','Тульская область']
     #reg_list = "('Ярославская область','Тверская область','Смоленская область','Рязанская область','Московская область','Москва','Калужская область','Ивановская область','Владимирская область','Брянская область')"
 
-    #connecting to database
-    conn = psycopg2.connect(dbname=dbname, user=dbuser, password=dbpass)
+    conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
     cursor = conn.cursor()
 
     #check_peats_stat(conn, cursor, year_tab, alert_tab, reg_list, peat_stat_period, peat_stat_critical, date)
