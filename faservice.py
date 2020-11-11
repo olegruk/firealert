@@ -8,6 +8,7 @@
 from falogging import log
 from faconfig import get_db_config
 import os, re
+import requests
 import psycopg2
 
 def get_path(root_path,folder):
@@ -46,3 +47,10 @@ def index_all_region(conn,cursor,outlines):
 
     cursor.close
     conn.close
+
+def send_to_telegram(url, chat, text):
+    params = {'chat_id': chat, 'text': text}
+    response = requests.post(url + 'sendMessage', data=params)
+    if response.status_code != 200:
+        raise Exception("post_text error: %s" %response.status_code)
+    return response
