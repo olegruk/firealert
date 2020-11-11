@@ -7,7 +7,7 @@
 
 import os, sys
 import psycopg2
-import falogging, faconfig
+from faconfig import get_db_config
 
 conf_list = ['subs_id',
             'subs_name',
@@ -55,7 +55,7 @@ conf_desc = ['Идентификатор подписчика: ',
             'Контролировать VIP-зоны :']
 
 def get_cursor():
-    [dbserver,dbport,dbname,dbuser,dbpass] = faconfig.get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
+    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
     subs_table = 'subscribers'
     conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
     cursor = conn.cursor()
