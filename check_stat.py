@@ -7,88 +7,11 @@
 
 
 import os, time, sys
-import logging
 import requests
 import psycopg2
-from configparser import ConfigParser
-
-inifile = "firealert.ini"
-logfile = 'firealert.log'
-
-#Получение параметров из узла "node" ini-файла "inifile"
-#Список имен параметров передается в "param_names"
-#Возвращаем список значений
-def get_config(inifile, node, param_names):
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(base_path, inifile)
-
-    # get the config
-    if os.path.exists(config_path):
-        cfg = ConfigParser()
-        cfg.read(config_path)
-    else:
-        log(logfile, "Ini-file %s not found!.." %(inifile))
-        sys.exit(1)
-
-    # extract params
-    raw_params = [cfg.get(node, param_name) for param_name in param_names]
-    params =[]
-    # differ lists and single params
-    for raw_param in raw_params:
-        if '[' in raw_param:
-            param = [element.strip("[]") for element in raw_param.split(", ")]
-        elif '{' in raw_param:
-            param = parse_dict(raw_param)
-        else:
-            param = raw_param
-        params.append(param)
-
-    return params
-
-def parse_dict(string):
-    param = [element.strip("{}") for element in string.split(",\n")]
-    #param = string.strip("{}")
-    dicta = {}
-    for item in param:
-        [key, val] = item.split(": ")
-        if val == "''":
-            val = ''
-        dicta[key] = val
-    return dicta
-
-def get_log_file(date):
-    [logfile, log_folder] = get_config(inifile, "path", ["logfile", "log_folder"])
-    logfile = "%(l)s_%(d)s.log"%{'l':logfile,'d':date}
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    result_path = os.path.join(base_path, log_folder)
-    if not os.path.exists(result_path):
-        try:
-            os.mkdir(result_path)
-            log(logfile, "Created %s" % result_path)
-        except OSError:
-            log(logfile, "Unable to create %s" % result_path)
-    result_path = os.path.join(result_path, logfile)
-    return result_path
-
-#Протоколирование
-def log(logfile, msg):
-    logging.basicConfig(format='%(asctime)s %(message)s',
-        datefmt='%m/%d/%Y %I:%M:%S %p',
-        filename=logfile)
-    logging.warning(msg)
-    #print(msg)
-
-def get_path(root_path,folder):
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    result_path = os.path.join(base_path, root_path)
-    result_path = os.path.join(result_path, folder)
-    if not os.path.exists(result_path):
-        try:
-            os.mkdir(result_path)
-            log (logfile, "Created %s" % result_path)
-        except OSError:
-            log (logfile, "Unable to create %s" % result_path)
-    return result_path
+from faconfig import get_config, get_db_config
+from falogging import start_logging, stop_logging, log
+from faservice import get_path
 
 def send_to_telegram(url, chat, text):
     params = {'chat_id': chat, 'text': text}
@@ -114,7 +37,7 @@ def smf_login(session, smf_url, smf_user, smf_pass):
         smf_random_input: smf_session_id,
     }
     response = session.post(smf_url + login_url2, data=payload)
-    log (logfile, "Login Response: %s" % response)
+    log("Login Response: %s" % response)
     return smf_session_id, smf_random_input
 
 def new_topic(smf_url, smf_user, smf_pass, board, subject, msg, icon="xx", notify=0, lock=0, sticky=0):
@@ -152,7 +75,7 @@ def new_topic(smf_url, smf_user, smf_pass, board, subject, msg, icon="xx", notif
             return False
 
 def check_peats_stat(conn, cursor, year_tab, alert_tab, reglist, period, critical, cur_date):
-    log(logfile, "Getting peats statistic...")
+    log("Getting peats statistic...")
     statements = (
         """
         INSERT INTO %(a)s (object_id, point_count)
@@ -176,21 +99,22 @@ def check_peats_stat(conn, cursor, year_tab, alert_tab, reglist, period, critica
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log(logfile, 'TGetting peats statistic finished.')
+        log('TGetting peats statistic finished.')
     except IOError as e:
-        log(logfile, 'Error getting peats statistic:$s'%e)
+        log('Error getting peats statistic:$s'%e)
     #cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
     #return cursor.fetchone()[0]
 
 def new_alerts(conn, cursor, clust_view, alert_tab, period, cur_date):
-    log(logfile, "Adding alerts...")
+    log("Adding alerts...")
     statements = (
         """
-        INSERT INTO %(a)s (object_id, alert_date, point_count, cluster)
+        INSERT INTO %(a)s (object_id, alert_date, point_count, satellite_base, cluster)
             SELECT
                 peat_id,
                 date_time,
   		        point_count,
+                'https://apps.sentinel-hub.com/eo-browser/?zoom=14&lat=' || ST_Y(ST_Transform(ST_Centroid(buffer)::geometry,4326)::geometry) || '&lng=' || ST_X(ST_Transform(ST_Centroid(buffer)::geometry,4326)::geometry) || '&themeId=DEFAULT-THEME',
                 buffer
             FROM %(t)s
             WHERE date_time >= (TIMESTAMP 'today' - INTERVAL '%(p)s') AND date_time < TIMESTAMP 'today'
@@ -198,7 +122,7 @@ def new_alerts(conn, cursor, clust_view, alert_tab, period, cur_date):
         """
         UPDATE %(a)s SET
             alert_date = '%(d)s',
-            source = 'ДМ'
+            source = 'Робот'
         WHERE alert_date IS NULL
         """%{'a':alert_tab,'d':cur_date}
         )
@@ -207,14 +131,14 @@ def new_alerts(conn, cursor, clust_view, alert_tab, period, cur_date):
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log(logfile, 'Adding alerts finished.')
+        log('Adding alerts finished.')
     except IOError as e:
-        log(logfile, 'Error adding alerts:$s'%e)
+        log('Error adding alerts:$s'%e)
     #cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
     #return cursor.fetchone()[0]
 
 def check_reg_stat(conn, cursor, year_tab, reg, period, critical):
-    log(logfile, "Getting statistic for %s..."%(reg))
+    log("Getting statistic for %s..."%(reg))
     statements = (
         """
         SELECT count(*) FROM
@@ -234,34 +158,31 @@ def check_reg_stat(conn, cursor, year_tab, reg, period, critical):
         critical_cnt = cursor.fetchone()[0]
         cursor.execute(statements[1])
         all_cnt = cursor.fetchone()[0]
-        log(logfile, 'Finished for:%s'%(reg))
+        log('Finished for:%s'%(reg))
     except IOError as e:
-        log(logfile, 'Error getting statistic for region:$s'%e)
+        log('Error getting statistic for region:$s'%e)
 
     return critical_cnt, all_cnt
 
 def check_stat_job():
+    start_logging('check_stat.py')
+    
     currtime = time.localtime()
     date=time.strftime('%Y-%m-%d',currtime)
-    cdate=time.strftime('%d-%m-%Y %H:%M:%S',currtime)
     fdate=time.strftime('%d-%m-%Y',currtime)
 
-    logfile = get_log_file(date)
-    log(logfile, '--------------------------------------------------------------------------------')
-    log(logfile, 'Process [check_stat.py] started at %s'%(cdate))
-
     # extract params from config
-    [dbname,dbuser,dbpass] = get_config(inifile, "db", ["dbname", "dbuser", "dbpass"])
-    [year_tab] = get_config(inifile, "tables", ["year_tab"])
-    [url, chat_id] = get_config(inifile, "telegramm", ["url", "wrk_chat_id"])
-    [period, critical_limit] = get_config(inifile, "statistic", ["period", "critical_limit"])
-    [smf_url, smf_user, smf_pass] = get_config(inifile, "smf", ["smf_url", "smf_user", "smf_pass"])
-    [peat_stat_period, peat_stat_critical,alert_tab,clust_view] = get_config(inifile, "peats_stat", ["period", "critical_limit", "alert_tab", "cluster_view"])
-    reg_list_cr = ['Ярославская область','Тверская область','Смоленская область','Рязанская область','Московская область','Москва','Калужская область','Ивановская область','Владимирская область','Брянская область','Тульская область']
-    reg_list = "('Ярославская область','Тверская область','Смоленская область','Рязанская область','Московская область','Москва','Калужская область','Ивановская область','Владимирская область','Брянская область')"
+    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
+    [year_tab] = get_config("tables", ["year_tab"])
+    [url, chat_id] = get_config("telegramm", ["url", "wrk_chat_id"])
+    [period, critical_limit] = get_config("statistic", ["period", "critical_limit"])
+    [smf_url, smf_user, smf_pass] = get_config("smf", ["smf_url", "smf_user", "smf_pass"])
+    [peat_stat_period, peat_stat_critical,alert_tab,clust_view] = get_config("peats_stat", ["period", "critical_limit", "alert_tab", "cluster_view"])
+    [reg_list_cr] = get_config("reglists", ["cr"])
+    #reg_list_cr = ['Ярославская область','Тверская область','Смоленская область','Рязанская область','Московская область','Москва','Калужская область','Ивановская область','Владимирская область','Брянская область','Тульская область']
+    #reg_list = "('Ярославская область','Тверская область','Смоленская область','Рязанская область','Московская область','Москва','Калужская область','Ивановская область','Владимирская область','Брянская область')"
 
-    #connecting to database
-    conn = psycopg2.connect(dbname=dbname, user=dbuser, password=dbpass)
+    conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
     cursor = conn.cursor()
 
     #check_peats_stat(conn, cursor, year_tab, alert_tab, reg_list, peat_stat_period, peat_stat_critical, date)
@@ -287,16 +208,13 @@ def check_stat_job():
         msg = 'Нет новых точек.'
         smf_msg = 'Нет новых точек.'
 
-    #print(msg)
     send_to_telegram(url, chat_id, msg)
     new_topic(smf_url, smf_user, smf_pass, 13.0, fdate, smf_msg)
 
     cursor.close
     conn.close
 
-    currtime = time.localtime()
-    cdate=time.strftime('%d-%m-%Y %H:%M:%S',currtime)
-    log(logfile, 'Process [check_stat.py] stopped at %s'%(cdate))
+    stop_logging('check_stat.py')
 
 #main
 if __name__ == "__main__":
