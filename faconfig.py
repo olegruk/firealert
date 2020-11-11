@@ -6,9 +6,9 @@
 #-------------------------------------------------------------------------------
 
 import os, sys
-from configparser import ConfigParser
 import psycopg2
-import falogging
+from configparser import ConfigParser
+from falogging import log
 from faservice import str_to_lst
 
 #Получение параметров из узла "node" ini-файла "inifile"
@@ -24,7 +24,7 @@ def get_db_config(node, param_names):
         cfg = ConfigParser()
         cfg.read(config_path)
     else:
-        falogging.log("Ini-file %s not found!.." %(inifile))
+        log("Ini-file %s not found!.." %(inifile))
         sys.exit(1)
 
     # extract params
@@ -64,9 +64,9 @@ def get_config(node, param_names):
             else:
                 lstval = None
 
-            falogging.log('Parameter readed:%s'%(key))
+            log('Parameter readed:%s'%(key))
         except IOError as e:
-            falogging.log('Error getting statistic for region:$s'%e)
+            log('Error getting statistic for region:$s'%e)
 
         if strval != None:
             val_list[i] = strval
@@ -81,5 +81,8 @@ def get_config(node, param_names):
 
         if type(param_names) is not list:
             val_list = val_list[0]
+
+    cursor.close
+    conn.close
 
     return val_list
