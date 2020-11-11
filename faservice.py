@@ -54,3 +54,16 @@ def send_to_telegram(url, chat, text):
     if response.status_code != 200:
         raise Exception("post_text error: %s" %response.status_code)
     return response
+
+def get_cursor():
+
+    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
+
+    conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
+    cursor = conn.cursor()
+    return conn, cursor
+
+def close_conn(conn, cursor):
+    conn.commit()
+    cursor.close
+    conn.close
