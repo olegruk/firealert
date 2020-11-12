@@ -95,7 +95,7 @@ def get_agol_features_job():
     start_logging('get_agol_features.py')
 
     # extract params from config
-    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
+    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config()
     [data_root,temp_folder] = get_config("path", ["data_root", "temp_folder"])
     [username, password, service_url, request_url] = get_config("aari", ["username", "password", "service_url", "request_url"])
     [dst_tabs, attr_fields] = get_config("aari", ["dst_tabs", "attr_fields"])

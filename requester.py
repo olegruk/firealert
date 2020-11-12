@@ -7,7 +7,7 @@
 
 import os, time
 from falogging import log
-from faservice import get_config, get_db_config, get_cursor, close_conn
+from faservice import get_config, get_cursor, close_conn, write_to_kml
 
 #Создаем таблицу для выгрузки подписчикам
 def make_reqst_table(conn,cursor,src_tab,crit_or_peat,limit, from_time, period, reg_list, whom,is_incremental):
@@ -254,20 +254,6 @@ def make_reqst_for_circle(conn,cursor,src_tab,crit_or_peat,limit, from_time, per
     cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
     return cursor.fetchone()[0]
 
-
-# Сохраняем созданную таблицу в kml-файл для последующей отправки подписчикам
-def write_to_kml(dbserver,dbport,dbname,dbuser,dbpass,dst_file,whom):
-    subs_tab = 'for_%s' %str(whom)
-    log("Writting data from %(s)s table to kml-file: %(f)s..." %{'s':subs_tab, 'f':dst_file})
-    if os.path.isfile(dst_file):
-        os.remove(dst_file)
-        log('Owerwrite kml %s...'%(dst_file))
-    else:
-        log('Create new kml %s...'%(dst_file))
-    command = """ogr2ogr -f "KML" %(d)s PG:"host=%(h)s user=%(u)s dbname=%(b)s password=%(w)s port=%(p)s" %(s)s"""%{'d':dst_file,'s':subs_tab,'h':dbserver,'u':dbuser,'b':dbname,'w':dbpass,'p':dbport}
-    os.system(command)
-    log('Done.')
-
 #Удаляем временные таблицы
 def drop_whom_table(conn,cursor, whom):
     subs_tab = 'for_%s' %str(whom)
@@ -302,7 +288,6 @@ def request_data(whom, lim_for, limit, from_time, period, regions, result_dir):
     date = time.strftime('%Y-%m-%d',currtime)
 
     # extract params from config
-    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
     [year_tab] = get_config("tables", ["year_tab"])
 
     #connecting to database
@@ -311,7 +296,7 @@ def request_data(whom, lim_for, limit, from_time, period, regions, result_dir):
     num_points = make_reqst_table(conn,cursor,year_tab,lim_for,limit,from_time,period,regions,whom, False)
     dst_file_name = make_file_name(period, date, whom, result_dir,0)
     dst_file = os.path.join(result_dir,dst_file_name)
-    write_to_kml(dbserver,dbport,dbname,dbuser,dbpass,dst_file,whom)
+    write_to_kml(dst_file,whom)
     drop_whom_table(conn,cursor,whom)
 
     close_conn(conn, cursor)
@@ -324,7 +309,6 @@ def request_for_circle(whom, lim_for, limit, from_time, period, circle, result_d
     date = time.strftime('%Y-%m-%d',currtime)
 
     # extract params from config
-    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
     [year_tab] = get_config("tables", ["year_tab"])
 
     #connecting to database
@@ -333,7 +317,7 @@ def request_for_circle(whom, lim_for, limit, from_time, period, circle, result_d
     num_points = make_reqst_for_circle(conn,cursor,year_tab,lim_for,limit,from_time,period,circle,whom)
     dst_file_name = make_file_name(period, date, whom, result_dir,0)
     dst_file = os.path.join(result_dir,dst_file_name)
-    write_to_kml(dbserver,dbport,dbname,dbuser,dbpass,dst_file,whom)
+    write_to_kml(dst_file,whom)
     drop_whom_table(conn,cursor,whom)
 
     close_conn(conn, cursor)

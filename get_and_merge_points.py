@@ -66,8 +66,8 @@ def GetPoints(pointset, dst_folder, aDate):
 #Процедура для конструктора
 def getconn():
     # extract db params from config
-    [dbname,dbuser,dbpass] = get_db_config( "db", ["dbname", "dbuser", "dbpass"])
-    c = psycopg2.connect(dbname=dbname, user=dbuser, password=dbpass)
+    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config()
+    c = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
     return c
 
 #Запись csv в таблицы

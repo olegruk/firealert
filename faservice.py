@@ -14,8 +14,10 @@ import psycopg2
 #Получение параметров из узла "node" ini-файла "inifile"
 #Список имен параметров передается в "param_names"
 #Возвращаем список значений
-def get_db_config(node, param_names):
+def get_db_config():
     inifile = "firealert.ini"
+    node = "db"
+    param_names = ["dbserver","dbport","dbname", "dbuser", "dbpass"]
     base_path = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(base_path, inifile)
 
@@ -36,7 +38,7 @@ def get_db_config(node, param_names):
 #Список имен параметров передается в "param_names"
 #Возвращаем список значений
 def get_config(node, param_names):
-    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
+    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config()
     param_table = 'parameters'
     conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
     cursor = conn.cursor()
@@ -109,7 +111,7 @@ def index_all_region(conn,cursor,outlines):
 
     log("Creating indexes for %s..." %outlines)
 
-    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
+    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config()
 
     conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
     cursor = conn.cursor()
@@ -142,7 +144,7 @@ def send_doc_to_telegram(url, chat, file):
 # Сохраняем созданную таблицу в kml-файл для последующей отправки подписчикам
 def write_to_kml(dst_file,whom):
 
-    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
+    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config()
 
     subs_tab = 'for_s%s' %str(whom)
     log("Writting data from %(s)s table to kml-file: %(f)s..." %{'s':subs_tab, 'f':dst_file})
@@ -157,7 +159,7 @@ def write_to_kml(dst_file,whom):
 
 def get_cursor():
 
-    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
+    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config()
 
     conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
     cursor = conn.cursor()
