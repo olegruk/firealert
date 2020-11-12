@@ -12,7 +12,7 @@ from faservice import get_config, get_cursor, close_conn, write_to_kml
 #Создаем таблицу для выгрузки подписчикам
 def make_reqst_table(conn,cursor,src_tab,crit_or_peat,limit, from_time, period, reg_list, whom,is_incremental):
     log("Creating table for subs_id:%s..." %whom)
-    subs_tab = 'for_%s' %str(whom)
+    subs_tab = 'for_s%s' %str(whom)
     period = '%s hours' %period
 
     statements_regional_yesterday = (
@@ -163,7 +163,7 @@ def make_reqst_table(conn,cursor,src_tab,crit_or_peat,limit, from_time, period, 
 #Создаем таблицу для выгрузки подписчикам
 def make_reqst_for_circle(conn,cursor,src_tab,crit_or_peat,limit, from_time, period, circle, whom):
     log("Creating table of points in circle for subs_id:%s..." %whom)
-    subs_tab = 'for_%s' %str(whom)
+    subs_tab = 'for_s%s' %str(whom)
 #    period = '%s hours' %period
     cent_x = circle[0]
     cent_y = circle[1]
@@ -256,7 +256,7 @@ def make_reqst_for_circle(conn,cursor,src_tab,crit_or_peat,limit, from_time, per
 
 #Удаляем временные таблицы
 def drop_whom_table(conn,cursor, whom):
-    subs_tab = 'for_%s' %str(whom)
+    subs_tab = 'for_s%s' %str(whom)
     log("Dropping table %s" %subs_tab)
     try:
         cursor.execute("DROP TABLE IF EXISTS %s"%(subs_tab))

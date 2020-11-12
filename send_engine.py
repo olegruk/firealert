@@ -533,7 +533,7 @@ def send_to_subscribers_job():
     result_dir = get_path(data_root,temp_folder)
 
     for subs in subscribers:
-        if subs.subs_name == NULL:
+        if subs.subs_name == "Null":
             subs.subs_name = subs.subs_id
         log('Processing for %s...'%(subs.subs_name))
         if subs.email_times == None:
