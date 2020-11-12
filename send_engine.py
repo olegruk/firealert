@@ -16,6 +16,7 @@ from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate
 from falogging import log, start_logging, stop_logging
 from faservice import get_config, get_cursor, close_conn, get_path, write_to_kml
+from psycopg2.extras import NamedTupleCursor
 
 #Создаем таблицу для выгрузки подписчикам
 def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental):
@@ -501,6 +502,7 @@ def send_to_subscribers_job():
 
     #connecting to database
     conn, cursor = get_cursor()
+    cursor = conn.cursor(cursor_factory=NamedTupleCursor)
 
     #Загружаем данные о подписчиках
     #subs_id - serial - автоидентификатор
