@@ -5,9 +5,7 @@
 # Created:     15.10.2020
 #-------------------------------------------------------------------------------
 
-import os, sys
-from faconfig import get_config
-from faservice import get_cursor, close_conn
+from faservice import get_config, get_cursor, close_conn
 
 [subs_table] = get_config("tables", ['subs_tab'])
 [conf_list, conf_desc] = get_config('subs', ['conf_list', 'conf_desc'])

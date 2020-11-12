@@ -5,8 +5,7 @@
 # Created:     24.01.2020
 #-------------------------------------------------------------------------------
 
-import os, time, sys
-import posixpath
+import os, time
 import smtplib
 # Добавляем необходимые подклассы - MIME-типы
 import mimetypes                                            # Импорт класса для обработки неизвестных MIME-типов, базирующихся на расширении файла
@@ -18,8 +17,7 @@ from email.mime.image import MIMEImage                      # Изображен
 from email.mime.audio import MIMEAudio                      # Аудио
 from email.mime.multipart import MIMEMultipart              # Многокомпонентный объект
 from falogging import log, start_logging, stop_logging
-from faconfig import get_db_config, get_config
-from faservice import send_to_telegram
+from faservice import get_config, send_to_telegram
 
 def is_files_exist(filelist):
     [log_folder] = get_config("path", ["log_folder"])
