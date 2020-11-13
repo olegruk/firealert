@@ -5,16 +5,9 @@
 # Created:     13.05.2020
 #-------------------------------------------------------------------------------
 
-import os, time, sys
-import smtplib
-from email import encoders
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email.mime.multipart import MIMEMultipart
-from email.utils import formatdate
+import os, time
 from falogging import log, start_logging, stop_logging
-from faservice import get_config, get_cursor, close_conn, get_path, write_to_kml, write_to_yadisk
-from psycopg2.extras import NamedTupleCursor
+from faservice import get_config, get_tuple_cursor, close_conn, get_path, write_to_kml, write_to_yadisk, send_email_with_attachment
 
 #Создаем таблицу для выгрузки подписчикам
 def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental):
@@ -344,61 +337,6 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
     cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
     return cursor.fetchone()[0]
 
-#Send an email with an attachment
-def send_email_with_attachment(date, emails, path_to_attach, file_to_attach, num_points, period):
-    log("Sending e-mail to addresses: %s..." %emails)
-    # extract server and from_addr from config
-    [host,from_addr,user,pwd] = get_config("smtp", ["server", "from_addr", "user", "pwd"])
-
-    header = 'Content-Disposition', 'attachment; filename="%s"' % file_to_attach
-    if period == 24:
-        if num_points > 0:
-            subject = "Daily points per %(d)s (%(n)s points)"%{'d':date, 'n':num_points}
-        else:
-            subject = "Daily points per %s (no any points)"%(date)
-        body_text = "In the attachment firepoints for last day.\r\nEmail to dist_mon@firevolonter.ru if you find any errors or inaccuracies."
-    else:
-        if num_points > 0:
-            subject = "Points per last %(p)s (%(n)s points)"%{'p':period, 'n':num_points}
-        else:
-            subject = "Points per last %s (no any points)"%(period)
-        body_text = "In the attachment firepoints for last day.\r\nEmail to dist_mon@firevolonter.ru if you find any errors or inaccuracies."
-
-    # create the message
-    msg = MIMEMultipart()
-    msg["From"] = from_addr
-    msg["Subject"] = subject
-    msg["Date"] = formatdate(localtime=True)
-
-    if body_text:
-        msg.attach( MIMEText(body_text) )
-
-    msg["To"] = ', '.join(emails)
-
-    attachment = MIMEBase('application', "octet-stream")
-    file_with_path = os.path.join(path_to_attach,file_to_attach)
-    try:
-        with open(file_with_path, "rb") as fh:
-            data = fh.read()
-
-        attachment.set_payload( data )
-        encoders.encode_base64(attachment)
-        attachment.add_header(*header)
-        msg.attach(attachment)
-    except IOError:
-        msg = "Error opening attachment file %s" % file_with_path
-        log(msg)
-        sys.exit(1)
-
-    mailserver = smtplib.SMTP(host,587)
-    mailserver.ehlo()
-    mailserver.starttls()
-    mailserver.ehlo()
-    mailserver.login(user, pwd)
-    mailserver.sendmail(from_addr, emails, msg.as_string())
-    mailserver.quit()
-    log('Mail sended.')
-
 #Удаляем временные таблицы
 def drop_whom_table(conn,cursor, whom):
     subs_tab = 'for_s%s' %str(whom)
@@ -461,6 +399,22 @@ def drop_temp_files(result_dir):
         except Exception as e:
             log('Cannot remove files:$s' %e)
 
+def make_mail_attr(date, period, num_points):
+    if period == 24:
+        if num_points > 0:
+            subject = "Daily points per %(d)s (%(n)s points)"%{'d':date, 'n':num_points}
+        else:
+            subject = "Daily points per %s (no any points)"%(date)
+        body_text = "In the attachment firepoints for last day.\r\nEmail to dist_mon@firevolonter.ru if you find any errors or inaccuracies."
+    else:
+        if num_points > 0:
+            subject = "Points per last %(p)s (%(n)s points)"%{'p':period, 'n':num_points}
+        else:
+            subject = "Points per last %s (no any points)"%(period)
+        body_text = "In the attachment firepoints for last day.\r\nEmail to dist_mon@firevolonter.ru if you find any errors or inaccuracies."
+    return subject, body_text
+
+
 def send_to_subscribers_job():
 
     start_logging('send_engine.py')
@@ -475,8 +429,7 @@ def send_to_subscribers_job():
     [to_dir] = get_config("yadisk", ["yadisk_out_path"])
 
     #connecting to database
-    conn, cursor = get_cursor()
-    cursor = conn.cursor(cursor_factory=NamedTupleCursor)
+    conn, cursor = get_tuple_cursor()
 
     #Загружаем данные о подписчиках
     #subs_id - serial - автоидентификатор
@@ -509,8 +462,8 @@ def send_to_subscribers_job():
     result_dir = get_path(data_root,temp_folder)
 
     for subs in subscribers:
-        if subs.subs_name == "Null":
-            subs.subs_name = subs.subs_id
+        if subs.subs_name == 'Null':
+            subs.subs_name = 'S-' + str(subs.subs_id)
         log('Processing for %s...'%(subs.subs_name))
         if subs.email_times == None:
             emailtimelist = fill_send_times(conn,cursor,subs_tab,'email_times',subs.subs_id,subs.email_first_time, subs.email_period).split(',')
@@ -541,8 +494,8 @@ def send_to_subscribers_job():
             maillist = subs.email.replace(' ','').split(',')
             log('Creating kml file...')
             write_to_kml(dst_file,subs.subs_id)
-            log('Sending e-mail...')
-            send_email_with_attachment(date, maillist, result_dir, dst_file_name, num_points, subs.point_period)
+            subject, body_text = make_mail_attr(date, subs.point_period, num_points)
+            send_email_with_attachment(maillist, subject, body_text, [dst_file])
             if now_hour == emailtimelist[0]:
                 log('Writing to yadisk...')
                 subs_folder = 'for_s%s' %str(subs.subs_name)
