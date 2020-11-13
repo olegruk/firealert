@@ -5,20 +5,10 @@
 # Created:     06.02.2020
 #-------------------------------------------------------------------------------
 
-
-import os, time, sys
+import time
 import requests
-import psycopg2
-from faconfig import get_config, get_db_config
 from falogging import start_logging, stop_logging, log
-from faservice import get_path
-
-def send_to_telegram(url, chat, text):
-    params = {'chat_id': chat, 'text': text}
-    response = requests.post(url + 'sendMessage', data=params)
-    if response.status_code != 200:
-        raise Exception("post_text error: %s" %response.status_code)
-    return response
+from faservice import get_config, get_cursor, close_conn, send_to_telegram
 
 def smf_login(session, smf_url, smf_user, smf_pass):
     # login method
@@ -172,7 +162,6 @@ def check_stat_job():
     fdate=time.strftime('%d-%m-%Y',currtime)
 
     # extract params from config
-    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
     [year_tab] = get_config("tables", ["year_tab"])
     [url, chat_id] = get_config("telegramm", ["url", "wrk_chat_id"])
     [period, critical_limit] = get_config("statistic", ["period", "critical_limit"])
@@ -182,8 +171,7 @@ def check_stat_job():
     #reg_list_cr = ['Ярославская область','Тверская область','Смоленская область','Рязанская область','Московская область','Москва','Калужская область','Ивановская область','Владимирская область','Брянская область','Тульская область']
     #reg_list = "('Ярославская область','Тверская область','Смоленская область','Рязанская область','Московская область','Москва','Калужская область','Ивановская область','Владимирская область','Брянская область')"
 
-    conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
-    cursor = conn.cursor()
+    conn, cursor = get_cursor()
 
     #check_peats_stat(conn, cursor, year_tab, alert_tab, reg_list, peat_stat_period, peat_stat_critical, date)
     new_alerts(conn, cursor, clust_view, alert_tab, peat_stat_period, date)
@@ -211,8 +199,7 @@ def check_stat_job():
     send_to_telegram(url, chat_id, msg)
     new_topic(smf_url, smf_user, smf_pass, 13.0, fdate, smf_msg)
 
-    cursor.close
-    conn.close
+    close_conn(conn, cursor)
 
     stop_logging('check_stat.py')
 

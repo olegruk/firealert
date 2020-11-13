@@ -5,14 +5,11 @@
 # Created:     30.10.2020
 #-------------------------------------------------------------------------------
 
-import psycopg2
-from psycopg2.extras import DictCursor, RealDictCursor, NamedTupleCursor
-import os, time, json, contextlib
+import os, json, contextlib
 from urllib.request import urlopen
 from urllib.parse import urlencode
-from faconfig import get_config, get_db_config
 from falogging import log, start_logging, stop_logging
-from faservice import get_path
+from faservice import get_path, get_db_config, get_config, get_cursor, close_conn
 
 #dst_tabs = ['oopt_reg_points', 'oopt_reg_polygons', 'oopt_reg_clusters', 'oopt_reg_zones']
 #attr_fields = ["gid,id,status,category,adm_rf,name,actuality,cluster,location,designatio,year,source,scale",
@@ -98,15 +95,14 @@ def get_agol_features_job():
     start_logging('get_agol_features.py')
 
     # extract params from config
-    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
+    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config()
     [data_root,temp_folder] = get_config("path", ["data_root", "temp_folder"])
     [username, password, service_url, request_url] = get_config("aari", ["username", "password", "service_url", "request_url"])
     [dst_tabs, attr_fields] = get_config("aari", ["dst_tabs", "attr_fields"])
 
-   #connecting to database
-    conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
-    cursor = conn.cursor(cursor_factory=NamedTupleCursor)
-
+    #connecting to database
+    conn, cursor = get_cursor()
+    
     #Создаем каталог для записи временных файлов
     result_dir = get_path(data_root,temp_folder)
     dst_file = os.path.join(result_dir,'temp.json')
@@ -135,8 +131,7 @@ def get_agol_features_job():
         cursor.execute("GRANT SELECT ON %(t)s TO %(u)s"%{'t':dst_tabs[id],'u':'db_reader'})
  
 
-    cursor.close
-    conn.close
+    close_conn(conn, cursor)
 
     stop_logging('get_agol_features.py')
 

@@ -6,35 +6,19 @@
 #-------------------------------------------------------------------------------
 
 import os, time, sys
-import psycopg2
-from psycopg2.extras import DictCursor, RealDictCursor, NamedTupleCursor
-from osgeo import ogr
-import yadisk
-import posixpath
 import smtplib
 from email import encoders
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate
-import falogging, faconfig
-
-def get_path(root_path,folder):
-    falogging.log("Creating folder %s..." %folder)
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    result_path = os.path.join(base_path, root_path)
-    result_path = os.path.join(result_path, folder)
-    if not os.path.exists(result_path):
-        try:
-            os.mkdir(result_path)
-            falogging.log("Created %s" %result_path)
-        except OSError:
-            falogging.log("Unable to create %s" %result_path)
-    return result_path
+from falogging import log, start_logging, stop_logging
+from faservice import get_config, get_cursor, close_conn, get_path, write_to_kml, write_to_yadisk
+from psycopg2.extras import NamedTupleCursor
 
 #Создаем таблицу для выгрузки подписчикам
 def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental):
-    falogging.log("Creating table for subs_id:%s..." %whom)
+    log("Creating table for subs_id:%s..." %whom)
     subs_tab = 'for_s%s' %str(whom)
     marker = '[s%s]' %str(whom)
     period = '%s hours' %period
@@ -354,54 +338,17 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        falogging.log('The table created: subs_id:%s'%(whom))
+        log('The table created: subs_id:%s'%(whom))
     except IOError as e:
-        falogging.log('Error creating subscribers tables: $s'%e)
+        log('Error creating subscribers tables: $s'%e)
     cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
     return cursor.fetchone()[0]
 
-# Сохраняем созданную таблицу в kml-файл для последующей отправки подписчикам
-def write_to_kml(dbserver,dbport,dbname,dbuser,dbpass,dst_file,whom):
-    subs_tab = 'for_s%s' %str(whom)
-    falogging.log("Writting data from %(s)s table to kml-file: %(f)s..." %{'s':subs_tab, 'f':dst_file})
-    if os.path.isfile(dst_file):
-        os.remove(dst_file)
-        falogging.log('Owerwrite kml %s...'%(dst_file))
-    else:
-        falogging.log('Create new kml %s...'%(dst_file))
-    command = """ogr2ogr -f "KML" %(d)s PG:"host=%(h)s user=%(u)s dbname=%(b)s password=%(w)s port=%(p)s" %(s)s"""%{'d':dst_file,'s':subs_tab,'h':dbserver,'u':dbuser,'b':dbname,'w':dbpass,'p':dbport}
-    os.system(command)
-    falogging.log('Done.')
-
-#Запись файла "file" из каталога "from_dir" на я-диск в каталог "to_dir" в подкаталог для "whom"
-def write_to_yadisk(file, from_dir, to_dir, yadisk_token, whom):
-    subs_folder = 'for_s%s' %str(whom)
-    falogging.log("Writing file %s to Yandex disk..." %file)
-    y = yadisk.YaDisk(token=yadisk_token)
-    to_dir = to_dir + subs_folder
-    p = from_dir.split(from_dir)[1].strip(os.path.sep)
-    dir_path = posixpath.join(to_dir, p)
-    if not y.exists(dir_path):
-        try:
-            y.mkdir(dir_path)
-            falogging.log('Path created on yadisk %s.'%(dir_path))
-        except yadisk.exceptions.PathExistsError:
-            falogging.log('Path cannot be created %s.'%(dir_path))
-    file_path = posixpath.join(dir_path, file)
-    p_sys = p.replace("/", os.path.sep)
-    in_path = os.path.join(from_dir, p_sys, file)
-    try:
-        y.upload(in_path, file_path, overwrite = True)
-        falogging.log('File written to yadisk %s.'%(file_path))
-    except yadisk.exceptions.PathExistsError:
-        falogging.log('Path not exist %s.'%(dir_path))
-        pass
-
 #Send an email with an attachment
 def send_email_with_attachment(date, emails, path_to_attach, file_to_attach, num_points, period):
-    falogging.log("Sending e-mail to addresses: %s..." %emails)
+    log("Sending e-mail to addresses: %s..." %emails)
     # extract server and from_addr from config
-    [host,from_addr,user,pwd] = faconfig.get_config("smtp", ["server", "from_addr", "user", "pwd"])
+    [host,from_addr,user,pwd] = get_config("smtp", ["server", "from_addr", "user", "pwd"])
 
     header = 'Content-Disposition', 'attachment; filename="%s"' % file_to_attach
     if period == 24:
@@ -440,7 +387,7 @@ def send_email_with_attachment(date, emails, path_to_attach, file_to_attach, num
         msg.attach(attachment)
     except IOError:
         msg = "Error opening attachment file %s" % file_with_path
-        falogging.log(msg)
+        log(msg)
         sys.exit(1)
 
     mailserver = smtplib.SMTP(host,587)
@@ -450,22 +397,22 @@ def send_email_with_attachment(date, emails, path_to_attach, file_to_attach, num
     mailserver.login(user, pwd)
     mailserver.sendmail(from_addr, emails, msg.as_string())
     mailserver.quit()
-    falogging.log('Mail sended.')
+    log('Mail sended.')
 
 #Удаляем временные таблицы
 def drop_whom_table(conn,cursor, whom):
     subs_tab = 'for_s%s' %str(whom)
-    falogging.log("Dropping table %s" %subs_tab)
+    log("Dropping table %s" %subs_tab)
     try:
         cursor.execute("DROP TABLE IF EXISTS %s"%(subs_tab))
         conn.commit()
-        falogging.log("Table dropped.")
+        log("Table dropped.")
     except IOError as e:
-        falogging.log('Error dropping table:$s' %e)
+        log('Error dropping table:$s' %e)
 
 # Заполняем в таблице подписчиков поле с временами рассылки, если не было заполнено
 def fill_send_times(conn,cursor,subs_tab,time_field,subs_id,zero_time, period):
-    falogging.log('Creating send times for %s.'%(subs_id))
+    log('Creating send times for %s.'%(subs_id))
     if (zero_time != None) and (period != None):
         zero_hour = int(zero_time.split(":")[0])
         send_hours = ''
@@ -512,24 +459,23 @@ def drop_temp_files(result_dir):
                 os.remove(file_path)
             #elif os.path.isdir(file_path): shutil.rmtree(file_path)
         except Exception as e:
-            falogging.log('Cannot remove files:$s' %e)
+            log('Cannot remove files:$s' %e)
 
 def send_to_subscribers_job():
 
-    falogging.start_logging('send_engine.py')
+    start_logging('send_engine.py')
 
     currtime = time.localtime()
     date = time.strftime('%Y-%m-%d',currtime)
     now_hour = time.strftime('%H',currtime)
 
     # extract params from config
-    [dbserver,dbport,dbname,dbuser,dbpass] = faconfig.get_db_config("db", ["dbserver","dbport","dbname", "dbuser", "dbpass"])
-    [year_tab, subs_tab] = faconfig.get_config("tables", ["year_tab","subs_tab"])
-    [data_root,temp_folder] = faconfig.get_config("path", ["data_root", "temp_folder"])
-    [to_dir,yadisk_token] = faconfig.get_config("yadisk", ["yadisk_out_path", "yadisk_token"])
+    [year_tab, subs_tab] = get_config("tables", ["year_tab","subs_tab"])
+    [data_root,temp_folder] = get_config("path", ["data_root", "temp_folder"])
+    [to_dir] = get_config("yadisk", ["yadisk_out_path"])
 
     #connecting to database
-    conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
+    conn, cursor = get_cursor()
     cursor = conn.cursor(cursor_factory=NamedTupleCursor)
 
     #Загружаем данные о подписчиках
@@ -563,7 +509,9 @@ def send_to_subscribers_job():
     result_dir = get_path(data_root,temp_folder)
 
     for subs in subscribers:
-        falogging.log('Processing for %s...'%(subs.subs_name))
+        if subs.subs_name == "Null":
+            subs.subs_name = subs.subs_id
+        log('Processing for %s...'%(subs.subs_name))
         if subs.email_times == None:
             emailtimelist = fill_send_times(conn,cursor,subs_tab,'email_times',subs.subs_id,subs.email_first_time, subs.email_period).split(',')
         else:
@@ -574,42 +522,41 @@ def send_to_subscribers_job():
             telegtimelist = subs.teleg_times.split(',')
 
         if now_hour in emailtimelist and subs.email_point:
-            falogging.log('Sending mail now!')
+            log('Sending mail now!')
             is_increment = not(now_hour == emailtimelist[0])
             if subs.crit_or_fire == 'crit':
-                falogging.log('Making critical-limited table...')
+                log('Making critical-limited table...')
                 num_points = make_subs_table(conn,cursor,year_tab,'critical',subs.critical,subs.point_period,subs.regions,subs.subs_id,is_increment)
             elif subs.crit_or_fire == 'fire':
-                falogging.log('Making fire-limited table...')
+                log('Making fire-limited table...')
                 num_points = make_subs_table(conn,cursor,year_tab,'peat_fire',subs.peatfire,subs.point_period,subs.regions,subs.subs_id,is_increment)
             else:
-                falogging.log('Making zero-critical table...')
+                log('Making zero-critical table...')
                 num_points = make_subs_table(conn,cursor,year_tab,'critical',0,subs.point_period,subs.regions,subs.subs_id,is_increment)
 
             dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,0)
             dst_file = os.path.join(result_dir,dst_file_name)
 
-            falogging.log('Creating maillist...')
+            log('Creating maillist...')
             maillist = subs.email.replace(' ','').split(',')
-            falogging.log('Creating kml file...')
-            write_to_kml(dbserver,dbport,dbname,dbuser,dbpass,dst_file,subs.subs_id)
-            falogging.log('Sending e-mail...')
+            log('Creating kml file...')
+            write_to_kml(dst_file,subs.subs_id)
+            log('Sending e-mail...')
             send_email_with_attachment(date, maillist, result_dir, dst_file_name, num_points, subs.point_period)
             if now_hour == emailtimelist[0]:
-                falogging.log('Writing to yadisk...')
-                write_to_yadisk(dst_file_name, result_dir, to_dir, yadisk_token, subs.subs_name)
+                log('Writing to yadisk...')
+                subs_folder = 'for_s%s' %str(subs.subs_name)
+                write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
             if now_hour == emailtimelist[-1]:
-                falogging.log('Dropping temp files...')
+                log('Dropping temp files...')
                 drop_temp_files(result_dir)
-            falogging.log('Dropping tables...')
+            log('Dropping tables...')
             drop_whom_table(conn,cursor,subs.subs_id)
         else:
-            falogging.log('Sending mail? It`s not time yet!')
+            log('Sending mail? It`s not time yet!')
 
-    cursor.close
-    conn.close
-
-    falogging.stop_logging('send_engine.py')
+    close_conn(conn, cursor)
+    stop_logging('send_engine.py')
 
 #main
 if __name__ == "__main__":

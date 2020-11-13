@@ -1,18 +1,19 @@
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-import logging, subsconf, requester
-import falogging, faconfig
-import os, time, sys, re
-import requests
+import subsconf, requester
+import os, time, re
+#import logging
 
-url = "https://api.telegram.org/bot990586097:AAHfAk360-IEPcgc7hitDSyD7pu9rzt5tbE/"
-TOKEN = '990586097:AAHfAk360-IEPcgc7hitDSyD7pu9rzt5tbE'
-user_id = "580325825" #"Это я
+from faservice import get_config, get_path, send_doc_to_telegram
+from falogging import log
+
+[url, TOKEN] = get_config('telegramm', ['url', 'token'])
+#user_id = "580325825" #"Это я
 
 # Enable logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
-
-logger = logging.getLogger(__name__)
+#logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+#                    level=logging.INFO)
+#
+#logger = logging.getLogger(__name__)
 
 command_list = ['',
                 '',
@@ -98,19 +99,6 @@ def parse_data_req(req):
 
     return req_params
 
-def get_path(root_path,folder):
-    falogging.log("Creating folder %s..." %folder)
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    result_path = os.path.join(base_path, root_path)
-    result_path = os.path.join(result_path, folder)
-    if not os.path.exists(result_path):
-        try:
-            os.mkdir(result_path)
-            falogging.log("Created %s" %result_path)
-        except OSError:
-            falogging.log("Unable to create %s" %result_path)
-    return result_path
-
 def drop_temp_files(result_dir):
     for the_file in os.listdir(result_dir):
         file_path = os.path.join(result_dir, the_file)
@@ -119,15 +107,7 @@ def drop_temp_files(result_dir):
                 os.remove(file_path)
             #elif os.path.isdir(file_path): shutil.rmtree(file_path)
         except Exception as e:
-            falogging.log('Cannot remove files:$s' %e)
-
-def send_doc_to_telegram(url, chat, file):
-    post_data = {'chat_id': chat}
-    post_file = {'document': file}
-    response = requests.post(url + 'sendDocument', data=post_data, files = post_file)
-    if response.status_code != 200:
-        raise Exception("post_text error: %s" %response)
-    return response
+            log('Cannot remove files:$s' %e)
 
 def start(bot, update):
     """Send a message when the command /start is issued."""
@@ -233,7 +213,7 @@ def show_conf(bot, update):
         update.message.reply_text(paramstr)
 
 def get_data(bot, update):
-    [data_root,temp_folder] = faconfig.get_config("path", ["data_root", "temp_folder"])
+    [data_root,temp_folder] = get_config("path", ["data_root", "temp_folder"])
     #Создаем каталог для записи временных файлов
     result_dir = get_path(data_root,temp_folder)
 
@@ -249,7 +229,7 @@ def get_data(bot, update):
     update.message.reply_text('В файле %s точек.' %nump)
 
 def get_around(bot, update):
-    [data_root,temp_folder] = faconfig.get_config("path", ["data_root", "temp_folder"])
+    [data_root,temp_folder] = get_config("path", ["data_root", "temp_folder"])
     #Создаем каталог для записи временных файлов
     result_dir = get_path(data_root,temp_folder)
 
