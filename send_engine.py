@@ -6,8 +6,6 @@
 #-------------------------------------------------------------------------------
 
 import os, time, sys
-import yadisk
-import posixpath
 import smtplib
 from email import encoders
 from email.mime.text import MIMEText
@@ -15,7 +13,7 @@ from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate
 from falogging import log, start_logging, stop_logging
-from faservice import get_config, get_cursor, close_conn, get_path, write_to_kml
+from faservice import get_config, get_cursor, close_conn, get_path, write_to_kml, write_to_yadisk
 from psycopg2.extras import NamedTupleCursor
 
 #Создаем таблицу для выгрузки подписчикам
@@ -346,30 +344,6 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
     cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
     return cursor.fetchone()[0]
 
-#Запись файла "file" из каталога "from_dir" на я-диск в каталог "to_dir" в подкаталог для "whom"
-def write_to_yadisk(file, from_dir, to_dir, yadisk_token, whom):
-    subs_folder = 'for_s%s' %str(whom)
-    log("Writing file %s to Yandex disk..." %file)
-    y = yadisk.YaDisk(token=yadisk_token)
-    to_dir = to_dir + subs_folder
-    p = from_dir.split(from_dir)[1].strip(os.path.sep)
-    dir_path = posixpath.join(to_dir, p)
-    if not y.exists(dir_path):
-        try:
-            y.mkdir(dir_path)
-            log('Path created on yadisk %s.'%(dir_path))
-        except yadisk.exceptions.PathExistsError:
-            log('Path cannot be created %s.'%(dir_path))
-    file_path = posixpath.join(dir_path, file)
-    p_sys = p.replace("/", os.path.sep)
-    in_path = os.path.join(from_dir, p_sys, file)
-    try:
-        y.upload(in_path, file_path, overwrite = True)
-        log('File written to yadisk %s.'%(file_path))
-    except yadisk.exceptions.PathExistsError:
-        log('Path not exist %s.'%(dir_path))
-        pass
-
 #Send an email with an attachment
 def send_email_with_attachment(date, emails, path_to_attach, file_to_attach, num_points, period):
     log("Sending e-mail to addresses: %s..." %emails)
@@ -498,7 +472,7 @@ def send_to_subscribers_job():
     # extract params from config
     [year_tab, subs_tab] = get_config("tables", ["year_tab","subs_tab"])
     [data_root,temp_folder] = get_config("path", ["data_root", "temp_folder"])
-    [to_dir,yadisk_token] = get_config("yadisk", ["yadisk_out_path", "yadisk_token"])
+    [to_dir] = get_config("yadisk", ["yadisk_out_path"])
 
     #connecting to database
     conn, cursor = get_cursor()
@@ -571,7 +545,8 @@ def send_to_subscribers_job():
             send_email_with_attachment(date, maillist, result_dir, dst_file_name, num_points, subs.point_period)
             if now_hour == emailtimelist[0]:
                 log('Writing to yadisk...')
-                write_to_yadisk(dst_file_name, result_dir, to_dir, yadisk_token, subs.subs_name)
+                subs_folder = 'for_s%s' %str(subs.subs_name)
+                write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
             if now_hour == emailtimelist[-1]:
                 log('Dropping temp files...')
                 drop_temp_files(result_dir)

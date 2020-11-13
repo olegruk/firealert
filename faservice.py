@@ -7,9 +7,11 @@
 
 from configparser import ConfigParser
 from falogging import log
-import os, sys, re
+import os, sys, re, posixpath
 import requests
 import psycopg2
+import yadisk
+
 
 #Получение параметров из узла "node" ini-файла "inifile"
 #Список имен параметров передается в "param_names"
@@ -156,6 +158,30 @@ def write_to_kml(dst_file,whom):
     command = """ogr2ogr -f "KML" %(d)s PG:"host=%(h)s user=%(u)s dbname=%(b)s password=%(w)s port=%(p)s" %(s)s"""%{'d':dst_file,'s':subs_tab,'h':dbserver,'u':dbuser,'b':dbname,'w':dbpass,'p':dbport}
     os.system(command)
     log('Done.')
+
+#Запись файла "file" из каталога "from_dir" на я-диск в каталог "to_dir" подкаталог "subscriber"
+def write_to_yadisk(file, from_dir, to_dir, whom):
+    log("Writing file %s to Yandex disk..." %file)
+    [yadisk_token] = get_config("yadisk", ["yadisk_token"])
+    y = yadisk.YaDisk(token=yadisk_token)
+    to_dir = to_dir + whom
+    p = from_dir.split(from_dir)[1].strip(os.path.sep)
+    dir_path = posixpath.join(to_dir, p)
+    if not y.exists(dir_path):
+        try:
+            y.mkdir(dir_path)
+            log('Path created on yadisk %s.'%(dir_path))
+        except yadisk.exceptions.PathExistsError:
+            log('Path cannot be created %s.'%(dir_path))
+    file_path = posixpath.join(dir_path, file)
+    p_sys = p.replace("/", os.path.sep)
+    in_path = os.path.join(from_dir, p_sys, file)
+    try:
+        y.upload(in_path, file_path, overwrite = True)
+        log('Written to yadisk %s'%(file_path))
+    except yadisk.exceptions.PathExistsError:
+        log('Path not exist %s.'%(dir_path))
+        pass
 
 def get_cursor():
 
