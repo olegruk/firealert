@@ -10,7 +10,18 @@ from falogging import log
 import os, sys, re, posixpath
 import requests
 import psycopg2
+from psycopg2.extras import NamedTupleCursor
 import yadisk
+import smtplib
+# Добавляем необходимые подклассы - MIME-типы
+import mimetypes                                            # Импорт класса для обработки неизвестных MIME-типов, базирующихся на расширении файла
+from email import encoders                                  # Импортируем энкодер
+from email.utils import formatdate
+from email.mime.base import MIMEBase                        # Общий тип
+from email.mime.text import MIMEText                        # Текст/HTML
+from email.mime.image import MIMEImage                      # Изображения
+from email.mime.audio import MIMEAudio                      # Аудио
+from email.mime.multipart import MIMEMultipart              # Многокомпонентный объект
 
 
 #Получение параметров из узла "node" ini-файла "inifile"
@@ -110,9 +121,7 @@ def str_to_lst(param_str):
 
 #Создание геоиндексов для таблиц из списка outlines
 def index_all_region(conn,cursor,outlines):
-
     log("Creating indexes for %s..." %outlines)
-
     [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config()
 
     conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
@@ -125,6 +134,23 @@ def index_all_region(conn,cursor,outlines):
         except IOError as e:
             log('Error indexing geometry $s' % e)
 
+    cursor.close
+    conn.close
+
+def get_cursor():
+    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config()
+    conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
+    cursor = conn.cursor()
+    return conn, cursor
+
+def get_tuple_cursor():
+    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config()
+    conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
+    cursor = conn.cursor(cursor_factory=NamedTupleCursor)
+    return conn, cursor
+
+def close_conn(conn, cursor):
+    conn.commit()
     cursor.close
     conn.close
 
@@ -183,15 +209,72 @@ def write_to_yadisk(file, from_dir, to_dir, whom):
         log('Path not exist %s.'%(dir_path))
         pass
 
-def get_cursor():
+def attach_file(msg, filepath):                                 # Функция по добавлению конкретного файла к сообщению
+    try:
+        filename = os.path.basename(filepath)                   # Получаем только имя файла
+        ctype, encoding = mimetypes.guess_type(filepath)        # Определяем тип файла на основе его расширения
+        if ctype is None or encoding is not None:               # Если тип файла не определяется
+            ctype = 'application/octet-stream'                  # Будем использовать общий тип
+        maintype, subtype = ctype.split('/', 1)                 # Получаем тип и подтип
+        if maintype == 'text':                                  # Если текстовый файл
+            with open(filepath) as fp:                          # Открываем файл для чтения
+                file = MIMEText(fp.read(), _subtype=subtype)    # Используем тип MIMEText
+                fp.close()                                      # После использования файл обязательно нужно закрыть
+        elif maintype == 'image':                               # Если изображение
+            with open(filepath, 'rb') as fp:
+                file = MIMEImage(fp.read(), _subtype=subtype)
+                fp.close()
+        elif maintype == 'audio':                               # Если аудио
+            with open(filepath, 'rb') as fp:
+                file = MIMEAudio(fp.read(), _subtype=subtype)
+                fp.close()
+        else:                                                   # Неизвестный тип файла
+            with open(filepath, 'rb') as fp:
+                file = MIMEBase(maintype, subtype)              # Используем общий MIME-тип
+                file.set_payload(fp.read())                     # Добавляем содержимое общего типа (полезную нагрузку)
+                fp.close()
+                encoders.encode_base64(file)                    # Содержимое должно кодироваться как Base64
+        file.add_header('Content-Disposition', 'attachment', filename=filename) # Добавляем заголовки
+        msg.attach(file)                                        # Присоединяем файл к сообщению
+    except IOError:
+        msg = "Error opening attachment file %s" % filepath
+        log(msg)
+        sys.exit(1)
 
-    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config()
+def process_attachement(msg, files):                        # Функция по обработке списка, добавляемых к сообщению файлов
+    for f in files:
+        if os.path.isfile(f):                               # Если файл существует
+            attach_file(msg,f)                              # Добавляем файл к сообщению
+        elif os.path.exists(f):                             # Если путь не файл и существует, значит - папка
+            dir = os.listdir(f)                             # Получаем список файлов в папке
+            for file in dir:                                # Перебираем все файлы и...
+                attach_file(msg,f+"/"+file)                 # ...добавляем каждый файл к сообщению
 
-    conn = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
-    cursor = conn.cursor()
-    return conn, cursor
+#Send an email with an attachment
+def send_email_with_attachment(maillist, subject, body_text, filelist):
+    log("Sending e-mail to addresses: %s..." %maillist)
 
-def close_conn(conn, cursor):
-    conn.commit()
-    cursor.close
-    conn.close
+    # extract server and from_addr from config
+    [host,from_addr,user,pwd] = get_config("smtp", ["server", "from_addr", "user", "pwd"])
+
+    # create the message
+    msg = MIMEMultipart()
+    msg["From"] = from_addr
+    msg["Subject"] = subject
+    msg["Date"] = formatdate(localtime=True)
+
+    if body_text:
+        msg.attach( MIMEText(body_text) )
+
+    msg["To"] = ', '.join(maillist)
+
+    process_attachement(msg, filelist)
+
+    mailserver = smtplib.SMTP(host,587)
+    mailserver.ehlo()
+    mailserver.starttls()
+    mailserver.ehlo()
+    mailserver.login(user, pwd)
+    mailserver.sendmail(from_addr, maillist, msg.as_string())
+    mailserver.quit()
+    log('Mail sended.')
