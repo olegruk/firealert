@@ -462,8 +462,8 @@ def send_to_subscribers_job():
     result_dir = get_path(data_root,temp_folder)
 
     for subs in subscribers:
-        if subs.subs_name == "Null":
-            subs.subs_name = subs.subs_id
+        if subs.subs_name == 'Null':
+            subs.subs_name = 'S-' + str(subs.subs_id)
         log('Processing for %s...'%(subs.subs_name))
         if subs.email_times == None:
             emailtimelist = fill_send_times(conn,cursor,subs_tab,'email_times',subs.subs_id,subs.email_first_time, subs.email_period).split(',')
