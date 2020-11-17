@@ -462,8 +462,8 @@ def send_to_subscribers_job():
     result_dir = get_path(data_root,temp_folder)
 
     for subs in subscribers:
-        if subs.subs_name == 'Null':
-            subs.subs_name = 'S-' + str(subs.subs_id)
+        if subs.subs_name == None:
+            subs.subs_name = 's-' + str(subs.subs_id)
         log('Processing for %s...'%(subs.subs_name))
         if subs.email_times == None:
             emailtimelist = fill_send_times(conn,cursor,subs_tab,'email_times',subs.subs_id,subs.email_first_time, subs.email_period).split(',')
@@ -486,16 +486,18 @@ def send_to_subscribers_job():
             else:
                 log('Making zero-critical table...')
                 num_points = make_subs_table(conn,cursor,year_tab,'critical',0,subs.point_period,subs.regions,subs.subs_id,is_increment)
+            if num_points > 0 or subs.send_empty:
+                dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,0)
+                dst_file = os.path.join(result_dir,dst_file_name)
 
-            dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,0)
-            dst_file = os.path.join(result_dir,dst_file_name)
-
-            log('Creating maillist...')
-            maillist = subs.email.replace(' ','').split(',')
-            log('Creating kml file...')
-            write_to_kml(dst_file,subs.subs_id)
-            subject, body_text = make_mail_attr(date, subs.point_period, num_points)
-            send_email_with_attachment(maillist, subject, body_text, [dst_file])
+                log('Creating maillist...')
+                maillist = subs.email.replace(' ','').split(',')
+                log('Creating kml file...')
+                write_to_kml(dst_file,subs.subs_id)
+                subject, body_text = make_mail_attr(date, subs.point_period, num_points)
+                send_email_with_attachment(maillist, subject, body_text, [dst_file])
+            else:
+                log('Don`t send zero-point file.')
             if now_hour == emailtimelist[0]:
                 log('Writing to yadisk...')
                 subs_folder = 'for_s%s' %str(subs.subs_name)
