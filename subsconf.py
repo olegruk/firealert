@@ -110,8 +110,10 @@ def list_reglist():
     cursor.execute("SELECT DISTINCT ON (region) region FROM reg_russia")
     reglist = cursor.fetchall()
     close_conn(conn, cursor)
-    return reglist
-
+    msg = ''
+    for elem in reglist:
+        msg = msg + str(elem) + '\n'
+    return msg
 
 def show_conf(telegram_id):
     conn, cursor = get_cursor()
