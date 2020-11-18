@@ -205,6 +205,10 @@ def show_regions(bot, update):
     reglist = subsconf.show_reglist(telegram_id)
     update.message.reply_text('Список регионов:\n%s' %reglist)
 
+def list_regions(bot, update):
+    reglist = subsconf.list_reglist()
+    update.message.reply_text('Список возможных регионов:\n%s' %reglist)
+
 def show_conf(bot, update):
     telegram_id = update.message.from_user.id
     conf = subsconf.show_conf(telegram_id)
@@ -276,6 +280,8 @@ def help(bot, update):
                               'убрать регион из списка регионов; \n'
                               '/show_regions - \n'
                               'показать список регионов; \n'
+                              '/list_regions - \n'
+                              'посмотреть, какие регионы бывают;'
                               '/show_conf - \n'
                               'показать параметры моей рассылки; \n'
                               '/get_data - \n'
@@ -342,6 +348,7 @@ def main():
     disp.add_handler(CommandHandler("add_region", add_region))
     disp.add_handler(CommandHandler("del_region", del_region))
     disp.add_handler(CommandHandler("show_regions", show_regions))
+    disp.add_handler(CommandHandler("list_regions", list_regions))
     disp.add_handler(CommandHandler("show_conf", show_conf))
     disp.add_handler(CommandHandler("get_data", get_data))
     disp.add_handler(CommandHandler("help_get_data", help_get_data))
