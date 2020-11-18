@@ -414,6 +414,12 @@ def make_mail_attr(date, period, num_points):
         body_text = "In the attachment firepoints for last day.\r\nEmail to dist_mon@firevolonter.ru if you find any errors or inaccuracies."
     return subject, body_text
 
+def set_name(conn, cursor, subs_tab, subs_id):
+    log('Setting name for ID %s'%subs_id)
+    new_name = 's-' + str(subs_id)
+    cursor.execute("UPDATE %(s)s SET subs_name = '%(n)s' WHERE subs_id = %(i)s"%{'s':subs_tab,'n':new_name,'i':subs_id})
+    conn.commit()
+    log('Setting name done.')
 
 def send_to_subscribers_job():
 
@@ -463,7 +469,7 @@ def send_to_subscribers_job():
 
     for subs in subscribers:
         if subs.subs_name == None:
-            subs.subs_name = 's-' + str(subs.subs_id)
+            set_name(conn, cursor, subs_tab, subs.subs_id)
         log('Processing for %s...'%(subs.subs_name))
         if subs.email_times == None:
             emailtimelist = fill_send_times(conn,cursor,subs_tab,'email_times',subs.subs_id,subs.email_first_time, subs.email_period).split(',')
