@@ -385,8 +385,7 @@ def make_file_name(period, date, whom, result_dir,iter):
         dst_file_name = '%(d)s_%(s)s_%(p)s%(i)s.kml'%{'d': date, 's': whom, 'p':period_mod, 'i':suff}
     dst_file = os.path.join(result_dir,dst_file_name)
     if os.path.isfile(dst_file):
-        iter = iter + 1
-        dst_file_name = make_file_name(period, date, whom, result_dir,iter)
+        drop_temp_file(dst_file)
     return dst_file_name
 
 def drop_temp_files(result_dir):
@@ -398,6 +397,14 @@ def drop_temp_files(result_dir):
             #elif os.path.isdir(file_path): shutil.rmtree(file_path)
         except Exception as e:
             log('Cannot remove files:$s' %e)
+
+def drop_temp_file(the_file):
+    try:
+        if os.path.isfile(the_file):
+            os.remove(the_file)
+    except Exception as e:
+        log('Cannot remove files:$s' %e)
+
 
 def make_mail_attr(date, period, num_points):
     if period == 24:
@@ -482,7 +489,8 @@ def send_to_subscribers_job():
 
         if now_hour in emailtimelist and subs.email_point:
             log('Sending mail now!')
-            is_increment = not(now_hour == emailtimelist[0])
+            iteration = emailtimelist.index(now_howr)
+            is_increment = (iteration <> 0)
             if subs.crit_or_fire == 'crit':
                 log('Making critical-limited table...')
                 num_points = make_subs_table(conn,cursor,year_tab,'critical',subs.critical,subs.point_period,subs.regions,subs.subs_id,is_increment)
@@ -493,7 +501,7 @@ def send_to_subscribers_job():
                 log('Making zero-critical table...')
                 num_points = make_subs_table(conn,cursor,year_tab,'critical',0,subs.point_period,subs.regions,subs.subs_id,is_increment)
             if num_points > 0 or subs.send_empty:
-                dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,0)
+                dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,iteration)
                 dst_file = os.path.join(result_dir,dst_file_name)
 
                 log('Creating maillist...')
@@ -504,17 +512,16 @@ def send_to_subscribers_job():
                 send_email_with_attachment(maillist, subject, body_text, [dst_file])
             else:
                 log('Don`t send zero-point file.')
-            if now_hour == emailtimelist[0]:
-                log('Writing to yadisk...')
-                subs_folder = 'for_s%s' %str(subs.subs_name)
-                write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
-            if now_hour == emailtimelist[-1]:
-                log('Dropping temp files...')
-                drop_temp_files(result_dir)
+            drop_temp_file(dst_file)
             log('Dropping tables...')
             drop_whom_table(conn,cursor,subs.subs_id)
         else:
             log('Sending mail? It`s not time yet!')
+        if now_hour =='23' and subs.ya_disk:
+            log('Writing to yadisk...')
+            subs_folder = 'for_s%s' %str(subs.subs_name)
+            write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
+
 
     close_conn(conn, cursor)
     stop_logging('send_engine.py')
