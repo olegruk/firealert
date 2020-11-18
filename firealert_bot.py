@@ -4,7 +4,7 @@ import os, time, re
 #import logging
 
 from faservice import get_config, get_path, send_doc_to_telegram
-from falogging import log
+from falogging import botlog, start_botlogging, stop_botlogging
 
 [url, TOKEN] = get_config('telegramm', ['url', 'token'])
 #user_id = "580325825" #"Это я
@@ -107,7 +107,7 @@ def drop_temp_files(result_dir):
                 os.remove(file_path)
             #elif os.path.isdir(file_path): shutil.rmtree(file_path)
         except Exception as e:
-            log('Cannot remove files:$s' %e)
+            botlog('Cannot remove files:$s' %e)
 
 def start(bot, update):
     """Send a message when the command /start is issued."""
@@ -332,6 +332,7 @@ def echo(bot, update):
 
 def main():
     """Start the bot."""
+    start_botlogging('firealert_bot.py')
     updater = Updater(token=TOKEN, use_context=False)
     disp = updater.dispatcher
     disp.add_handler(CommandHandler("start", start))
@@ -358,7 +359,7 @@ def main():
     disp.add_handler(MessageHandler(Filters.text, echo))
     updater.start_polling()
     updater.idle()
-
+    stop_botlogging('firalert_bot.py')
 
 if __name__ == '__main__':
     main()

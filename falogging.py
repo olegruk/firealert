@@ -11,6 +11,7 @@ import logging
 currtime = time.localtime()
 date=time.strftime('%Y-%m-%d',currtime)
 logfile = "firealert_%s.log" %date
+botlogfile = "firealert_bot.log"
 base_path = os.path.dirname(os.path.abspath(__file__))
 result_path = os.path.join(base_path, 'log')
 if not os.path.exists(result_path):
@@ -20,6 +21,7 @@ if not os.path.exists(result_path):
     except OSError:
         log("Unable to create %s" % result_path)
 fulllog = os.path.join(result_path, logfile)
+botlogf = os.path.join(result_path, botlogfile)
 
 def get_log_file(date):
     pass
@@ -33,6 +35,13 @@ def log(msg):
     logging.warning(msg)
     #print(msg)
 
+def botlog(msg):
+    logging.basicConfig(format='%(asctime)s %(message)s',
+        datefmt='%m/%d/%Y %I:%M:%S %p',
+        filename=botlogf)
+    logging.warning(msg)
+    #print(msg)
+
 def start_logging(proc):
     currtime = time.localtime()
     cdate=time.strftime('%d-%m-%Y %H:%M:%S',currtime)
@@ -43,4 +52,15 @@ def stop_logging(proc):
     currtime = time.localtime()
     cdate=time.strftime('%d-%m-%Y %H:%M:%S',currtime)
     log('Process [%(p)s] stopped at %(d)s'%{'p':proc, 'd':cdate})
+
+def start_botlogging(proc):
+    currtime = time.localtime()
+    cdate=time.strftime('%d-%m-%Y %H:%M:%S',currtime)
+    botlog('--------------------------------------------------------------------------------')
+    botlog('Telegram bot [%(p)s] started at %(d)s'%{'p':proc, 'd':cdate})
+
+def stop_botlogging(proc):
+    currtime = time.localtime()
+    cdate=time.strftime('%d-%m-%Y %H:%M:%S',currtime)
+    botlog('Telegram bot [%(p)s] stopped at %(d)s'%{'p':proc, 'd':cdate})
 
