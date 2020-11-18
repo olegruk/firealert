@@ -489,8 +489,8 @@ def send_to_subscribers_job():
 
         if now_hour in emailtimelist and subs.email_point:
             log('Sending mail now!')
-            iteration = emailtimelist.index(now_howr)
-            is_increment = (iteration <> 0)
+            iteration = emailtimelist.index(now_hour)
+            is_increment = (iteration != 0)
             if subs.crit_or_fire == 'crit':
                 log('Making critical-limited table...')
                 num_points = make_subs_table(conn,cursor,year_tab,'critical',subs.critical,subs.point_period,subs.regions,subs.subs_id,is_increment)
