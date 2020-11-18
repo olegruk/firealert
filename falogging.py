@@ -43,4 +43,3 @@ def stop_logging(proc):
     currtime = time.localtime()
     cdate=time.strftime('%d-%m-%Y %H:%M:%S',currtime)
     log('Process [%(p)s] stopped at %(d)s'%{'p':proc, 'd':cdate})
-

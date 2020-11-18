@@ -105,6 +105,16 @@ def show_reglist(telegram_id):
     close_conn(conn, cursor)
     return reglist
 
+def list_reglist():
+    conn, cursor = get_cursor()
+    cursor.execute("SELECT DISTINCT ON (region) region FROM reg_russia")
+    reglist = cursor.fetchall()
+    close_conn(conn, cursor)
+    msg = ''
+    for elem in reglist[0:-1]:
+        msg = msg + str(elem)[2:-3] + '\n'
+    return msg
+
 def show_conf(telegram_id):
     conn, cursor = get_cursor()
     cursor.execute("SELECT * FROM %(s)s WHERE telegramm = '%(i)s'" %{'s':subs_table, 'i':telegram_id})
