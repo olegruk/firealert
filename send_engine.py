@@ -7,7 +7,8 @@
 
 import os, time
 from falogging import log, start_logging, stop_logging
-from faservice import get_config, get_tuple_cursor, close_conn, get_path, write_to_kml, write_to_yadisk, send_email_with_attachment
+from faservice import get_config, get_tuple_cursor, close_conn, get_path
+from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_doc_to_telegram, send_to_telegram
 
 #Создаем таблицу для выгрузки подписчикам
 def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental):
@@ -349,7 +350,7 @@ def drop_whom_table(conn,cursor, whom):
         log('Error dropping table:$s' %e)
 
 # Заполняем в таблице подписчиков поле с временами рассылки, если не было заполнено
-def fill_send_times(conn,cursor,subs_tab,time_field,subs_id,zero_time, period):
+def fill_send_times(conn,cursor,subs_tab,subs_id,zero_time, period):
     log('Creating send times for %s.'%(subs_id))
     if (zero_time != None) and (period != None):
         zero_hour = int(zero_time.split(":")[0])
@@ -366,7 +367,7 @@ def fill_send_times(conn,cursor,subs_tab,time_field,subs_id,zero_time, period):
                 send_hours = send_hours + str(new_hour)
             if i < num_of_times - 1:
                 send_hours = send_hours + ","
-        cursor.execute("UPDATE %(s)s SET %(t)s = '%(h)s' WHERE subs_id = %(i)s"%{'s':subs_tab,'t':time_field,'h':send_hours,'i':subs_id})
+        cursor.execute("UPDATE %(s)s SET send_times = '%(h)s' WHERE subs_id = %(i)s"%{'s':subs_tab,'h':send_hours,'i':subs_id})
         conn.commit()
         return send_hours
     else:
@@ -440,6 +441,7 @@ def send_to_subscribers_job():
     [year_tab, subs_tab] = get_config("tables", ["year_tab","subs_tab"])
     [data_root,temp_folder] = get_config("path", ["data_root", "temp_folder"])
     [to_dir] = get_config("yadisk", ["yadisk_out_path"])
+    [url] = get_config('telegramm', ['url'])
 
     #connecting to database
     conn, cursor = get_tuple_cursor()
@@ -460,12 +462,9 @@ def send_to_subscribers_job():
 	#crit_or_fire - varchar(4) - критерий отбора точек, критичность точки - 'crit' или горимость торфа - 'fire'
 	#critical - integer - порог критичности для отбора точек
 	#peatfire - integer - порог горимости торфяника для отбора точек
-	#email_first_time - varchar(5) - время рассылки по почте
-	#email_period - integer - периодичность рассылки по почте
-	#email_times - varchar() - список временных меток для рассылки по почте
-	#teleg_first_time - varchar(5) - время рассылки по телеграмм
-	#teleg_period - integer - периодичность рассылки по телеграмм
-	#teleg_times - varchar() - список временных меток для рассылки по телеграмм
+	#send_first_time - varchar(5) - время рассылки
+	#send_period - integer - периодичность рассылки
+	#send_times - varchar() - список временных меток для рассылки
     #vip_zones - boolean - рассылать ли информацию по зонам особого внимания
 
     cursor.execute("SELECT * FROM %s WHERE active"%(subs_tab))
@@ -478,18 +477,14 @@ def send_to_subscribers_job():
         if subs.subs_name == None:
             set_name(conn, cursor, subs_tab, subs.subs_id)
         log('Processing for %s...'%(subs.subs_name))
-        if subs.email_times == None:
-            emailtimelist = fill_send_times(conn,cursor,subs_tab,'email_times',subs.subs_id,subs.email_first_time, subs.email_period).split(',')
+        if subs.send_times == None:
+            sendtimelist = fill_send_times(conn,cursor,subs_tab,subs.subs_id,subs.send_first_time, subs.send_period).split(',')
         else:
-            emailtimelist = subs.email_times.split(',')
-        if subs.teleg_times == None:
-            telegtimelist = fill_send_times(conn,cursor,subs_tab,'teleg_times',subs.subs_id,subs.teleg_first_time, subs.teleg_period).split(',')
-        else:
-            telegtimelist = subs.teleg_times.split(',')
+            sendtimelist = subs.send_times.split(',')
 
-        if now_hour in emailtimelist and subs.email_point:
-            log('Sending mail now!')
-            iteration = emailtimelist.index(now_hour)
+        if now_hour in sendtimelist and (subs.email_point or subs.teleg_point):
+            log('Sending points now!')
+            iteration = sendtimelist.index(now_hour)
             is_increment = (iteration != 0)
             if subs.crit_or_fire == 'crit':
                 log('Making critical-limited table...')
@@ -508,19 +503,25 @@ def send_to_subscribers_job():
                 maillist = subs.email.replace(' ','').split(',')
                 log('Creating kml file...')
                 write_to_kml(dst_file,subs.subs_id)
-                subject, body_text = make_mail_attr(date, subs.point_period, num_points)
-                send_email_with_attachment(maillist, subject, body_text, [dst_file])
+                if subs.email_point:
+                    subject, body_text = make_mail_attr(date, subs.point_period, num_points)
+                    send_email_with_attachment(maillist, subject, body_text, [dst_file])
+                if subs.teleg_point:
+                    doc = open(dst_file, 'rb')
+                    send_doc_to_telegram(url, subs.telegramm, doc)
+                    send_to_telegram(url, subs.telegramm, 'В файле %s точек.' %num_points)
+                log('Dropping temp files...')
+                drop_temp_file(dst_file)
             else:
                 log('Don`t send zero-point file.')
-            drop_temp_file(dst_file)
+            if now_hour == sendtimelist[0] and subs.ya_disk:
+                log('Writing to yadisk...')
+                subs_folder = 'for_s%s' %str(subs.subs_name)
+                write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
             log('Dropping tables...')
             drop_whom_table(conn,cursor,subs.subs_id)
         else:
-            log('Sending mail? It`s not time yet!')
-        if now_hour =='23' and subs.ya_disk:
-            log('Writing to yadisk...')
-            subs_folder = 'for_s%s' %str(subs.subs_name)
-            write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
+            log('Sending anything? It`s not time yet!')
 
 
     close_conn(conn, cursor)
