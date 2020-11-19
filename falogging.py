@@ -5,12 +5,17 @@
 # Created:     09.04.2020
 #-------------------------------------------------------------------------------
 
-import os, time
+import os, time, re, traceback
 import logging
 
 currtime = time.localtime()
 date=time.strftime('%Y-%m-%d',currtime)
-logfile = "firealert_%s.log" %date
+root_path = traceback.StackSummary.extract(traceback.walk_stack(None))[-1][0]
+uname = re.search(r'\w+\.py', root_path)[0]
+if uname == 'firealert_bot.py':
+    logfile = "firealert_bot.log"
+else:
+    logfile = "firealert_%s.log" %date
 base_path = os.path.dirname(os.path.abspath(__file__))
 result_path = os.path.join(base_path, 'log')
 if not os.path.exists(result_path):
