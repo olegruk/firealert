@@ -469,3 +469,45 @@ def check_peats_stat(reglist, cur_date):
 
     #cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
     #return cursor.fetchone()[0]
+
+def check_vip_zones(outline, period):
+    log("Checking VIP-zones...")
+
+    [year_tab] = get_config("tables", ["year_tab"])
+    dst_tab = year_tab + '_vip'
+
+    conn, cursor = get_cursor()
+
+    statements = (
+		"""
+		DROP TABLE IF EXISTS %s
+		"""%(dst_tab),
+		"""
+		CREATE TABLE %(d)s
+			AS SELECT %(s)s.ident, %(o)s.name AS zone_name, %(s)s.geog
+				FROM %(s)s, %(o)s
+				WHERE (%(s)s.date_time > TIMESTAMP 'today' - INTERVAL '%(p)s') AND (%(s)s.vip IS NULL) AND (ST_Intersects(%(o)s.geog, %(s)s.geog))
+		"""%{'d':dst_tab, 's':year_tab, 'o':outline, 'p':period},
+        """
+    	UPDATE %(y)s
+		SET vip = 1
+        FROM %(d)s
+        WHERE %(d)s.ident = %(y)s.ident
+		"""%{'d':dst_tab, 'y':year_tab}
+        )
+    try:
+        for sql_stat in statements:
+            cursor.execute(sql_stat)
+            conn.commit()
+        log('The table created:%s'%(dst_tab))
+    except IOError as e:
+        log('Error intersecting points with region:$s'%e)
+    cursor.execute("SELECT count(*) FROM %s"%(dst_tab))
+    points_count = cursor.fetchone()[0]
+    #cursor.execute("SELECT DISTINCT zone_name FROM %s"%(dst_tab))
+    cursor.execute("SELECT zone_name, COUNT(*) FROM %s GROUP BY zone_name"%(dst_tab))
+    zones = cursor.fetchall()
+
+    close_conn(conn, cursor)
+
+    return points_count, zones
