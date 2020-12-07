@@ -9,7 +9,7 @@ import os, time
 from falogging import log, start_logging, stop_logging
 from faservice import get_config, get_tuple_cursor, close_conn, get_path
 from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_doc_to_telegram, send_to_telegram
-
+from requester import make_tlg_stat_msg, check_vip_zones
 #Создаем таблицу для выгрузки подписчикам
 def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental):
     log("Creating table for subs_id:%s..." %whom)
@@ -442,6 +442,7 @@ def send_to_subscribers_job():
     [data_root,temp_folder] = get_config("path", ["data_root", "temp_folder"])
     [to_dir] = get_config("yadisk", ["yadisk_out_path"])
     [url] = get_config('telegramm', ['url'])
+    [outline] = get_config('tables', ['vip_zones'])
 
     #connecting to database
     conn, cursor = get_tuple_cursor()
@@ -466,6 +467,8 @@ def send_to_subscribers_job():
 	#send_period - integer - периодичность рассылки
 	#send_times - varchar() - список временных меток для рассылки
     #vip_zones - boolean - рассылать ли информацию по зонам особого внимания
+    #send_empty - отправлять или нет пустой файл
+    #ya_disk - писать или нет файл на яндекс-диск
 
     cursor.execute("SELECT * FROM %s WHERE active"%(subs_tab))
     subscribers = cursor.fetchall()
@@ -518,10 +521,22 @@ def send_to_subscribers_job():
                 log('Writing to yadisk...')
                 subs_folder = 'for_s%s' %str(subs.subs_name)
                 write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
+            if now_hour == sendtimelist[0] and subs.telegstat:
+                log('Sending stat to telegram...')
+                msg = make_tlg_stat_msg(subs.regions, subs.stat_period, subs.critical)
+                send_to_telegram(url, subs.telegramm, msg)
             log('Dropping tables...')
             drop_whom_table(conn,cursor,subs.subs_id)
         else:
-            log('Sending anything? It`s not time yet!')
+            log('Do anything? It`s not time yet!')
+
+        if now_hour == sendtimelist[0] and subs.vip_zones:
+            points_count, zones = check_vip_zones(outline, subs.stat_period)
+            if points_count > 0:
+                msg = 'Новых точек\r\nв зонах особого внимания: %s\r\n\r\n' %points_count
+                for (zone, num_points) in zones:
+                    msg = msg + '%s - %s\r\n' %(zone, num_points)
+                send_to_telegram(url, subs.telegramm, msg)
 
 
     close_conn(conn, cursor)

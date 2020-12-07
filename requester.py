@@ -323,3 +323,191 @@ def request_for_circle(whom, lim_for, limit, from_time, period, circle, result_d
     close_conn(conn, cursor)
 
     return dst_file, num_points
+
+def check_reg_stat(reg, period, critical):
+    log("Getting statistic for %s..."%(reg))
+    # extract params from config
+    [year_tab] = get_config("tables", ["year_tab"])
+    #connecting to database
+    conn, cursor = get_cursor()
+
+    statements = (
+        """
+        SELECT count(*) FROM
+            (SELECT name
+            FROM %(y)s
+            WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND critical >= %(c)s AND region = '%(r)s') as critical_sel
+        """%{'y':year_tab,'p':period,'c':critical,'r':reg},
+        """
+        SELECT count(*) FROM
+            (SELECT name
+            FROM %(y)s
+            WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND region = '%(r)s') as all_sel
+        """%{'y':year_tab,'p':period,'r':reg}
+        )
+    try:
+        cursor.execute(statements[0])
+        critical_cnt = cursor.fetchone()[0]
+        cursor.execute(statements[1])
+        all_cnt = cursor.fetchone()[0]
+        log('Finished for:%s'%(reg))
+    except IOError as e:
+        log('Error getting statistic for region:$s'%e)
+
+    close_conn(conn, cursor)
+
+    return critical_cnt, all_cnt
+
+def make_tlg_stat_msg(reg_list, period, limit):
+    full_cnt = 0
+    full_cr_cnt = 0
+    msg = 'Количество точек:'
+    for reg in reg_list:
+        critical_cnt, all_cnt = check_reg_stat(reg, period, limit)
+        if all_cnt > 0:
+            msg = msg + '\r\n%(r)s: %(a)s'%{'r':reg,'a':all_cnt}
+            if critical_cnt > 0:
+                msg = msg + '\r\nкритичных: %(c)s'%{'c':critical_cnt}
+        full_cnt = full_cnt + all_cnt
+        full_cr_cnt = full_cr_cnt + critical_cnt
+    if full_cnt == 0:
+        msg = 'Нет новых точек.'
+    return msg
+
+def make_smf_stat_msg(reg_list, period, limit):
+    full_cnt = 0
+    full_cr_cnt = 0
+    smf_msg = 'Количество точек:\r\n\r\n[table]'
+    smf_msg = smf_msg + '\r\n[tr][td][b]Регион[/b][/td][td]   [/td][td][b]Всего точек   [/b][/td][td][b]Критичных точек[/b][/td][/tr]'
+    for reg in reg_list:
+        critical_cnt, all_cnt = check_reg_stat(reg, period, limit)
+        smf_msg = smf_msg + '\r\n[tr][td]%(r)s[/td][td]   [/td][td][center]%(a)s[/center][/td][td][center]%(c)s[/center][/td][/tr]'%{'r':reg,'a':all_cnt, 'c':critical_cnt}
+        full_cnt = full_cnt + all_cnt
+        full_cr_cnt = full_cr_cnt + critical_cnt
+    smf_msg = smf_msg + '\r\n[tr][td][b]Всего:[/b][/td][td]   [/td][td][center][b]%(a)s[/b][/center][/td][td][center][b]%(c)s[/b][/center][/td][/tr]'%{'a':full_cnt, 'c':full_cr_cnt}
+    smf_msg = smf_msg + '\r\n[/table]'
+    if full_cnt == 0:
+        smf_msg = 'Нет новых точек.'
+    return smf_msg
+
+def new_alerts(period, cur_date):
+    log("Adding alerts...")
+
+    # extract params from config
+    [alert_tab,clust_view] = get_config("peats_stat", ["alert_tab", "cluster_view"])
+    #connecting to database
+    conn, cursor = get_cursor()
+
+    statements = (
+        """
+        INSERT INTO %(a)s (object_id, alert_date, point_count, satellite_base, cluster)
+            SELECT
+                peat_id,
+                date_time,
+  		        point_count,
+                'https://apps.sentinel-hub.com/eo-browser/?zoom=14&lat=' || ST_Y(ST_Transform(ST_Centroid(buffer)::geometry,4326)::geometry) || '&lng=' || ST_X(ST_Transform(ST_Centroid(buffer)::geometry,4326)::geometry) || '&themeId=DEFAULT-THEME',
+                buffer
+            FROM %(t)s
+            WHERE date_time >= (TIMESTAMP 'today' - INTERVAL '%(p)s') AND date_time < TIMESTAMP 'today'
+        """%{'a':alert_tab,'t':clust_view,'p':period},
+        """
+        UPDATE %(a)s SET
+            alert_date = '%(d)s',
+            source = 'Робот'
+        WHERE alert_date IS NULL
+        """%{'a':alert_tab,'d':cur_date}
+        )
+
+    try:
+        for sql_stat in statements:
+            cursor.execute(sql_stat)
+            conn.commit()
+        log('Adding alerts finished.')
+    except IOError as e:
+        log('Error adding alerts:$s'%e)
+
+    close_conn(conn, cursor)
+
+    #cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
+    #return cursor.fetchone()[0]
+
+def check_peats_stat(reglist, cur_date):
+    log("Getting peats statistic...")
+    [year_tab] = get_config("tables", ["year_tab"])
+    [period, critical,alert_tab] = get_config("peats_stat", ["period", "critical_limit", "alert_tab"])
+
+    conn, cursor = get_cursor()
+
+    statements = (
+        """
+        INSERT INTO %(a)s (object_id, point_count)
+            SELECT
+                peat_id,
+  		        COUNT(*) AS num
+            FROM %(y)s
+            WHERE date_time >= NOW() - INTERVAL '%(p)s' AND (critical >= %(c)s OR revision >= %(c)s) AND region IN %(r)s
+            GROUP BY peat_id
+            ORDER BY num DESC
+        """%{'a':alert_tab,'y':year_tab,'p':period,'c':critical,'r':reglist},
+        """
+        UPDATE %(a)s SET
+            alert_date = '%(d)s',
+            source = 'ДМ'
+        WHERE alert_date IS NULL
+        """%{'a':alert_tab,'d':cur_date}
+        )
+
+    try:
+        for sql_stat in statements:
+            cursor.execute(sql_stat)
+            conn.commit()
+        log('TGetting peats statistic finished.')
+    except IOError as e:
+        log('Error getting peats statistic:$s'%e)
+
+    close_conn(conn, cursor)
+
+    #cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
+    #return cursor.fetchone()[0]
+
+def check_vip_zones(outline, period):
+    log("Checking VIP-zones...")
+
+    [year_tab] = get_config("tables", ["year_tab"])
+    dst_tab = year_tab + '_vip'
+
+    conn, cursor = get_cursor()
+
+    statements = (
+		"""
+		DROP TABLE IF EXISTS %s
+		"""%(dst_tab),
+		"""
+		CREATE TABLE %(d)s
+			AS SELECT %(s)s.ident, %(o)s.name AS zone_name, %(s)s.geog
+				FROM %(s)s, %(o)s
+				WHERE (%(s)s.date_time > TIMESTAMP 'today' - INTERVAL '%(p)s') AND (%(s)s.vip IS NULL) AND (ST_Intersects(%(o)s.geog, %(s)s.geog))
+		"""%{'d':dst_tab, 's':year_tab, 'o':outline, 'p':period},
+        """
+    	UPDATE %(y)s
+		SET vip = 1
+        FROM %(d)s
+        WHERE %(d)s.ident = %(y)s.ident
+		"""%{'d':dst_tab, 'y':year_tab}
+        )
+    try:
+        for sql_stat in statements:
+            cursor.execute(sql_stat)
+            conn.commit()
+        log('The table created:%s'%(dst_tab))
+    except IOError as e:
+        log('Error intersecting points with region:$s'%e)
+    cursor.execute("SELECT count(*) FROM %s"%(dst_tab))
+    points_count = cursor.fetchone()[0]
+    #cursor.execute("SELECT DISTINCT zone_name FROM %s"%(dst_tab))
+    cursor.execute("SELECT zone_name, COUNT(*) FROM %s GROUP BY zone_name"%(dst_tab))
+    zones = cursor.fetchall()
+
+    close_conn(conn, cursor)
+
+    return points_count, zones

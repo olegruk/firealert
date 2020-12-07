@@ -278,3 +278,57 @@ def send_email_with_attachment(maillist, subject, body_text, filelist):
     mailserver.sendmail(from_addr, maillist, msg.as_string())
     mailserver.quit()
     log('Mail sended.')
+
+def smf_login(session, smf_url, smf_user, smf_pass):
+    # login method
+    login_url1 = "index.php?action=login"
+    login_url2 = "index.php?action=login2"
+    # get auth_key and random input name
+    login_page = session.get(smf_url + login_url1)
+    smf_session_id = login_page.text.split("hashLoginPassword(this, '")[1].split("'")[0]
+    smf_random_input = login_page.text.split("<input type=\"hidden\" name=\"hash_passwrd\" value=\"\" />"
+                                                  "<input type=\"hidden\" name=\"")[1].split("\"")[0]
+    # login
+    payload = {
+        'user': smf_user,
+        'passwrd': smf_pass,
+        'cookielength': -1,
+        smf_random_input: smf_session_id,
+    }
+    response = session.post(smf_url + login_url2, data=payload)
+    log("Login Response: %s" % response)
+    return smf_session_id, smf_random_input
+
+def smf_new_topic(smf_url, smf_user, smf_pass, board, subject, msg, icon="xx", notify=0, lock=0, sticky=0):
+    post_url1 = "index.php?action=post;board=" + str(board)
+    post_url2 = "index.php?action=post2;start=0;board=" + str(board) + ".0"
+    with requests.session() as session:
+        smf_session_id, smf_random_input = smf_login(session, smf_url, smf_user, smf_pass)
+        # get seqnum
+        post_page = session.get(smf_url + post_url1, cookies=session.cookies)
+        try:
+            seqnum = post_page.text.split("<input type=\"hidden\" name=\"seqnum\" value=\"")[1].split("\"")[0]
+            # post the post :)
+            payload = {'topic': 0,
+                       'subject': str(subject),
+                       'icon': str(icon),
+                       'sel_face': '',
+                       'sel_size': '',
+                       'sel_color': '',
+                       'message': str(msg),
+                       'message_mode': 0,
+                       'notify': notify,
+                       'lock': lock,
+                       'sticky': sticky,
+                       'move': 0,
+                       'attachment[]': "",
+                       'additional_options': 0,
+                       str(smf_random_input): str(smf_session_id),
+                       'seqnum': str(seqnum)}
+            response = requests.post(smf_url + post_url2, data=payload, cookies=session.cookies)
+            if response:
+                return True
+            else:
+                return False
+        except KeyError:
+            return False
