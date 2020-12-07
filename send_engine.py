@@ -522,19 +522,21 @@ def send_to_subscribers_job():
                 subs_folder = 'for_s%s' %str(subs.subs_name)
                 write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
             if now_hour == sendtimelist[0] and subs.telegstat:
+                log('Sending stat to telegram...')
                 msg = make_tlg_stat_msg(subs.regions, subs.stat_period, subs.critical)
                 send_to_telegram(url, subs.telegramm, msg)
-            if now_hour == sendtimelist[0] and subs.vip_zones:
-                points_count, zones = check_vip_zones(outline, subs.stat_period)
-                if points_count > 0:
-                    msg = 'Новых точек\r\nв зонах особого внимания: %s\r\n\r\n' %points_count
-                    for (zone, num_points) in zones:
-                        msg = msg + '%s - %s\r\n' %(zone, num_points)
-                    send_to_telegram(url, subs.telegramm, msg)
             log('Dropping tables...')
             drop_whom_table(conn,cursor,subs.subs_id)
         else:
             log('Do anything? It`s not time yet!')
+
+        if now_hour == sendtimelist[0] and subs.vip_zones:
+            points_count, zones = check_vip_zones(outline, subs.stat_period)
+            if points_count > 0:
+                msg = 'Новых точек\r\nв зонах особого внимания: %s\r\n\r\n' %points_count
+                for (zone, num_points) in zones:
+                    msg = msg + '%s - %s\r\n' %(zone, num_points)
+                send_to_telegram(url, subs.telegramm, msg)
 
 
     close_conn(conn, cursor)

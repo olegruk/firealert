@@ -336,13 +336,13 @@ def check_reg_stat(reg, period, critical):
         SELECT count(*) FROM
             (SELECT name
             FROM %(y)s
-            WHERE date_time >= NOW() - INTERVAL '%(p)s' AND (critical >= %(c)s OR revision >= %(c)s) AND region = '%(r)s') as critical_sel
+            WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND critical >= %(c)s AND region = '%(r)s') as critical_sel
         """%{'y':year_tab,'p':period,'c':critical,'r':reg},
         """
         SELECT count(*) FROM
             (SELECT name
             FROM %(y)s
-            WHERE date_time >= NOW() - INTERVAL '%(p)s' AND region = '%(r)s') as all_sel
+            WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND region = '%(r)s') as all_sel
         """%{'y':year_tab,'p':period,'r':reg}
         )
     try:
