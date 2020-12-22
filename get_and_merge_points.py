@@ -621,7 +621,7 @@ def get_and_merge_points_job():
 
     if loaded < int(num_of_src):
         msg = 'Загружены данные из %s таблиц'%loaded
-        send_to_telegram(url, chat_id, msg)
+        #send_to_telegram(url, chat_id, msg)
 
     #Приводим время к виду "чч:мм"
     correct_time_field(conn,cursor,common_tab)
