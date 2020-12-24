@@ -279,6 +279,33 @@ def send_email_with_attachment(maillist, subject, body_text, filelist):
     mailserver.quit()
     log('Mail sended.')
 
+def send_email_message(maillist, subject, body_text):
+    log("Sending e-mail to addresses: %s..." %maillist)
+
+    # extract server and from_addr from config
+    [host,from_addr,user,pwd] = get_config("smtp", ["server", "from_addr", "user", "pwd"])
+
+    # create the message
+    msg = MIMEMultipart()
+    msg["From"] = from_addr
+    msg["Subject"] = subject
+    msg["Date"] = formatdate(localtime=True)
+
+    if body_text:
+        msg.attach( MIMEText(body_text) )
+
+    msg["To"] = ', '.join(maillist)
+
+    mailserver = smtplib.SMTP(host,587)
+    mailserver.ehlo()
+    mailserver.starttls()
+    mailserver.ehlo()
+    mailserver.login(user, pwd)
+    mailserver.sendmail(from_addr, maillist, msg.as_string())
+    mailserver.quit()
+    log('Mail sended.')
+
+
 def smf_login(session, smf_url, smf_user, smf_pass):
     # login method
     login_url1 = "index.php?action=login"

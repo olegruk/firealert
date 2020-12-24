@@ -7,9 +7,9 @@
 
 import os, time
 from falogging import log, start_logging, stop_logging
-from faservice import get_config, get_tuple_cursor, close_conn, get_path
-from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_doc_to_telegram, send_to_telegram
-from requester import make_tlg_stat_msg, check_vip_zones
+from faservice import get_config, get_tuple_cursor, close_conn, get_path, smf_new_topic
+from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_email_message, send_doc_to_telegram, send_to_telegram
+from requester import make_tlg_stat_msg, make_smf_stat_msg, check_vip_zones
 #Создаем таблицу для выгрузки подписчикам
 def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental):
     log("Creating table for subs_id:%s..." %whom)
@@ -521,10 +521,6 @@ def send_to_subscribers_job():
                 log('Writing to yadisk...')
                 subs_folder = 'for_s%s' %str(subs.subs_name)
                 write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
-            if now_hour == sendtimelist[0] and subs.telegstat:
-                log('Sending stat to telegram...')
-                msg = make_tlg_stat_msg(subs.regions, subs.stat_period, subs.critical)
-                send_to_telegram(url, subs.telegramm, msg)
             log('Dropping tables...')
             drop_whom_table(conn,cursor,subs.subs_id)
         else:
@@ -538,6 +534,24 @@ def send_to_subscribers_job():
                     msg = msg + '%s - %s\r\n' %(zone, num_points)
                 send_to_telegram(url, subs.telegramm, msg)
 
+        if now_hour == sendtimelist[0] and (subs.teleg_stat or subs.email_stat):
+            msg = make_tlg_stat_msg(subs.regions, subs.stat_period, subs.critical)
+            if subs.teleg_stat:
+                log('Sending stat to telegram...')
+                send_to_telegram(url, subs.telegramm, msg)
+            if subs.email_stat:
+                log('Sending stat to email...')
+                subject = "Statistic per last %(p)s"%{'p':subs.stat_period}
+                maillist = subs.email.replace(' ','').split(',')
+                send_email_message(maillist, subject, msg)
+
+        if now_hour == '24':
+            [smf_url, smf_user, smf_pass] = get_config("smf", ["smf_url", "smf_user", "smf_pass"])
+            [period, critical_limit] = get_config("statistic", ["period", "critical_limit"])
+            [reg_list_cr] = get_config("reglists", ["cr"])
+            fdate=time.strftime('%d-%m-%Y',currtime)
+            smf_msg = make_smf_stat_msg(reg_list_cr, period, critical_limit)
+            smf_new_topic(smf_url, smf_user, smf_pass, 13.0, fdate, smf_msg)
 
     close_conn(conn, cursor)
     stop_logging('send_engine.py')
