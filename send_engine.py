@@ -7,7 +7,7 @@
 
 import os, time
 from falogging import log, start_logging, stop_logging
-from faservice import get_config, get_tuple_cursor, close_conn, get_path, smf_new_topic
+from faservice import get_config, get_tuple_cursor, close_conn, get_path, smf_new_topic, str_to_lst
 from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_email_message, send_doc_to_telegram, send_to_telegram
 from requester import make_tlg_stat_msg, make_smf_stat_msg, check_vip_zones
 #Создаем таблицу для выгрузки подписчикам
@@ -535,7 +535,8 @@ def send_to_subscribers_job():
                 send_to_telegram(url, subs.telegramm, msg)
 
         if now_hour == sendtimelist[0] and (subs.teleg_stat or subs.email_stat):
-            msg = make_tlg_stat_msg(subs.regions, subs.stat_period, subs.critical)
+            reg_list = str_to_lst(subs.regions[2:-2])
+            msg = make_tlg_stat_msg(reg_list, subs.stat_period, subs.critical)
             if subs.teleg_stat:
                 log('Sending stat to telegram...')
                 send_to_telegram(url, subs.telegramm, msg)
