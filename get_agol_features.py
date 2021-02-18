@@ -5,7 +5,7 @@
 # Created:     30.10.2020
 #-------------------------------------------------------------------------------
 
-import os, json, contextlib
+import os, json, contextlib, requests
 from urllib.request import urlopen
 from urllib.parse import urlencode
 from falogging import log, start_logging, stop_logging
@@ -23,6 +23,13 @@ def submit_request(request):
         result = json.load(response)
         return result
 
+def submit_request1(url, params):
+    response = requests.post(url + 'sendMessage', data=params)
+    if response.status_code != 200:
+        raise Exception("post_text error: %s" %response.status_code)
+    resp_text = json.loads (response.text)
+    return resp_text
+
 def return_token(service_url, username, password, request_url):
     """ Returns an authentication token for use in ArcGIS Online."""
     log('Requesting token...')
@@ -30,8 +37,10 @@ def return_token(service_url, username, password, request_url):
             "password": password,
             "referer": request_url,
             "f": "json"}
-    request = "{}?{}".format(service_url, urlencode(params))
-    token_response = submit_request(request)
+    response = requests.post(service_url + 'sendMessage', data=params)
+    if response.status_code != 200:
+        raise Exception("post_text error: %s" %response.status_code)
+    token_response = json.loads (response.text)
     if "token" in token_response:
         token = token_response.get("token")
         log('Token requested.')
@@ -48,7 +57,6 @@ def return_token(service_url, username, password, request_url):
                 raise Exception("AGOL error: {} ".format(error_mess))
 
 def return_json(id, request_url, token, attr_fields, n):
-    """ Returns an authentication token for use in ArcGIS Online."""
     params = {"token": token,
             "where": "gid>"+str(n),
             "objectIds": "",
