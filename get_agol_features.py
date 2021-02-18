@@ -118,23 +118,32 @@ def get_agol_features_job():
     #Получаем токен для доступа к сервису ArcGIS Online
     token = return_token(service_url, username, password, request_url)
     
-    for id in range(4):
+    for id in [0]:
         log('Syncing for table №%s...'%(id))
         n = 0
+        m = 0
         is_repeat = True
         while is_repeat:
+            dst_file = os.path.join(result_dir,'temp-%s.json'%m)
             response = return_json(id, request_url, token, attr_fields, n)
             if id > 0:
                 response['geometryType'] = 'esriGeometryMultiPolygon'
             is_repeat = 'exceededTransferLimit' in response
             with open(dst_file, 'w') as outfile:
                 json.dump(response, outfile)
-            if n < 1000:
-                command = """ogr2ogr -overwrite -append -t_srs "+proj=longlat +datum=WGS84 +no_defs" -f "PostgreSQL"  PG:"host=%(h)s user=%(u)s dbname=%(b)s password=%(w)s port=%(p)s" %(s)s -nln %(d)s"""%{'s':dst_file,'d':dst_tabs[id],'h':dbserver,'u':dbuser,'b':dbname,'w':dbpass,'p':dbport}
-            else:
-                command = """ogr2ogr -append -t_srs "+proj=longlat +datum=WGS84 +no_defs" -f "PostgreSQL"  PG:"host=%(h)s user=%(u)s dbname=%(b)s password=%(w)s port=%(p)s" %(s)s -nln %(d)s"""%{'s':dst_file,'d':dst_tabs[id],'h':dbserver,'u':dbuser,'b':dbname,'w':dbpass,'p':dbport}
-            os.system(command)
             n+=1000
+            m+=1
+            log('%s loaded...'%(n))
+        for i in range(m):
+            dst_file = os.path.join(result_dir,'temp-%s.json'%i)
+            if i == 0:
+                command = """ogr2ogr -overwrite -update -t_srs "+proj=longlat +datum=WGS84 +no_defs" -f "PostgreSQL"  PG:"host=%(h)s user=%(u)s dbname=%(b)s password=%(w)s port=%(p)s" %(s)s -nln %(d)s"""%{'s':dst_file,'d':dst_tabs[id],'h':dbserver,'u':dbuser,'b':dbname,'w':dbpass,'p':dbport}
+            else:
+                command = """ogr2ogr -append -update -t_srs "+proj=longlat +datum=WGS84 +no_defs" -f "PostgreSQL"  PG:"host=%(h)s user=%(u)s dbname=%(b)s password=%(w)s port=%(p)s" %(s)s -nln %(d)s"""%{'s':dst_file,'d':dst_tabs[id],'h':dbserver,'u':dbuser,'b':dbname,'w':dbpass,'p':dbport}
+            os.system(command)
+            log('File %s uploaded...'%(dst_file))
+
+        log('All done in table №%(t)s. Total of %(c)s features.'%{'t': id, 'c': n})
 
         cursor.execute("GRANT SELECT ON %(t)s TO %(u)s"%{'t':dst_tabs[id],'u':'db_reader'})
  
