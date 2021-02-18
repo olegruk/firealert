@@ -58,7 +58,7 @@ def return_token(service_url, username, password, request_url):
 
 def return_json(id, request_url, token, attr_fields, n):
     params = {"token": token,
-            "where": "gid>"+str(n),
+            "where": "id>"+str(n)+" and id<="+str(n+1000),
             "objectIds": "",
             "time": "",
             "geometry": "",
@@ -113,7 +113,7 @@ def get_agol_features_job():
     
     #Создаем каталог для записи временных файлов
     result_dir = get_path(data_root,temp_folder)
-    dst_file = os.path.join(result_dir,'temp.json')
+#    dst_file = os.path.join(result_dir,'temp.json')
 
     #Получаем токен для доступа к сервису ArcGIS Online
     token = return_token(service_url, username, password, request_url)
@@ -124,16 +124,18 @@ def get_agol_features_job():
         m = 0
         is_repeat = True
         while is_repeat:
-            dst_file = os.path.join(result_dir,'temp-%s.json'%m)
             response = return_json(id, request_url, token, attr_fields, n)
-            if id > 0:
-                response['geometryType'] = 'esriGeometryMultiPolygon'
-            is_repeat = 'exceededTransferLimit' in response
-            with open(dst_file, 'w') as outfile:
-                json.dump(response, outfile)
-            n+=1000
-            m+=1
-            log('%s loaded...'%(n))
+            is_repeat = response["features"] != []
+            if is_repeat:
+                dst_file = os.path.join(result_dir,'temp-%s.json'%m)
+                if id > 0:
+                    response['geometryType'] = 'esriGeometryMultiPolygon'
+    #            is_repeat = (('exceededTransferLimit' in response) and ('gid' in response))
+                with open(dst_file, 'w') as outfile:
+                    json.dump(response, outfile)
+                n+=1000
+                m+=1
+                log('%s loaded...'%(n))
         for i in range(m):
             dst_file = os.path.join(result_dir,'temp-%s.json'%i)
             if i == 0:
