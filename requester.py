@@ -374,6 +374,42 @@ def make_tlg_stat_msg(reg_list, period, limit):
         msg = 'Нет новых точек.'
     return msg
 
+def check_zone_stat(zone, period):
+    log("Getting statistic for %s..."%(zone))
+    # extract params from config
+    [year_tab] = get_config("tables", ["year_tab"])
+    #connecting to database
+    conn, cursor = get_cursor()
+
+    statement = """
+        SELECT count(*) FROM
+            (SELECT name
+            FROM %(y)s
+            WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND vip_zone = '%(z)s') as all_sel
+        """%{'y':year_tab,'p':period,'z':zone}
+    try:
+        cursor.execute(statement)
+        all_cnt = cursor.fetchone()[0]
+        log('Finished for:%s'%(zone))
+    except IOError as e:
+        log('Error getting statistic for region:$s'%e)
+
+    close_conn(conn, cursor)
+
+    return all_cnt
+
+def make_zone_stat_msg(zone_list, period):
+    full_cnt = 0
+    msg = 'Новые точки в зонах особого внимания:'
+    for zone in zone_list:
+        all_cnt = check_zone_stat(zone, period)
+        if all_cnt > 0:
+            msg = msg + '\r\n%(z)s: %(a)s'%{'z':zone,'a':all_cnt}
+        full_cnt = full_cnt + all_cnt
+    if full_cnt == 0:
+        msg = ''
+    return msg
+
 def make_smf_stat_msg(reg_list, period, limit):
     full_cnt = 0
     full_cr_cnt = 0
