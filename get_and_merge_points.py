@@ -519,6 +519,21 @@ def check_tech_zones(conn, cursor, src_tab, tech_zones):
     except IOError as e:
         log('Error intersecting points with tech-zones:$s'%e)
 
+def check_vip_zones(conn, cursor, src_tab, vip_zones):
+    log("Checking vip-zones...")
+    sql_stat = """
+        UPDATE %(s)s
+		SET vip_zone = %(o)s.name
+        FROM %(o)s
+        WHERE ST_Intersects(%(o)s.geog, %(s)s.geog)
+		"""%{'s':src_tab, 'o':vip_zones}
+    try:
+        cursor.execute(sql_stat)
+        conn.commit()
+        log('Vip zones checked.')
+    except IOError as e:
+        log('Error intersecting points with vip-zones:$s'%e)
+
 #Копирование данных в общую годичную таблицу
 def copy_to_common_table(conn,cursor,today_tab, year_tab):
     log("Copying data into common table...")
@@ -586,7 +601,7 @@ def get_and_merge_points_job():
     start_logging('get_and_merge_points.py')
 
     # extract db params from config
-    [year_tab,common_tab,tech_zones] = get_config("tables", ["year_tab", "common_tab", "tech_zones"])
+    [year_tab,common_tab,tech_zones,vip_zones] = get_config("tables", ["year_tab", "common_tab", "tech_zones", "vip_zones"])
     [data_root,firms_folder] = get_config("path", ["data_root", "firms_folder"])
     [clst_dist] = get_config("clusters", ["cluster_dist"])
     [num_of_src] = get_config("sources", ["num_of_src"])
@@ -650,6 +665,9 @@ def get_and_merge_points_job():
 
     #Проверка точек на попадание в слой техногена
     check_tech_zones(conn, cursor, common_tab, tech_zones)
+
+    #Проверка точек на попадание в зоны особого контроля
+    check_vip_zones(conn, cursor, common_tab, vip_zones)
 
     #Копирование данных в общую годичную таблицу
     copy_to_common_table(conn,cursor,common_tab, year_tab)

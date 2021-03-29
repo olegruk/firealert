@@ -9,7 +9,7 @@ import os, time
 from falogging import log, start_logging, stop_logging
 from faservice import get_config, get_tuple_cursor, close_conn, get_path, smf_new_topic, str_to_lst
 from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_email_message, send_doc_to_telegram, send_to_telegram
-from requester import make_tlg_stat_msg, make_smf_stat_msg, check_vip_zones
+from requester import make_tlg_stat_msg, make_zone_stat_msg, make_smf_stat_msg, check_vip_zones
 #Создаем таблицу для выгрузки подписчикам
 def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental):
     log("Creating table for subs_id:%s..." %whom)
@@ -526,14 +526,21 @@ def send_to_subscribers_job():
         else:
             log('Do anything? It`s not time yet!')
 
-        if now_hour == sendtimelist[0] and subs.vip_zones:
-            points_count, zones = check_vip_zones(outline, subs.stat_period)
-            if points_count > 0:
-                msg = 'Новых точек\r\nв зонах особого внимания: %s\r\n\r\n' %points_count
-                for (zone, num_points) in zones:
-                    msg = msg + '%s - %s\r\n' %(zone, num_points)
-                send_to_telegram(url, subs.telegramm, msg)
+#        if now_hour == sendtimelist[0] and subs.vip_zones:
+#            points_count, zones = check_vip_zones(outline, subs.stat_period)
+#            if points_count > 0:
+#                msg = 'Новых точек\r\nв зонах особого внимания: %s\r\n\r\n' %points_count
+#                for (zone, num_points) in zones:
+#                    msg = msg + '%s - %s\r\n' %(zone, num_points)
+#                send_to_telegram(url, subs.telegramm, msg)
 
+        if subs.vip_zones:
+            zone_list = str_to_lst(subs.zones[2:-2])
+            msg = make_zone_stat_msg(zone_list, subs.stat_period)
+            if msg != '':
+                log('Sending zones stat to telegram...')
+                send_to_telegram(url, subs.telegramm, msg)
+ 
         if now_hour == sendtimelist[0] and (subs.teleg_stat or subs.email_stat):
             reg_list = str_to_lst(subs.regions[2:-2])
             msg = make_tlg_stat_msg(reg_list, subs.stat_period, subs.critical)
