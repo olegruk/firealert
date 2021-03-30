@@ -217,7 +217,8 @@ def make_common_table(conn,cursor,dst_tab,pointsets):
                 date_time TIMESTAMP,
                 geog GEOGRAPHY(POINT, 4326),
                 marker VARCHAR(26),
-                tech VARCHAR(256)
+                tech VARCHAR(254),
+                vip_zone VARCHAR(254)
 		)
 		"""%(dst_tab)
 	)
