@@ -539,7 +539,7 @@ def check_vip_zones(conn, cursor, src_tab, vip_zones):
 def copy_to_common_table(conn,cursor,today_tab, year_tab):
     log("Copying data into common table...")
     ins_string = """
-        INSERT INTO %(y)s (name,acq_date,acq_time,daynight,latitude,longitude,satellite,conf_modis,conf_viirs,brightness,bright_t31,bright_ti4,bright_ti5,scan,track,version,frp,region,rating,critical,revision,peat_id,peat_district,peat_region,peat_area,peat_class,peat_fire,ident,date_time,geog,marker,tech)
+        INSERT INTO %(y)s (name,acq_date,acq_time,daynight,latitude,longitude,satellite,conf_modis,conf_viirs,brightness,bright_t31,bright_ti4,bright_ti5,scan,track,version,frp,region,rating,critical,revision,peat_id,peat_district,peat_region,peat_area,peat_class,peat_fire,ident,date_time,geog,marker,tech,vip_zone)
             SELECT
                 name,
                 acq_date,
@@ -571,7 +571,8 @@ def copy_to_common_table(conn,cursor,today_tab, year_tab):
                 date_time,
                 geog,
                 marker,
-                tech
+                tech,
+                vip_zone
             FROM %(t)s
                 WHERE NOT EXISTS(
 					SELECT ident FROM %(y)s
