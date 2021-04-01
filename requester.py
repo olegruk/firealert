@@ -380,16 +380,27 @@ def check_zone_stat(zone, period):
     [year_tab] = get_config("tables", ["year_tab"])
     #connecting to database
     conn, cursor = get_cursor()
+    zone_time = time.strftime('%H',currtime)
 
-    statement = """
+
+    statements = (
+        """
         SELECT count(*) FROM
             (SELECT name
             FROM %(y)s
-            WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND vip_zone = '%(z)s') as all_sel
-        """%{'y':year_tab,'p':period,'z':zone}
+            WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND vip_zone = '%(z)s' AND (vip_time IS NULL OR vip_time = '%(t)s' ) as all_sel
+        """%{'y':year_tab,'p':period,'z':zone,'t':zone_time},
+        """
+        UPDATE %(y)s SET
+            zone_time = '%(t)s'
+        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND vip_zone = '%(z)s' AND vip_time IS NULL
+        """%{'y':year_tab,'p':period,'z':zone,'t':zone_time}
+        )
+
     try:
-        cursor.execute(statement)
+        cursor.execute(statements[0])
         all_cnt = cursor.fetchone()[0]
+        cursor.execute(statements[1])
         log('Finished for:%s'%(zone))
     except IOError as e:
         log('Error getting statistic for region:$s'%e)

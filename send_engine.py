@@ -535,6 +535,7 @@ def send_to_subscribers_job():
 #                send_to_telegram(url, subs.telegramm, msg)
 
         if subs.vip_zones:
+            log('Checking zones stat for %s...'%str(subs.subs_name))
             zone_list = str_to_lst(subs.zones[2:-2])
             msg = make_zone_stat_msg(zone_list, subs.stat_period)
             if msg != '':
