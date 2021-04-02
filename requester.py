@@ -380,15 +380,15 @@ def check_zone_stat(zone, period):
     [year_tab] = get_config("tables", ["year_tab"])
     #connecting to database
     conn, cursor = get_cursor()
+    currtime = time.localtime()
     zone_time = time.strftime('%H',currtime)
-
 
     statements = (
         """
         SELECT count(*) FROM
             (SELECT name
             FROM %(y)s
-            WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND vip_zone = '%(z)s' AND (vip_time IS NULL OR vip_time = '%(t)s' ) as all_sel
+            WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND vip_zone = '%(z)s' AND (vip_time IS NULL OR vip_time = '%(t)s')) as all_sel
         """%{'y':year_tab,'p':period,'z':zone,'t':zone_time},
         """
         UPDATE %(y)s SET
