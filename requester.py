@@ -392,7 +392,7 @@ def check_zone_stat(zone, period):
         """%{'y':year_tab,'p':period,'z':zone,'t':zone_time},
         """
         UPDATE %(y)s SET
-            zone_time = '%(t)s'
+            vip_time = '%(t)s'
         WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND vip_zone = '%(z)s' AND vip_time IS NULL
         """%{'y':year_tab,'p':period,'z':zone,'t':zone_time}
         )
