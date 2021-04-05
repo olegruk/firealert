@@ -16,7 +16,8 @@ from falogging import log, start_logging, stop_logging
 import os, time, re
 
 #from config import url, TOKEN
-[url, TOKEN] = get_config('telegramm', ['url', 'token'])
+#[url, TOKEN] = get_config('telegramm', ['url', 'token'])
+from config import url, TOKEN
 
 # Stages
 [MAIN_MENU,
