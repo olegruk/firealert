@@ -11,12 +11,14 @@ from telegram.ext import (
     CallbackContext)
 
 import subsconf, requester
-from faservice import get_config, get_path, send_doc_to_telegram, str_to_lst
+from faservice import get_config, get_path, send_to_telegram, send_doc_to_telegram, str_to_lst
 from falogging import log, start_logging, stop_logging
 import os, time, re
 
 #from config import url, TOKEN
 #[url, TOKEN] = get_config('telegramm', ['url', 'token'])
+[tst_url, tst_chat_id] = get_config("telegramm", ["url", "tst_chat_id"])
+
 from config import url, TOKEN
 
 # Stages
@@ -587,8 +589,11 @@ def get_r_cf_lim(update: Update, context: CallbackContext):
 def get_r_date(update: Update, context: CallbackContext):
     message = update.message.text
     context.user_data['request'] = context.user_data['request'] + ' ' + message
-    update.message.reply_text('И время (в формате ЧЧ:ММ).')
-    return WAIT_R_TIME
+    update.message.reply_text("Задайте период за который надо отобрать точки.\n"
+                                "Возможны варианты '12h', '32 hours', '2 months' или их комбинации.")
+#    update.message.reply_text('И время (в формате ЧЧ:ММ).')
+#    return WAIT_R_TIME
+    return WAIT_R_PERIOD
 
 def get_r_time(update: Update, context: CallbackContext):
     message = update.message.text
@@ -600,12 +605,6 @@ def get_r_time(update: Update, context: CallbackContext):
 def get_r_period1(update: Update, context: CallbackContext):
     message = update.message.text
     context.user_data['request'] = context.user_data['request'] + ' ' + message + 'h'
-    update.message.reply_text('Укажите регион, по которому будут отобраны точки.')
-    return WAIT_R_REGLIST
-
-def get_r_period(update: Update, context: CallbackContext):
-    message = update.message.text
-    context.user_data['request'] = context.user_data['request'] + ' ' + message + 'h'
     reglist = subsconf.list_reglist()
     msg = '0 Вся Россия\n'
     for num, elem in enumerate(reglist[0:-1]):
@@ -615,6 +614,29 @@ def get_r_period(update: Update, context: CallbackContext):
                                 'Можно указать несколько номеров через запятую.\n'
                                 'ЦР - Центральный регион.'%msg)
     return WAIT_R_REGLIST
+
+def get_r_period(update: Update, context: CallbackContext):
+    message = update.message.text
+    context.user_data['request'] = context.user_data['request'] + ' ' + message + 'h'
+    reglist = subsconf.list_reglist()
+
+    msg = '0 Вся Россия\n'
+    for num, elem in enumerate(reglist[0:50]):
+        msg = msg + str(num+1) + ' ' + str(elem)[2:-3] + '\n'
+    update.message.reply_text(u'Список всех регионов:\n%s\n'%msg)
+    print(msg)
+    return WAIT_R_REGLIST
+"""
+    msg = ''
+    for num, elem in enumerate(reglist[50:-1]):
+        msg = msg + str(num+1) + ' ' + str(elem)[2:-3] + '\n'
+    num = num + 2
+    update.message.reply_text('%(m)s\n'
+                                '%(n)s - Центральный регион.\n'
+                                'Укажите номер региона, по которому будут отобраны точки.\n'
+                                'Можно указать несколько номеров через запятую.'
+                                %{'m':msg, 'n':num})
+"""
 
 def get_r_reglist(update: Update, context: CallbackContext):
     [data_root,temp_folder] = get_config("path", ["data_root", "temp_folder"])
@@ -631,10 +653,17 @@ def get_r_reglist(update: Update, context: CallbackContext):
         numlist = message.strip().split(',')
         final_reglist = ''
         for num in numlist[0:-1]:
-            region = str(reglist[0:-1][int(num)-1])[2:-3]
-            final_reglist = final_reglist + "'%s', "%region
-        region = str(reglist[0:-1][int(numlist[-1])-1])[2:-3]
-        final_reglist = final_reglist + "'%s'"%region
+            if num.isdigit():
+                region = str(reglist[0:-1][int(num)-1])[2:-3]
+                final_reglist = final_reglist + "'%s', "%region
+            else:
+                update.message.reply_text('Укажите порядковые номера регионов. В перечислении должны быть только числа.')
+                break
+        if numlist[-1].isdigit():
+            region = str(reglist[0:-1][int(numlist[-1])-1])[2:-3]
+            final_reglist = final_reglist + "'%s'"%region
+        else:
+            update.message.reply_text('Укажите порядковые номера регионов. В перечислении должны быть только числа.')
     if message != '':
         context.user_data['request'] = context.user_data['request'] + ' ' + '(' + final_reglist + ')'
     update.message.reply_text('Сейчас сюда прилетят точки.')
@@ -892,7 +921,7 @@ def manual_get_around(update: Update, context: CallbackContext):
 
 def manual_help(update: Update, context: CallbackContext):
     """Send a message when the command /help is issued."""
-    update.message.reply_text('Тут можно плдучить результат двумя путями - через диалог (с кнопками и подсказками) и через команды, набираемые в строке:\n'
+    update.message.reply_text('Тут можно получить результат двумя путями - через диалог (с кнопками и подсказками) и через команды, набираемые в строке:\n'
                               'Команды тут такие:\n'
                               '/start - \n'
                               'начать диалог; \n'
@@ -962,6 +991,11 @@ def manual_help_get_around(update: Update, context: CallbackContext):
                               'Порядок параметров несущественен, скобки и кавычки - необходимы. \n'
                               'Просто запрос /get_around (N55.66173821, E41.37139873, 10000) вернет точки за последние 24 часа.')
 
+def error_callback(update: Update, context: CallbackContext):
+    msg = 'Ошибки в боте:\n%s'%context.error
+    send_to_telegram(tst_url, tst_chat_id, msg)
+    #print(msg)
+    return ConversationHandler.END
 
 def main():
     """Start the bot."""
@@ -1037,10 +1071,12 @@ def main():
                 MessageHandler(Filters.text, get_r_time)
             ],
             WAIT_R_PERIOD: [
-                MessageHandler(Filters.text, get_r_period)
+                MessageHandler(Filters.text, get_r_period),
+                CommandHandler('start', start)
             ],
             WAIT_R_REGLIST: [
-                MessageHandler(Filters.text, get_r_reglist)
+                MessageHandler(Filters.text, get_r_reglist),
+                CommandHandler('start', start)
             ],
             WAIT_C_CF_ANSW: [
                 CallbackQueryHandler(get_c_cf_answ_c, pattern='^' + str(CF_CRITICAL) + '$'),
@@ -1065,11 +1101,15 @@ def main():
                 MessageHandler(Filters.text, get_c_radius)
             ]
         },
-        fallbacks=[CommandHandler('start', start)]
+        fallbacks=[CommandHandler('start', start),
+                    CommandHandler("help", manual_help)
+        ],
+        allow_reentry = True
     )
 
     # Add ConversationHandler to dispatcher that will be used for handling
     # updates
+    disp.add_error_handler(error_callback)
     disp.add_handler(conv_handler)
     disp.add_handler(CommandHandler("init", init))
     disp.add_handler(CommandHandler("t_subs_stat", manual_t_subs_stat))
