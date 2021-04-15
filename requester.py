@@ -336,13 +336,13 @@ def check_reg_stat(reg, period, critical):
         SELECT count(*) FROM
             (SELECT name
             FROM %(y)s
-            WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)sh' AND date_time < TIMESTAMP 'today' AND critical >= %(c)s AND region = '%(r)s') as critical_sel
+            WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND date_time < TIMESTAMP 'today' AND critical >= %(c)s AND region = '%(r)s') as critical_sel
         """%{'y':year_tab,'p':period,'c':critical,'r':reg},
         """
         SELECT count(*) FROM
             (SELECT name
             FROM %(y)s
-            WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)sh' AND date_time < TIMESTAMP 'today' AND region = '%(r)s') as all_sel
+            WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND date_time < TIMESTAMP 'today' AND region = '%(r)s') as all_sel
         """%{'y':year_tab,'p':period,'r':reg}
         )
     try:
@@ -388,12 +388,12 @@ def check_zone_stat(zone, period):
         SELECT count(*) FROM
             (SELECT name
             FROM %(y)s
-            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)sh' AND vip_zone = '%(z)s' AND (vip_time IS NULL OR vip_time = '%(t)s')) as all_sel
+            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND vip_zone = '%(z)s' AND (vip_time IS NULL OR vip_time = '%(t)s')) as all_sel
         """%{'y':year_tab,'p':period,'z':zone,'t':zone_time},
         """
         UPDATE %(y)s SET
             vip_time = '%(t)s'
-        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)sh' AND vip_zone = '%(z)s' AND vip_time IS NULL
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND vip_zone = '%(z)s' AND vip_time IS NULL
         """%{'y':year_tab,'p':period,'z':zone,'t':zone_time}
         )
 

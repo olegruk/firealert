@@ -533,18 +533,18 @@ def send_to_subscribers_job():
 #                for (zone, num_points) in zones:
 #                    msg = msg + '%s - %s\r\n' %(zone, num_points)
 #                send_to_telegram(url, subs.telegramm, msg)
-
+        period = '%sh'%subs.stat_period
         if subs.vip_zones:
             log('Checking zones stat for %s...'%str(subs.subs_name))
             zone_list = str_to_lst(subs.zones[2:-2])
-            msg = make_zone_stat_msg(zone_list, subs.stat_period)
+            msg = make_zone_stat_msg(zone_list, period)
             if msg != '':
                 log('Sending zones stat to telegram...')
                 send_to_telegram(url, subs.telegramm, msg)
  
         if now_hour == sendtimelist[0] and (subs.teleg_stat or subs.email_stat):
             reg_list = str_to_lst(subs.regions[2:-2])
-            msg = make_tlg_stat_msg(reg_list, subs.stat_period, subs.critical)
+            msg = make_tlg_stat_msg(reg_list, period, subs.critical)
             if subs.teleg_stat:
                 log('Sending stat to telegram...')
                 send_to_telegram(url, subs.telegramm, msg)
