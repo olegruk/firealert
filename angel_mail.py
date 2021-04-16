@@ -24,15 +24,16 @@ def parse_multipart(email_message, result_dir):
             ctype = payload.get_content_type()
             print('Type: %s'%ctype)
             if ctype in ['image/jpeg', 'image/png']:
-                dst_file_name = ''.join((t[0].decode(codepage)) for t in payload.get_filename())
+                dst_file_name = ''.join((t[0].decode(codepage)) for t in decode_header(payload.get_filename()))
+                print('File name: %s'%dst_file_name)
                 dst_file = os.path.join(result_dir,dst_file_name)
                 print('File: %s'%dst_file)
-                open(dst_file, 'wb').write(payload.get_payload(decode=True))
+#                open(dst_file, 'wb').write(payload.get_payload(decode=True))
             elif ctype in ['text/plain']:#, 'text/html']:
                 #print(payload.get_payload(decode=True))
                 body = payload.get_payload(decode=True).decode(codepage, errors='ignore')
                 print(body)
-            elif ctype in ['multipart/related']:
+            elif ctype in ['multipart/related', 'multipart/alternative', 'multipart/mixed']:
                 parse_multipart(payload, result_dir)
     else:    
         body = email_message.get_payload(decode=True).decode(codepage, errors='ignore')
