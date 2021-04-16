@@ -16,28 +16,35 @@ codepage='utf-8'
 #codepage='unicode-escape'
 #, errors='ignore'
 
+def print_list(lst):
+    for [ctype, body] in lst:
+        if type(body) is str:
+            print(ctype,body)
+        elif type(body) is list:
+            print_list(body)
+
 def parse_multipart(email_message, result_dir):
     result = []
     if email_message.is_multipart():
         for part in email_message.get_payload():
             ctype = part.get_content_type()
-            #print('Type: %s'%ctype)
             if ctype in ['image/jpeg', 'image/png']:
                 dst_file_name = ''.join((t[0].decode(codepage)) for t in decode_header(part.get_filename()))
                 dst_file = os.path.join(result_dir,dst_file_name)
-                #open(dst_file, 'wb').write(part.get_payload(decode=True))
-                result.append((ctype,dst_file_name))
+                open(dst_file, 'wb').write(part.get_payload(decode=True))
+                result.append([ctype,dst_file_name])
             elif ctype in ['text/plain']:#, 'text/html']:
-                #print(part.get_payload(decode=True))
+                #body = part.get_payload(decode=True)
                 body = part.get_payload(decode=True).decode(codepage, errors='ignore')
-                result.append((ctype,body))
+                result.append([ctype,body])
             elif ctype in ['multipart/related', 'multipart/alternative', 'multipart/mixed']:
-                result.append(parse_multipart(part, result_dir))
+                result.append([ctype,parse_multipart(part, result_dir)])
     else:
         ctype = email_message.get_payload().get_content_type()
         body = email_message.get_payload(decode=True).decode(codepage, errors='ignore')
         #body = email_message.get_payload(decode=True).decode(part.get_content_charset())
-        result = [(ctype,body)]
+        result = [[ctype,body]]
+    return result
 
 def angel_mail_job():
 
@@ -77,14 +84,14 @@ def angel_mail_job():
     attr_id = email_message['Message-Id']
     attr_body = ''
 
-
     print('To: %s'%attr_to)
     print('From: %s <%s>'%(attr_from[0],attr_from[1]))
     print('Date: %s'%attr_date)
     print('Subject: %s'%attr_subj)
     print('Message-Id: %s'%attr_id)
     print('Body:')
-    print(parse_multipart(email_message,result_dir))
+    body = parse_multipart(email_message,result_dir)
+    print_list(body)
 
     mail.close()
     mail.logout()
