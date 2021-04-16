@@ -18,7 +18,6 @@ def check_stat_job():
 
     [alerts_period] = get_config("alerts", ["period"])
     new_alerts(alerts_period, date)
-    print(date) 
 
     stop_logging('check_alerts.py')
 
