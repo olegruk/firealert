@@ -10,7 +10,6 @@ from config import imap_login, imap_password
 
 imap_server = "imap.mail.ru"
 imap_port = "993"
-#codepage='cp1251'
 codepage='utf-8'
 #codepage='iso-8859-1'
 #codepage='windows-1251'
@@ -18,27 +17,27 @@ codepage='utf-8'
 #, errors='ignore'
 
 def parse_multipart(email_message, result_dir):
+    result = []
     if email_message.is_multipart():
-        for n, payload in enumerate(email_message.get_payload()):
-            print('Part %s:\n'%n)
-            ctype = payload.get_content_type()
-            print('Type: %s'%ctype)
+        for part in email_message.get_payload():
+            ctype = part.get_content_type()
+            #print('Type: %s'%ctype)
             if ctype in ['image/jpeg', 'image/png']:
-                dst_file_name = ''.join((t[0].decode(codepage)) for t in decode_header(payload.get_filename()))
-                print('File name: %s'%dst_file_name)
+                dst_file_name = ''.join((t[0].decode(codepage)) for t in decode_header(part.get_filename()))
                 dst_file = os.path.join(result_dir,dst_file_name)
-                print('File: %s'%dst_file)
-#                open(dst_file, 'wb').write(payload.get_payload(decode=True))
+                #open(dst_file, 'wb').write(part.get_payload(decode=True))
+                result.append((ctype,dst_file_name))
             elif ctype in ['text/plain']:#, 'text/html']:
-                #print(payload.get_payload(decode=True))
-                body = payload.get_payload(decode=True).decode(codepage, errors='ignore')
-                print(body)
+                #print(part.get_payload(decode=True))
+                body = part.get_payload(decode=True).decode(codepage, errors='ignore')
+                result.append((ctype,body))
             elif ctype in ['multipart/related', 'multipart/alternative', 'multipart/mixed']:
-                parse_multipart(payload, result_dir)
-    else:    
+                result.append(parse_multipart(part, result_dir))
+    else:
+        ctype = email_message.get_payload().get_content_type()
         body = email_message.get_payload(decode=True).decode(codepage, errors='ignore')
-    #    body = email_message.get_payload(decode=True).decode(payload.get_content_charset())
-        print(body)
+        #body = email_message.get_payload(decode=True).decode(part.get_content_charset())
+        result = [(ctype,body)]
 
 def angel_mail_job():
 
@@ -85,7 +84,7 @@ def angel_mail_job():
     print('Subject: %s'%attr_subj)
     print('Message-Id: %s'%attr_id)
     print('Body:')
-    parse_multipart(email_message,result_dir)
+    print(parse_multipart(email_message,result_dir))
 
     mail.close()
     mail.logout()
