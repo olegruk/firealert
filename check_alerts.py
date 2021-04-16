@@ -5,7 +5,7 @@
 # Created:     24.12.2020
 #-------------------------------------------------------------------------------
 
-import time
+from datetime import datetime, timedelta
 from falogging import start_logging, stop_logging
 from faservice import get_config
 from requester import new_alerts
@@ -13,11 +13,12 @@ from requester import new_alerts
 def check_stat_job():
     start_logging('check_alerts.py')
     
-    currtime = time.localtime()
-    date=time.strftime('%Y-%m-%d',currtime)
+    yesterday = datetime.now() - timedelta(days=1)
+    date=yesterday.strftime('%Y-%m-%d')
 
     [alerts_period] = get_config("alerts", ["period"])
-    new_alerts(alerts_period, date) 
+    new_alerts(alerts_period, date)
+    print(date) 
 
     stop_logging('check_alerts.py')
 
