@@ -8,7 +8,7 @@
 import time
 from falogging import start_logging, stop_logging
 from faservice import get_config, send_to_telegram, smf_new_topic
-from requester import make_tlg_stat_msg, make_smf_stat_msg, new_alerts
+from requester import make_tlg_stat_msg, make_smf_stat_msg
 
 def check_stat_job():
     start_logging('check_stat.py')
@@ -25,7 +25,6 @@ def check_stat_job():
     [peat_stat_period] = get_config("peats_stat", ["period"])
 
     #check_peats_stat(reg_list, date)
-    new_alerts(peat_stat_period, date)
     msg = make_tlg_stat_msg(reg_list_cr, period, critical_limit)
     smf_msg = make_smf_stat_msg(reg_list_cr, period, critical_limit)
 
