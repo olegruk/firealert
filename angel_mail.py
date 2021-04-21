@@ -1,20 +1,11 @@
 # -*- coding: utf-8 -*-
 
+import os, datetime, re
 import imaplib, email, base64
 from email.header import decode_header
-import os, time, re
-import datetime
 from falogging import log, start_logging, stop_logging
 from faservice import get_config, get_path, get_cursor, close_conn, send_to_telegram, send_doc_to_telegram
 
-from config import imap_login, imap_password
-
-[angel_tab] = get_config("tables", ['angel_tab'])
-[url, chat_id] = get_config("telegramm", ["url", "tst_chat_id"])
-
-imap_server = "imap.mail.ru"
-imap_port = "993"
-codepage='utf-8'
 #codepage='iso-8859-1'
 #codepage='windows-1251'
 #codepage='unicode-escape'
@@ -43,7 +34,7 @@ def parse_multipart(email_message, result_dir, uid):
         #body = email_message.get_payload(decode=True).decode(part.get_content_charset())
     return result
 
-def get_last_uid(conn, cursor):
+def get_last_uid(conn, cursor, angel_tab):
     cursor.execute("SELECT max(uid) FROM %s"%angel_tab)
     last_uid = cursor.fetchone()[0]
     return last_uid
@@ -61,23 +52,29 @@ def store_message(conn, cursor, uid, date, time, description, region, district, 
     except IOError as e:
         log('Error adding message:$s'%e)
         
-def process_attachement(msg, files):                        # Функция по обработке списка, добавляемых к сообщению файлов
+def telegram_images(url, chat_id, files):
     for f in files:
-        if os.path.isfile(f):                               # Если файл существует
-            attach_file(msg,f)                              # Добавляем файл к сообщению
-        elif os.path.exists(f):                             # Если путь не файл и существует, значит - папка
-            dir = os.listdir(f)                             # Получаем список файлов в папке
-            for file in dir:                                # Перебираем все файлы и...
-                attach_file(msg,f+"/"+file)                 # ...добавляем каждый файл к сообщению
+        if os.path.isfile(f):
+            send_doc_to_telegram(url, chat_id, f)
+            os.remove(f)
+        elif os.path.exists(f):
+            dir = os.listdir(f)
+            for file in dir:
+                send_doc_to_telegram(url, chat_id, file)
+                os.remove(file)
 
 def angel_mail_job():
     start_logging('angel_mail.py')
+    [angel_tab] = get_config("tables", ['angel_tab'])
+    [url, chat_id] = get_config("telegramm", ["url", "tst_chat_id"])
+    [imap_server,imap_port,codepage,imap_login,imap_password] = get_config("angel", ["imap_server","imap_port","codepage","imap_login","imap_password"])
+    [data_root,angel_folder] = get_config("path", ["data_root", "angel_folder"])
+
     #currtime = time.localtime()
     #date = time.strftime('%Y-%m-%d',currtime)
     #now_hour = time.strftime('%H',currtime)
     yesterday = (datetime.date.today() - datetime.timedelta(1)).strftime("%d-%b-%Y")
     #Создаем каталог для записи временных файлов
-    [data_root,angel_folder] = get_config("path", ["data_root", "angel_folder"])
     result_dir = get_path(data_root,angel_folder)
 
     conn, cursor = get_cursor()
@@ -95,7 +92,7 @@ def angel_mail_job():
     #result, data = mail.uid('search', None, '(SENTSINCE "19-Apr-2021")'.format(date=yesterday))
     #result, data = mail.uid('search', None, '(SENTSINCE {date} HEADER Subject "My Subject" NOT FROM "yuji@grovemade.com")'.format(date=yesterday))
     max_uid = 5500
-    #max_uid = get_last_uid(conn, cursor)
+    #max_uid = get_last_uid(conn, cursor, angel_tab)
     #print(max_uid)
     uid_list = []
     for uid in data[0].split():
@@ -155,6 +152,7 @@ def angel_mail_job():
             store_message(conn, cursor, dig_uid, date, time, description, region, district, place, lat, lon, azimuth, google, yandex, send_to)
             telegram_mes = "Сообщение #{uid}\n{date} {time} UTC\nЧС: {desc}\nОбласть: {reg}\nРайон: {dist}\nН.п.: {place}\nN{lat} E{lon}\nАзимут: {az}\nGoogle Maps: {google}\nYandex Maps: {yandex}".format(uid=dig_uid,date=date,time=time,desc=description,reg=region,dist=district,place=place,lat=lat,lon=lon,az=azimuth,google=google,yandex=yandex)
             send_to_telegram(url, chat_id, telegram_mes)
+            telegram_images(url, chat_id, result_dir)
 
 
     mail.close()
