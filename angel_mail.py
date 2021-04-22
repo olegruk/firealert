@@ -4,14 +4,14 @@ import os, datetime, re
 import imaplib, email, base64
 from email.header import decode_header
 from falogging import log, start_logging, stop_logging
-from faservice import get_config, get_path, get_cursor, close_conn, send_to_telegram, send_doc_to_telegram
+from faservice import get_config, get_path, get_cursor, close_conn, send_to_telegram, send_img_to_telegram
 
 #codepage='iso-8859-1'
 #codepage='windows-1251'
 #codepage='unicode-escape'
 #, errors='ignore'
 
-def parse_multipart(email_message, result_dir, uid):
+def parse_multipart(email_message, result_dir, uid, codepage):
     result = ''
     if email_message.is_multipart():
         for part in email_message.get_payload():
@@ -27,7 +27,7 @@ def parse_multipart(email_message, result_dir, uid):
                 body = part.get_payload(decode=True).decode(codepage, errors='ignore')
                 result = result + body + '\n'
             elif ctype in ['multipart/related', 'multipart/alternative', 'multipart/mixed']:
-                result = result + parse_multipart(part, result_dir, uid) + '\n'
+                result = result + parse_multipart(part, result_dir, uid, codepage) + '\n'
     else:
         ctype = email_message.get_payload().get_content_type()
         result = email_message.get_payload(decode=True).decode(codepage, errors='ignore')
@@ -39,35 +39,47 @@ def get_last_uid(conn, cursor, angel_tab):
     last_uid = cursor.fetchone()[0]
     return last_uid
 
-def store_message(conn, cursor, uid, date, time, description, region, district, place, lat, lon, azimuth, google, yandex, send_to):
-    print('Uid: {uid}'.format(uid=uid))
+def store_message(conn, cursor, angel_tab, peat_tab, uid, date, time, description, region, district, place, lat, lon, azimuth, google, yandex, send_to):
+    #print('Uid: {uid}'.format(uid=uid))
     stat = """
         INSERT INTO %(a)s (uid,date,time,description,region,district,place,lat,lon,azimuth,google,yandex,send_to,geom)
             VALUES ('%(u)s','%(d)s','%(t)s','%(i)s','%(r)s','%(c)s','%(p)s','%(l)s','%(o)s','%(z)s','%(g)s','%(y)s','%(n)s',ST_GeomFromText('POINT(%(o)s %(l)s)',4326))
     """%{'a':angel_tab,'u':uid,'d':date,'t':time,'i':description,'r':region,'c':district,'p':place,'l':lat,'o':lon,'z':azimuth,'g':google,'y':yandex,'n':send_to}
+    check = """
+        UPDATE %(a)s SET
+            peat_id = %(p)s.unique_id
+        FROM %(p)s
+        WHERE %(a)s.uid = '%(u)s' AND ST_Intersects(st_transform(%(a)s.geom::geometry, 3857), %(p)s.geom)
+    """%{'a':angel_tab, 'p':peat_tab, 'u':uid}
     try:
         cursor.execute(stat)
         conn.commit()
         log("A message #%s added."%uid)
     except IOError as e:
         log('Error adding message:$s'%e)
+    try:
+        cursor.execute(check)
+        conn.commit()
+        log("A peatlands check for #%s done."%uid)
+    except IOError as e:
+        log('Error adding message:$s'%e)
+    cursor.execute("SELECT peat_id FROM %(a)s WHERE %(a)s.uid = '%(u)s'"%{'a':angel_tab, 'u':uid})
+    return cursor.fetchone()[0]
         
-def telegram_images(url, chat_id, files):
-    for f in files:
-        if os.path.isfile(f):
-            send_doc_to_telegram(url, chat_id, f)
-            os.remove(f)
-        elif os.path.exists(f):
-            dir = os.listdir(f)
-            for file in dir:
-                send_doc_to_telegram(url, chat_id, file)
-                os.remove(file)
+def telegram_images(url, chat_id, f):
+    if os.path.exists(f):
+        dir = os.listdir(f)
+        for file in dir:
+            dst_file = os.path.join(f, file)
+            photo = open(dst_file, 'rb')
+            send_img_to_telegram(url, chat_id, photo)
+            os.remove(dst_file)
 
 def angel_mail_job():
     start_logging('angel_mail.py')
-    [angel_tab] = get_config("tables", ['angel_tab'])
+    [angel_tab, peat_tab] = get_config("tables", ['angel_tab', 'angelpeat_tab'])
     [url, chat_id] = get_config("telegramm", ["url", "tst_chat_id"])
-    [imap_server,imap_port,codepage,imap_login,imap_password] = get_config("angel", ["imap_server","imap_port","codepage","imap_login","imap_password"])
+    [imap_server,imap_port,codepage,imap_login,imap_password] = get_config("angel", ["imap_server","imap_port","imap_codepage","imap_login","imap_password"])
     [data_root,angel_folder] = get_config("path", ["data_root", "angel_folder"])
 
     #currtime = time.localtime()
@@ -91,15 +103,15 @@ def angel_mail_job():
     #result, data = mail.uid('search', None, '(HEADER Received "localhost")')
     #result, data = mail.uid('search', None, '(SENTSINCE "19-Apr-2021")'.format(date=yesterday))
     #result, data = mail.uid('search', None, '(SENTSINCE {date} HEADER Subject "My Subject" NOT FROM "yuji@grovemade.com")'.format(date=yesterday))
-    max_uid = 5500
-    #max_uid = get_last_uid(conn, cursor, angel_tab)
+    #max_uid = 5500
+    max_uid = get_last_uid(conn, cursor, angel_tab)
     #print(max_uid)
     uid_list = []
     for uid in data[0].split():
         if int(uid) > max_uid:
             uid_list.append(uid)
 
-    print(uid_list)
+    #print(uid_list)
 
     for uid in uid_list:
         result, fetch_data = mail.uid('fetch', uid, '(RFC822)')
@@ -116,10 +128,10 @@ def angel_mail_job():
         #attr_from = [''.join((t[0].decode()) for t in decode_header(email.utils.parseaddr(email_message['From'])[0])), email.utils.parseaddr(email_message['From'])[1]]
         #attr_from = [''.join((t[0]) for t in decode_header(email.utils.parseaddr(email_message['From'])[0])), email.utils.parseaddr(email_message['From'])[1]]
         #attr_id = email_message['Message-Id']
-        #message = parse_multipart(email_message,result_dir,dig_uid)
+        #message = parse_multipart(email_message,result_dir,dig_uid,codepage)
         #if not(re.search(r'Fwd:', subj)) and re.search(r'Оперативный дежурный', message):
         if not(re.search(r'Fwd:', subj)) and re.search(r'\d\d/\d\d/\d\d\d\d \d\d:\d\d UTC', subj):
-            message = parse_multipart(email_message,result_dir,dig_uid)
+            message = parse_multipart(email_message,result_dir,dig_uid,codepage)
             date_time = re.search(r'Дата и время:.*\n', message)[0]#[14:-1]
             dmy = re.search(r'\d\d/\d\d/\d\d\d\d', date_time)[0]
             date = '{yyyy}-{mm}-{dd}'.format(yyyy=dmy[6:10],mm=dmy[3:5],dd=dmy[0:2])
@@ -149,11 +161,11 @@ def angel_mail_job():
             yandex = re.search(r'Yandex Maps:.*\n', message)[0]#[13:-1]
             yandex = re.sub(r'Yandex Maps:\s*','',yandex)
             yandex = re.sub(r'\s*\n','',yandex)            
-            store_message(conn, cursor, dig_uid, date, time, description, region, district, place, lat, lon, azimuth, google, yandex, send_to)
-            telegram_mes = "Сообщение #{uid}\n{date} {time} UTC\nЧС: {desc}\nОбласть: {reg}\nРайон: {dist}\nН.п.: {place}\nN{lat} E{lon}\nАзимут: {az}\nGoogle Maps: {google}\nYandex Maps: {yandex}".format(uid=dig_uid,date=date,time=time,desc=description,reg=region,dist=district,place=place,lat=lat,lon=lon,az=azimuth,google=google,yandex=yandex)
-            send_to_telegram(url, chat_id, telegram_mes)
-            telegram_images(url, chat_id, result_dir)
-
+            is_peat = store_message(conn, cursor, angel_tab, peat_tab, dig_uid, date, time, description, region, district, place, lat, lon, azimuth, google, yandex, send_to)
+            if is_peat:
+                telegram_mes = "Сообщение #{uid}\n{date} {time} UTC\nЧС: {desc}\nОбласть: {reg}\nРайон: {dist}\nН.п.: {place}\nN{lat} E{lon}\nАзимут: {az}\nGoogle Maps: {google}\nYandex Maps: {yandex}".format(uid=dig_uid,date=date,time=time,desc=description,reg=region,dist=district,place=place,lat=lat,lon=lon,az=azimuth,google=google,yandex=yandex)
+                send_to_telegram(url, chat_id, telegram_mes)
+                telegram_images(url, chat_id, result_dir)
 
     mail.close()
     mail.logout()
