@@ -75,11 +75,21 @@ def telegram_images(url, chat_id, f):
             send_img_to_telegram(url, chat_id, photo)
             os.remove(dst_file)
 
+def drop_temp_files(result_dir):
+    for the_file in os.listdir(result_dir):
+        file_path = os.path.join(result_dir, the_file)
+        try:
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+            #elif os.path.isdir(file_path): shutil.rmtree(file_path)
+        except Exception as e:
+            log('Cannot remove files:$s' %e)
+
 def angel_mail_job():
     start_logging('angel_mail.py')
     [angel_tab, peat_tab] = get_config("tables", ['angel_tab', 'angelpeat_tab'])
-    [url, chat_id] = get_config("telegramm", ["url", "tst_chat_id"])
-    [imap_server,imap_port,codepage,imap_login,imap_password] = get_config("angel", ["imap_server","imap_port","imap_codepage","imap_login","imap_password"])
+    [url] = get_config("telegramm", ["url"])
+    [imap_server,imap_port,codepage,imap_login,imap_password,chat_list,lim] = get_config("angel", ["imap_server","imap_port","imap_codepage","imap_login","imap_password","chat_list","lim"])
     [data_root,angel_folder] = get_config("path", ["data_root", "angel_folder"])
 
     #currtime = time.localtime()
@@ -163,10 +173,14 @@ def angel_mail_job():
             yandex = re.sub(r'\s*\n','',yandex)            
             is_peat = store_message(conn, cursor, angel_tab, peat_tab, dig_uid, date, time, description, region, district, place, lat, lon, azimuth, google, yandex, send_to)
             if is_peat:
-                telegram_mes = "Сообщение #{uid}\n{date} {time} UTC\nЧС: {desc}\nОбласть: {reg}\nРайон: {dist}\nН.п.: {place}\nN{lat} E{lon}\nАзимут: {az}\nGoogle Maps: {google}\nYandex Maps: {yandex}".format(uid=dig_uid,date=date,time=time,desc=description,reg=region,dist=district,place=place,lat=lat,lon=lon,az=azimuth,google=google,yandex=yandex)
-                send_to_telegram(url, chat_id, telegram_mes)
-                telegram_images(url, chat_id, result_dir)
-
+                cursor.execute("SELECT burn_indx FROM %(p)s WHERE unique_id = '%(u)s'"%{'p':peat_tab, 'u':is_peat})
+                burn = int(cursor.fetchone()[0])
+                if  burn >= int(lim):
+                    telegram_mes = "Сообщение #{uid}\n{date} {time} UTC\nЧС: {desc}\nОбласть: {reg}\nРайон: {dist}\nН.п.: {place}\nN{lat} E{lon}\nАзимут: {az}\nGoogle Maps: {google}\nYandex Maps: {yandex}".format(uid=dig_uid,date=date,time=time,desc=description,reg=region,dist=district,place=place,lat=lat,lon=lon,az=azimuth,google=google,yandex=yandex)
+                    for chat_id in chat_list:
+                        send_to_telegram(url, chat_id, telegram_mes)
+                        telegram_images(url, chat_id, result_dir)
+    drop_temp_files(result_dir)
     mail.close()
     mail.logout()
     close_conn(conn, cursor)
