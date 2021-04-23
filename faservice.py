@@ -169,6 +169,14 @@ def send_doc_to_telegram(url, chat, file):
         raise Exception("post_text error: %s" %response)
     return response
 
+def send_img_to_telegram(url, chat, file):
+    post_data = {'chat_id': chat}
+    post_file = {'photo': file}
+    response = requests.post(url + 'sendPhoto', data=post_data, files = post_file)
+    if response.status_code != 200:
+        raise Exception("post_text error: %s" %response)
+    return response
+
 # Сохраняем созданную таблицу в kml-файл для последующей отправки подписчикам
 def write_to_kml(dst_file,whom):
 
