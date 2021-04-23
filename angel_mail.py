@@ -47,7 +47,8 @@ def store_message(conn, cursor, angel_tab, peat_tab, uid, date, time, descriptio
     """%{'a':angel_tab,'u':uid,'d':date,'t':time,'i':description,'r':region,'c':district,'p':place,'l':lat,'o':lon,'z':azimuth,'g':google,'y':yandex,'n':send_to}
     check = """
         UPDATE %(a)s SET
-            peat_id = %(p)s.unique_id
+            peat_id = %(p)s.unique_id,
+            burn = %(p)s.burn_indx
         FROM %(p)s
         WHERE %(a)s.uid = '%(u)s' AND ST_Intersects(st_transform(%(a)s.geom::geometry, 3857), %(p)s.geom)
     """%{'a':angel_tab, 'p':peat_tab, 'u':uid}
@@ -63,8 +64,8 @@ def store_message(conn, cursor, angel_tab, peat_tab, uid, date, time, descriptio
         log("A peatlands check for #%s done."%uid)
     except IOError as e:
         log('Error adding message:$s'%e)
-    cursor.execute("SELECT peat_id FROM %(a)s WHERE %(a)s.uid = '%(u)s'"%{'a':angel_tab, 'u':uid})
-    return cursor.fetchone()[0]
+    cursor.execute("SELECT peat_id, burn FROM %(a)s WHERE %(a)s.uid = '%(u)s'"%{'a':angel_tab, 'u':uid})
+    return cursor.fetchone()#[0]
         
 def telegram_images(url, chat_id, f):
     if os.path.exists(f):
@@ -113,8 +114,8 @@ def angel_mail_job():
     #result, data = mail.uid('search', None, '(HEADER Received "localhost")')
     #result, data = mail.uid('search', None, '(SENTSINCE "19-Apr-2021")'.format(date=yesterday))
     #result, data = mail.uid('search', None, '(SENTSINCE {date} HEADER Subject "My Subject" NOT FROM "yuji@grovemade.com")'.format(date=yesterday))
-    #max_uid = 5500
     max_uid = get_last_uid(conn, cursor, angel_tab)
+    #max_uid = 5500
     #print(max_uid)
     uid_list = []
     for uid in data[0].split():
@@ -129,12 +130,13 @@ def angel_mail_job():
         raw_email = fetch_data[0][1]
         raw_email_string = raw_email.decode()
         email_message = email.message_from_string(raw_email_string)
-
         dig_uid = int(uid)
         send_to = email_message['To']
+        if send_to[0:7] == '=?UTF-8':
+            send_to = ''.join((t[0].decode(codepage)) for t in decode_header(send_to))
         #date_time = email_message['Date']
-        subj = ''.join((t[0].decode(codepage)) for t in decode_header(email_message['Subject']))
-        #subj = email_message['Subject']
+        subj = email_message['Subject']
+        subj = ''.join((t[0].decode(codepage)) for t in decode_header(subj))
         #attr_from = [''.join((t[0].decode()) for t in decode_header(email.utils.parseaddr(email_message['From'])[0])), email.utils.parseaddr(email_message['From'])[1]]
         #attr_from = [''.join((t[0]) for t in decode_header(email.utils.parseaddr(email_message['From'])[0])), email.utils.parseaddr(email_message['From'])[1]]
         #attr_id = email_message['Message-Id']
@@ -172,11 +174,11 @@ def angel_mail_job():
             yandex = re.sub(r'Yandex Maps:\s*','',yandex)
             yandex = re.sub(r'\s*\n','',yandex)            
             is_peat = store_message(conn, cursor, angel_tab, peat_tab, dig_uid, date, time, description, region, district, place, lat, lon, azimuth, google, yandex, send_to)
-            if is_peat:
-                cursor.execute("SELECT burn_indx FROM %(p)s WHERE unique_id = '%(u)s'"%{'p':peat_tab, 'u':is_peat})
-                burn = int(cursor.fetchone()[0])
+            if is_peat[0]:
+                burn = int(is_peat[1])
                 if  burn >= int(lim):
-                    telegram_mes = "Сообщение #{uid}\n{date} {time} UTC\nЧС: {desc}\nОбласть: {reg}\nРайон: {dist}\nН.п.: {place}\nN{lat} E{lon}\nАзимут: {az}\nGoogle Maps: {google}\nYandex Maps: {yandex}".format(uid=dig_uid,date=date,time=time,desc=description,reg=region,dist=district,place=place,lat=lat,lon=lon,az=azimuth,google=google,yandex=yandex)
+                    telegram_mes = "Сообщение #{uid}\n{date} {time} UTC\nЧС: {desc}\nТорфяник: ID{peat}, горимость - {burn}\nОбласть: {reg}\nРайон: {dist}\nН.п.: {place}\nN{lat} E{lon}\nАзимут: {az}\nGoogle Maps: {google}\nYandex Maps: {yandex}".format(uid=dig_uid,date=date,time=time,desc=description,peat=is_peat[0],burn=burn,reg=region,dist=district,place=place,lat=lat,lon=lon,az=azimuth,google=google,yandex=yandex)
+                    #print(telegram_mes)
                     for chat_id in chat_list:
                         send_to_telegram(url, chat_id, telegram_mes)
                         telegram_images(url, chat_id, result_dir)
