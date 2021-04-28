@@ -97,6 +97,7 @@ def angel_mail_job():
     #date = time.strftime('%Y-%m-%d',currtime)
     #now_hour = time.strftime('%H',currtime)
     yesterday = (datetime.date.today() - datetime.timedelta(1)).strftime("%d-%b-%Y")
+    today = datetime.date.today().strftime("%Y-%m-%d")
     #Создаем каталог для записи временных файлов
     result_dir = get_path(data_root,angel_folder)
 
@@ -142,46 +143,101 @@ def angel_mail_job():
         #attr_id = email_message['Message-Id']
         #message = parse_multipart(email_message,result_dir,dig_uid,codepage)
         #if not(re.search(r'Fwd:', subj)) and re.search(r'Оперативный дежурный', message):
-        if not(re.search(r'Fwd:', subj)) and re.search(r'\d\d/\d\d/\d\d\d\d \d\d:\d\d UTC', subj):
+        if not(re.search(r'Fwd:', subj)) and re.search(r'\d{1,2}/\d{1,2}/\d{2,4}\s+\d{1,2}:\d\d\s+UTC', subj):
             message = parse_multipart(email_message,result_dir,dig_uid,codepage)
-            date_time = re.search(r'Дата и время:.*\n', message)[0]#[14:-1]
-            dmy = re.search(r'\d\d/\d\d/\d\d\d\d', date_time)[0]
-            date = '{yyyy}-{mm}-{dd}'.format(yyyy=dmy[6:10],mm=dmy[3:5],dd=dmy[0:2])
-            time = re.search(r'\d\d:\d\d', date_time)[0]
-            description = re.search(r'Описание наблюдаемого ЧС:.*\n', message)[0]#[26:-1]
-            description = re.sub(r'Описание наблюдаемого ЧС:\s*','',description)
-            description = re.sub(r'\s*\n','',description)
-            region = re.search(r'Область:.*\n', message)[0]#[9:-1]
-            region = re.sub(r'Область:\s*','',region)
-            region = re.sub(r'\s*\n','',region)
-            district = re.search(r'Район:.*\n', message)[0]#[7:-1]
-            district = re.sub(r'Район:\s*','',district)
-            district = re.sub(r'\s*\n','',district)
-            place = re.search(r'Ближайший населенный пункт:.*\n', message)[0]#[28:-1]
-            place = re.sub(r'Ближайший населенный пункт:\s*','',place)
-            place = re.sub(r'\s*\n','',place)
-            latlon = re.search(r'N\d{1,2}\.\d{1,8} E\d{1,3}\.\d{1,8}', message)[0]
-            lat = re.search(r'N\d{1,2}\.\d{1,8}', latlon)[0][1:]
-            lon = re.search(r'E\d{1,3}\.\d{1,8}', latlon)[0][1:]
-            azimuth = re.search(r'Курс: .*\n', message)[0]#[6:]
-            azimuth = re.sub(r'Курс:\s*','',azimuth)
-            azimuth = re.sub(r'\s*\n','',azimuth)
+            date_time = re.search(r'Дата и время:.*\n', message)
+            if date_time:
+                date_time = date_time[0]
+                dmy = re.search(r'\d{1,2}/\d{1,2}/\d{2,4}', date_time)
+                if dmy:
+                    dmy = dmy[0]
+                    date = '{yyyy}-{mm}-{dd}'.format(yyyy=dmy[6:10],mm=dmy[3:5],dd=dmy[0:2])
+                else:
+                    date = ''
+                time = re.search(r'\d{1,2}:\d\d', date_time)
+                if time:
+                    time = time[0]
+                else:
+                    time = ''
+            else:
+                date = today
+                time = '00:01'
+            description = re.search(r'Описание наблюдаемого ЧС:.*\n', message)
+            if description:
+                description = description[0]
+                description = re.sub(r'Описание наблюдаемого ЧС:\s*','',description)
+                description = re.sub(r'\s*\n','',description)
+            else:
+                description = ''
+            region = re.search(r'Область:.*\n', message)
+            if region:
+                region = region[0]
+                region = re.sub(r'Область:\s*','',region)
+                region = re.sub(r'\s*\n','',region)
+            else:
+                region = ''
+            district = re.search(r'Район:.*\n', message)
+            if district:
+                district = district[0]
+                district = re.sub(r'Район:\s*','',district)
+                district = re.sub(r'\s*\n','',district)
+            else:
+                district = ''
+            place = re.search(r'Ближайший населенный пункт:.*\n', message)
+            if place:
+                place = place[0]
+                place = re.sub(r'Ближайший населенный пункт:\s*','',place)
+                place = re.sub(r'\s*\n','',place)
+            else:
+                place = ''
+            latlon = re.search(r'N\d{1,2}\.\d{1,8} E\d{1,3}\.\d{1,8}', message)
+            if latlon:
+                latlon = latlon[0]
+                lat = re.search(r'N\d{1,2}\.\d{1,8}', latlon)
+                if lat:
+                    lat = lat[0][1:]
+                else:
+                    lat = ''
+                lon = re.search(r'E\d{1,3}\.\d{1,8}', latlon)
+                if lon:
+                    lon = lon[0][1:]
+                else:
+                    lon = ''
+            else:
+                lat = ''
+                lon = ''
+            azimuth = re.search(r'Курс: .*\n', message)
+            if azimuth:
+                azimuth = azimuth[0]
+                azimuth = re.sub(r'Курс:\s*','',azimuth)
+                azimuth = re.sub(r'\s*\n','',azimuth)
             #azimuth = re.search(r'Курс: \d{1,3}\.\d{1,2}', message)[0]#[6:]
-            google = re.search(r'Google Maps:.*\n', message)[0]#[13:-1]
-            google = re.sub(r'Google Maps:\s*','',google)
-            google = re.sub(r'\s*\n','',google)
-            yandex = re.search(r'Yandex Maps:.*\n', message)[0]#[13:-1]
-            yandex = re.sub(r'Yandex Maps:\s*','',yandex)
-            yandex = re.sub(r'\s*\n','',yandex)            
-            is_peat = store_message(conn, cursor, angel_tab, peat_tab, dig_uid, date, time, description, region, district, place, lat, lon, azimuth, google, yandex, send_to)
-            if is_peat[0]:
-                burn = int(is_peat[1])
-                if  burn >= int(lim):
-                    telegram_mes = "Сообщение #{uid}\n{date} {time} UTC\nЧС: {desc}\nТорфяник: ID{peat}, горимость - {burn}\nОбласть: {reg}\nРайон: {dist}\nН.п.: {place}\nN{lat} E{lon}\nАзимут: {az}\nGoogle Maps: {google}\nYandex Maps: {yandex}".format(uid=dig_uid,date=date,time=time,desc=description,peat=is_peat[0],burn=burn,reg=region,dist=district,place=place,lat=lat,lon=lon,az=azimuth,google=google,yandex=yandex)
-                    #print(telegram_mes)
-                    for chat_id in chat_list:
-                        send_to_telegram(url, chat_id, telegram_mes)
-                        telegram_images(url, chat_id, result_dir)
+            else:
+                azimuth = 'не определен'
+            google = re.search(r'Google Maps:.*\n', message)
+            if google:
+                google = google[0]
+                google = re.sub(r'Google Maps:\s*','',google)
+                google = re.sub(r'\s*\n','',google)
+            else:
+                google = ''
+            yandex = re.search(r'Yandex Maps:.*\n', message)
+            if yandex:
+                yandex = yandex[0]
+                yandex = re.sub(r'Yandex Maps:\s*','',yandex)
+                yandex = re.sub(r'\s*\n','',yandex)            
+            else:
+                yandex = ''
+            if lat != '' and lon != '':
+                is_peat = store_message(conn, cursor, angel_tab, peat_tab, dig_uid, date, time, description, region, district, place, lat, lon, azimuth, google, yandex, send_to)
+                if is_peat[0]:
+                    burn = int(is_peat[1])
+                    if  burn >= int(lim):
+                        telegram_mes = "Сообщение #{uid}\n{date} {time} UTC\nЧС: {desc}\nТорфяник: ID{peat}, горимость - {burn}\nОбласть: {reg}\nРайон: {dist}\nН.п.: {place}\nN{lat} E{lon}\nАзимут: {az}\nGoogle Maps: {google}\nYandex Maps: {yandex}".format(uid=dig_uid,date=date,time=time,desc=description,peat=is_peat[0],burn=burn,reg=region,dist=district,place=place,lat=lat,lon=lon,az=azimuth,google=google,yandex=yandex)
+                        #print(telegram_mes)
+                        for chat_id in chat_list:
+                            send_to_telegram(url, chat_id, telegram_mes)
+                            telegram_images(url, chat_id, result_dir)
     drop_temp_files(result_dir)
     mail.close()
     mail.logout()
