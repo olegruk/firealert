@@ -143,7 +143,7 @@ def angel_mail_job():
         #attr_id = email_message['Message-Id']
         #message = parse_multipart(email_message,result_dir,dig_uid,codepage)
         #if not(re.search(r'Fwd:', subj)) and re.search(r'Оперативный дежурный', message):
-        if not(re.search(r'Fwd:', subj)) and re.search(r'\d{1,2}/\d{1,2}/\d{2,4}\s+\d{1,2}:\d\d\s+UTC', subj):
+        if not(re.search(r'Fwd:', subj)) and not(re.search(r'Re:', subj)) and re.search(r'\d{1,2}/\d{1,2}/\d{2,4}\s+\d{1,2}:\d\d\s+UTC', subj):
             message = parse_multipart(email_message,result_dir,dig_uid,codepage)
             date_time = re.search(r'Дата и время:.*\n', message)
             if date_time:
@@ -153,15 +153,15 @@ def angel_mail_job():
                     dmy = dmy[0]
                     date = '{yyyy}-{mm}-{dd}'.format(yyyy=dmy[6:10],mm=dmy[3:5],dd=dmy[0:2])
                 else:
-                    date = ''
+                    date = today
                 time = re.search(r'\d{1,2}:\d\d', date_time)
                 if time:
                     time = time[0]
                 else:
-                    time = ''
+                    time = '00:00'
             else:
                 date = today
-                time = '00:01'
+                time = '00:00'
             description = re.search(r'Описание наблюдаемого ЧС:.*\n', message)
             if description:
                 description = description[0]
