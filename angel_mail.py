@@ -133,12 +133,18 @@ def angel_mail_job():
         email_message = email.message_from_string(raw_email_string)
         dig_uid = int(uid)
         send_to = email_message['To']
+        if not(send_to):
+            send_to = email_message['Cc']
         if send_to[0:7] == '=?UTF-8':
             send_to = ''.join((t[0].decode(codepage)) for t in decode_header(send_to))
         #date_time = email_message['Date']
         subj = email_message['Subject']
-        subj = ''.join((t[0].decode(codepage)) for t in decode_header(subj))
-        #attr_from = [''.join((t[0].decode()) for t in decode_header(email.utils.parseaddr(email_message['From'])[0])), email.utils.parseaddr(email_message['From'])[1]]
+        parse_subj = email.utils.parseaddr(email_message['Subject'])
+        if subj:
+            subj = ''.join((t[0].decode(codepage)) for t in decode_header(subj))
+        else:
+            subj = ''.join((t[0].decode(codepage)) for t in decode_header(parse_subj[0],parse_subj[1]))
+        attr_from = [''.join((t[0].decode()) for t in decode_header(email.utils.parseaddr(email_message['From'])[0])), email.utils.parseaddr(email_message['From'])[1]]
         #attr_from = [''.join((t[0]) for t in decode_header(email.utils.parseaddr(email_message['From'])[0])), email.utils.parseaddr(email_message['From'])[1]]
         #attr_id = email_message['Message-Id']
         #message = parse_multipart(email_message,result_dir,dig_uid,codepage)
