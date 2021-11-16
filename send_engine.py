@@ -508,7 +508,10 @@ def send_to_subscribers_job():
                 write_to_kml(dst_file,subs.subs_id)
                 if subs.email_point:
                     subject, body_text = make_mail_attr(date, subs.point_period, num_points)
-                    send_email_with_attachment(maillist, subject, body_text, [dst_file])
+                    try:
+                        send_email_with_attachment(maillist, subject, body_text, [dst_file])
+                    except IOError as e:
+                        log('Error seneding e-mail. Error:$s'%e)
                 if subs.teleg_point:
                     doc = open(dst_file, 'rb')
                     send_doc_to_telegram(url, subs.telegramm, doc)
