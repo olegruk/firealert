@@ -9,9 +9,9 @@ import os, time
 from falogging import log, start_logging, stop_logging
 from faservice import get_config, get_tuple_cursor, close_conn, get_path, smf_new_topic, str_to_lst
 from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_email_message, send_doc_to_telegram, send_to_telegram
-from requester import make_tlg_stat_msg, make_zone_stat_msg, make_smf_stat_msg, check_vip_zones
+from requester import make_tlg_stat_msg, make_zone_stat_msg, make_oopt_stat_msg, make_smf_stat_msg, check_vip_zones
 #Создаем таблицу для выгрузки подписчикам
-def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental):
+def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental,filter_tech):
     log("Creating table for subs_id:%s..." %whom)
     subs_tab = 'for_s%s' %str(whom)
     marker = '[s%s]' %str(whom)
@@ -56,9 +56,9 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
             %(s)s.peat_fire,
             %(s)s.geog
         FROM %(s)s
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND %(c)s >= %(l)s AND region in %(r)s
+        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND %(c)s >= %(l)s AND region in %(r)s AND NOT((tech IS NOT NULL) AND %(t)s)
         ORDER BY %(s)s.peat_id
-    """%{'w':subs_tab,'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker},
+    """%{'w':subs_tab,'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker, 't':filter_tech},
     """
 	UPDATE %(s)s
 		SET whom = whom || '%(m)s'
@@ -131,8 +131,8 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
             %(s)s.region,
             %(s)s.geog
         FROM %(s)s
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today'
-    """%{'w':subs_tab,'s':src_tab,'p':period,'m':marker},
+        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND NOT((tech IS NOT NULL) AND %(t)s)
+    """%{'w':subs_tab,'s':src_tab,'p':period,'m':marker, 't':filter_tech},
     """
 	UPDATE %(s)s
 		SET whom = whom || '%(m)s'
@@ -206,9 +206,9 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
             %(s)s.peat_fire,
             %(s)s.geog
         FROM %(s)s
-        WHERE "date_time" > TIMESTAMP 'today' AND %(c)s >= %(l)s AND region in %(r)s AND (whom is Null OR POSITION('%(m)s' in whom) = 0)
+        WHERE "date_time" > TIMESTAMP 'today' AND %(c)s >= %(l)s AND region in %(r)s AND (whom is Null OR POSITION('%(m)s' in whom) = 0) AND NOT((tech IS NOT NULL) AND %(t)s)
         ORDER BY %(s)s.peat_id
-    """%{'w':subs_tab,'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker},
+    """%{'w':subs_tab,'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker, 't':filter_tech},
     """
 	UPDATE %(s)s
 		SET whom = whom || '%(m)s'
@@ -281,8 +281,8 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
             %(s)s.region,
             %(s)s.geog
         FROM %(s)s
-        WHERE "date_time" > TIMESTAMP 'today' AND (whom is Null OR POSITION('%(m)s' in whom) = 0)
-    """%{'w':subs_tab,'s':src_tab,'p':period,'m':marker},
+        WHERE "date_time" > TIMESTAMP 'today' AND (whom is Null OR POSITION('%(m)s' in whom) = 0) AND NOT((tech IS NOT NULL) AND %(t)s)
+    """%{'w':subs_tab,'s':src_tab,'p':period,'m':marker, 't':filter_tech},
     """
 	UPDATE %(s)s
 		SET whom = whom || '%(m)s'
@@ -491,13 +491,13 @@ def send_to_subscribers_job():
             is_increment = (iteration != 0)
             if subs.crit_or_fire == 'crit':
                 log('Making critical-limited table...')
-                num_points = make_subs_table(conn,cursor,year_tab,'critical',subs.critical,subs.point_period,subs.regions,subs.subs_id,is_increment)
+                num_points = make_subs_table(conn,cursor,year_tab,'critical',subs.critical,subs.point_period,subs.regions,subs.subs_id,is_increment,subs.filter_tech)
             elif subs.crit_or_fire == 'fire':
                 log('Making fire-limited table...')
-                num_points = make_subs_table(conn,cursor,year_tab,'peat_fire',subs.peatfire,subs.point_period,subs.regions,subs.subs_id,is_increment)
+                num_points = make_subs_table(conn,cursor,year_tab,'peat_fire',subs.peatfire,subs.point_period,subs.regions,subs.subs_id,is_increment,subs.filter_tech)
             else:
                 log('Making zero-critical table...')
-                num_points = make_subs_table(conn,cursor,year_tab,'critical',0,subs.point_period,subs.regions,subs.subs_id,is_increment)
+                num_points = make_subs_table(conn,cursor,year_tab,'critical',0,subs.point_period,subs.regions,subs.subs_id,is_increment,subs.filter_tech)
             if num_points > 0 or subs.send_empty:
                 dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,iteration)
                 dst_file = os.path.join(result_dir,dst_file_name)
@@ -544,7 +544,15 @@ def send_to_subscribers_job():
             if msg != '':
                 log('Sending zones stat to telegram...')
                 send_to_telegram(url, subs.telegramm, msg)
- 
+
+        if subs.check_oopt:
+            log('Checking oopt stat for %s...'%str(subs.subs_name))
+            oopt_list = str_to_lst(subs.oopt_zones[2:-2])
+            msg = make_oopt_stat_msg(oopt_list, period)
+            if msg != '':
+                log('Sending oopt stat to telegram...')
+                send_to_telegram(url, subs.telegramm, msg)
+
         if now_hour == sendtimelist[0] and (subs.teleg_stat or subs.email_stat):
             reg_list = str_to_lst(subs.regions[2:-2])
             msg = make_tlg_stat_msg(reg_list, period, subs.critical)
