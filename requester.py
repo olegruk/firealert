@@ -439,7 +439,7 @@ def check_oopt_stat(oopt, period):
         """%{'y':year_tab,'p':period,'o':oopt,'t':oopt_time},
         """
         UPDATE %(y)s SET
-            vip_time = '%(t)s'
+            oopt_time = '%(t)s'
         WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND oopt = '%(o)s' AND oopt_time IS NULL
         """%{'y':year_tab,'p':period,'o':oopt,'t':oopt_time}
         )
