@@ -271,11 +271,25 @@ def drop_temp_files(result_dir):
         except Exception as e:
             log('Cannot remove files:$s' %e)
 
+def echo(update: Update, context: CallbackContext):
+    try:
+        user = update.message.from_user
+        telegram_id = user.id
+        try:
+            chat = update.message.forward_from_chat
+            chat_id = chat.id
+            log("User with id %(t)s forward message from channel with id %(c)s." %{'t':telegram_id,'c':chat_id})
+        except:
+            log("User with id %s post an unknown command." %telegram_id)
+    except:
+        log('Cannot get user.id.')
+    #log('Message returned: %s'%update.message)
+
 def init(update: Update, context: CallbackContext):
     main_keyboard = [[KeyboardButton('/start'), KeyboardButton('/help')]]
     reply_kb_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True, one_time_keyboard=True)
     user = update.message.from_user
-    log("User %s started the conversation." %user.first_name)
+    log("User %(n)s id %(i)s started the conversation." %{'n':user.first_name,'i':user.id})
     telegram_id = user.id
     subsconf.add_tlg_user(telegram_id)
     update.message.reply_text('Если ничего не понятно, скажите "/help".', reply_markup=reply_kb_markup)
@@ -284,7 +298,7 @@ def start(update: Update, context: CallbackContext) -> None:
     """Send message on `/start`."""
     # Get user that sent /start and log his name
     user = update.message.from_user
-    log("User %s started the conversation." %user.first_name)
+    log("User %(n)s id %(i)s started the conversation." %{'n':user.first_name,'i':user.id})
     telegram_id = user.id
     subsconf.add_tlg_user(telegram_id)
     reply_markup = InlineKeyboardMarkup(mm_keyboard)
@@ -1090,6 +1104,7 @@ def main():
     disp.add_handler(CommandHandler("get_around", manual_get_around))
     disp.add_handler(CommandHandler("help_get_around", manual_help_get_around))
     disp.add_handler(CommandHandler("help", manual_help))
+    disp.add_handler(MessageHandler(Filters.text, echo))
     # Start the Bot
     updater.start_polling()
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
