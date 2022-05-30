@@ -278,20 +278,37 @@ def echo(update: Update, context: CallbackContext):
         try:
             chat = update.message.forward_from_chat
             chat_id = chat.id
+            cmd = update.message.text
             log("User with id %(t)s forward message from channel with id %(c)s." %{'t':telegram_id,'c':chat_id})
+            update.message.reply_text('Вы переслали сообщение из канала Id %s'%chat_id)
         except:
-            log("User with id %s post an unknown command." %telegram_id)
+            pass
     except:
         log('Cannot get user.id.')
+    if re.search(r'/init', cmd):
+        update.message.reply_text('Канал с Id %s включен в список подписчиков.' %chat_id)
     #log('Message returned: %s'%update.message)
 
 def init(update: Update, context: CallbackContext):
     main_keyboard = [[KeyboardButton('/start'), KeyboardButton('/help')]]
     reply_kb_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True, one_time_keyboard=True)
     user = update.message.from_user
-    log("User %(n)s id %(i)s started the conversation." %{'n':user.first_name,'i':user.id})
+    #log("User %(n)s id %(i)s started the conversation." %{'n':user.first_name,'i':user.id})
     telegram_id = user.id
-    subsconf.add_tlg_user(telegram_id)
+    #subsconf.add_tlg_user(telegram_id)
+    chat_id = 0
+    try:
+        chat = update.message.forward_from_chat
+        chat_id = chat.id
+        log("User with id %(t)s forward message from channel with id %(c)s." %{'t':telegram_id,'c':chat_id})
+    except:
+        log("User %(n)s id %(i)s started the conversation." %{'n':user.first_name,'i':user.id})
+    if chat_id != 0:
+        subsconf.add_tlg_user(chat_id)
+        update.message.reply_text('Канал с Id %s включен в список подписчиков.' %chat_id, reply_markup=reply_kb_markup)
+    else:
+        subsconf.add_tlg_user(telegram_id)
+        update.message.reply_text('Чат с Id %s включен в список подписчиков.' %telegram_id, reply_markup=reply_kb_markup)
     update.message.reply_text('Если ничего не понятно, скажите "/help".', reply_markup=reply_kb_markup)
 
 def start(update: Update, context: CallbackContext) -> None:
