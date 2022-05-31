@@ -540,10 +540,10 @@ def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
     log("Checking oopt-zones...")
     sql_stat = """
         UPDATE %(s)s
-		SET oopt = %(o)s.fid || ' - ' || %(o)s.name
+        SET oopt = %(o)s.region || ' : ' || %(o)s.name || ' (fid:' || %(o)s.fid || ')'
         FROM %(o)s
         WHERE ST_Intersects(%(o)s.geog, %(s)s.geog)
-		"""%{'s':src_tab, 'o':oopt_zones}
+        """%{'s':src_tab, 'o':oopt_zones}
     try:
         cursor.execute(sql_stat)
         conn.commit()
