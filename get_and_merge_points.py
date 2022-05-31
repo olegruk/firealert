@@ -542,7 +542,7 @@ def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
         UPDATE %(s)s
         SET oopt = %(o)s.region || ' : ' || %(o)s.name || ' (fid:' || %(o)s.fid || ')'
         FROM %(o)s
-        WHERE ST_Intersects(%(o)s.geog, %(s)s.geog)
+        WHERE ST_Intersects(%(s)s.geog, %(o)s.geog)
         """%{'s':src_tab, 'o':oopt_zones}
     try:
         cursor.execute(sql_stat)
