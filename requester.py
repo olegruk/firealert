@@ -605,3 +605,12 @@ def check_vip_zones(outline, period):
     close_conn(conn, cursor)
 
     return points_count, zones
+
+def get_oopt_for_region(reglist):
+    log("Making OOPT list for regions...")
+    [oopt_zones] = get_config("tables", ["oopt_zones"])
+    conn, cursor = get_cursor()
+    cursor.execute("SELECT name, FROM %(t)s WHERE region IN %(r)s"%{'t':oopt_zones, 'r':reglist})
+    oopt_list = cursor.fetchall()
+    return oopt_list
+
