@@ -9,7 +9,7 @@ import os, time
 from falogging import log, start_logging, stop_logging
 from faservice import get_config, get_tuple_cursor, close_conn, get_path, smf_new_topic, str_to_lst
 from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_email_message, send_doc_to_telegram, send_to_telegram
-from requester import make_tlg_stat_msg, make_zone_stat_msg, make_oopt_stat_msg, make_smf_stat_msg, check_vip_zones
+from requester import make_tlg_stat_msg, make_zone_stat_msg, make_oopt_stat_msg, make_smf_stat_msg, check_vip_zones,get_oopt_for_region
 #Создаем таблицу для выгрузки подписчикам
 def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental,filter_tech):
     log("Creating table for subs_id:%s..." %whom)
@@ -547,7 +547,11 @@ def send_to_subscribers_job():
 
         if subs.check_oopt:
             log('Checking oopt stat for %s...'%str(subs.subs_name))
-            oopt_list = str_to_lst(subs.oopt_zones[2:-2])
+            if subs.oopt_zones !='':
+                oopt_list = str_to_lst(subs.oopt_zones[2:-2])
+            elif subs.oopt_regions !='':
+                oopt_list = get_oopt_for_region(subs.oopt_regions)
+            log('List of zones for checking: %s'%oopt_list)
             msg = make_oopt_stat_msg(oopt_list, period)
             if msg != '':
                 log('Sending oopt stat to telegram...')
