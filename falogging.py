@@ -22,9 +22,10 @@ result_path = os.path.join(base_path, 'log')
 if not os.path.exists(result_path):
     try:
         os.mkdir(result_path)
-        log("Created %s" % result_path)
+        #log("Created %s" % result_path)
     except OSError:
-        log("Unable to create %s" % result_path)
+        #log("Unable to create %s" % result_path)
+        pass
 fulllog = os.path.join(result_path, logfile)
 
 def get_log_file(date):

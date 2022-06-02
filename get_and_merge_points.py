@@ -219,7 +219,8 @@ def make_common_table(conn,cursor,dst_tab,pointsets):
                 marker VARCHAR(26),
                 tech VARCHAR(254),
                 vip_zone VARCHAR(254),
-                oopt VARCHAR(254)
+                oopt VARCHAR(254),
+                oopt_id INTEGER
 		)
 		"""%(dst_tab)
 	)
@@ -540,7 +541,7 @@ def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
     log("Checking oopt-zones...")
     sql_stat = """
         UPDATE %(s)s
-        SET oopt = %(o)s.region || ' : ' || %(o)s.name || ' (fid:' || %(o)s.fid || ')'
+        SET oopt_id =  %(o)s.fid
         FROM %(o)s
         WHERE ST_Intersects(%(s)s.geog, %(o)s.geog)
         """%{'s':src_tab, 'o':oopt_zones}
