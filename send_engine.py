@@ -547,16 +547,19 @@ def send_to_subscribers_job():
 
         if subs.check_oopt:
             log('Checking oopt stat for %s...'%str(subs.subs_name))
-            if subs.oopt_zones !='':
+            oopt_list = ''
+            if subs.oopt_zones != None:
                 #oopt_list = str_to_lst(subs.oopt_zones[2:-2])
                 oopt_list = get_oopt_for_ids(subs.oopt_zones)
-            elif subs.oopt_regions !='':
+            elif subs.oopt_regions != None:
                 oopt_list = get_oopt_for_region(subs.oopt_regions)
             log('List of zones for checking: %s'%oopt_list)
-            msg = make_oopt_stat_msg(oopt_list, period)
-            if msg != '':
+            if oopt_list != '':
+                msg = make_oopt_stat_msg(oopt_list, period)
                 log('Sending oopt stat to telegram...')
                 send_to_telegram(url, subs.telegramm, msg)
+            else:
+                log('Error sending oopt stat to telegram. Oopt list is Null!!!')
 
         if now_hour == sendtimelist[0] and (subs.teleg_stat or subs.email_stat):
             reg_list = str_to_lst(subs.regions[2:-2])

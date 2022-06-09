@@ -158,7 +158,8 @@ def send_to_telegram(url, chat, text):
     params = {'chat_id': chat, 'text': text}
     response = requests.post(url + 'sendMessage', data=params)
     if response.status_code != 200:
-        raise Exception("post_text error: %s" %response.status_code)
+        #raise Exception("post_text error: %s" %response.status_code)
+        log("post_text error: %s" %response.status_code)
     return response
 
 def send_doc_to_telegram(url, chat, file):
@@ -166,7 +167,8 @@ def send_doc_to_telegram(url, chat, file):
     post_file = {'document': file}
     response = requests.post(url + 'sendDocument', data=post_data, files = post_file)
     if response.status_code != 200:
-        raise Exception("post_text error: %s" %response)
+        #raise Exception("post_text error: %s" %response.status_code)
+        log("post_text error: %s" %response.status_code)
     return response
 
 def send_img_to_telegram(url, chat, file):
@@ -174,7 +176,8 @@ def send_img_to_telegram(url, chat, file):
     post_file = {'photo': file}
     response = requests.post(url + 'sendPhoto', data=post_data, files = post_file)
     if response.status_code != 200:
-        raise Exception("post_text error: %s" %response)
+        #raise Exception("post_text error: %s" %response.status_code)
+        log("post_text error: %s" %response.status_code)
     return response
 
 # Сохраняем созданную таблицу в kml-файл для последующей отправки подписчикам

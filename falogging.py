@@ -5,8 +5,9 @@
 # Created:     09.04.2020
 #-------------------------------------------------------------------------------
 
-import os, time, re, traceback
+import os, time, re, traceback, requests
 import logging
+#from faservice import get_config, send_to_telegram
 
 currtime = time.localtime()
 date=time.strftime('%Y-%m-%d',currtime)
@@ -32,12 +33,25 @@ def get_log_file(date):
     pass
 #    return result_path
 
+def send_to_telegram(url, chat, text):
+    params = {'chat_id': chat, 'text': text}
+    response = requests.post(url + 'sendMessage', data=params)
+    if response.status_code != 200:
+        raise Exception("post_text error: %s" %response.status_code)
+    return response
+
 #Протоколирование
 def log(msg):
     logging.basicConfig(format='%(asctime)s %(message)s',
         datefmt='%m/%d/%Y %I:%M:%S %p',
         filename=fulllog)
     logging.warning(msg)
+    if re.search(r'rror', msg):
+        url = 'https://api.telegram.org/bot990586097:AAHQ8uKZ2q_usZLMDPkbUfFfBJ6-8GLvvlk/'
+        chat_id = '-1001416479771'
+        errmsg = 'Обнаружены ошибки в log-файлах...'
+        send_to_telegram(url, chat_id, errmsg)
+        send_to_telegram(url, chat_id, msg)
     #print(msg)
 
 def start_logging(proc):

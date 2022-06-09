@@ -9,6 +9,8 @@
 import os, time
 import psycopg2
 import requests, shutil
+from requests.adapters import HTTPAdapter
+from requests.exceptions import ConnectionError, HTTPError, RequestException
 import csv, pandas
 from sqlalchemy import create_engine
 from falogging import log, start_logging, stop_logging
@@ -47,11 +49,51 @@ def get_session(url):
 
 #read file from site and save to csv
 def read_csv_from_site(url,sourcepath):
-    filereq = requests.get(url,stream = True)
-    #filereq = requests.get(url,stream = True,verify=False)
-    with open(sourcepath,"wb") as receive:
-        shutil.copyfileobj(filereq.raw,receive)
-        del filereq
+    try:
+        filereq = requests.get(url,stream = True)
+        filereq.raise_for_status()
+    except HTTPError as http_err:
+        log(f'HTTP error occurred: {http_err}')  # Python 3.6
+        errcode = 2
+    except Exception as err:
+        log(f'Other error occurred: {err}')  # Python 3.6
+        errcode = 3
+    else:
+        log(f'Get receive status code {filereq.status_code}')
+        #filereq = requests.get(url,stream = True,verify=False)
+        with open(sourcepath,"wb") as receive:
+            shutil.copyfileobj(filereq.raw,receive)
+            del filereq
+        errcode = 0
+    return errcode
+
+#read file from site with retries and save to csv
+def read_csv_from_site_with_retries(url,sourcepath):
+    nasa_adapter = HTTPAdapter(max_retries=3)
+    session = requests.Session()
+    session.mount(url, nasa_adapter)
+    try:
+        filereq = session.get(url,stream = True)
+    except ConnectionError as conn_err:
+        log(f'Connection error occurred: {conn_err}')  # Python 3.6
+        errcode = 1
+    except HTTPError as http_err:
+        log(f'HTTP error occurred: {http_err}')  # Python 3.6
+        errcode = 2
+    except RequestException as req_err:
+        log(f'Request error occurred: {req_err}')  # Python 3.6
+        errcode = 3
+    except Exception as err:
+        log(f'Other error occurred: {err}')  # Python 3.6
+        errcode = 4
+    else:
+        log(f'Get receive status code {filereq.status_code}')
+        #filereq = requests.get(url,stream = True,verify=False)
+        with open(sourcepath,"wb") as receive:
+            shutil.copyfileobj(filereq.raw,receive)
+            del filereq
+        errcode = 0
+    return errcode
 
 #Процедура получения csv-файла точек
 def GetPoints(pointset, dst_folder, aDate):
@@ -60,8 +102,36 @@ def GetPoints(pointset, dst_folder, aDate):
     [src_url] = get_config("NASA", ["%s_src_%s"%(pointset,period)])
     dst_file = "%s_%s.csv"%(pointset,aDate)
     dst_file = os.path.join(dst_folder, dst_file)
-    read_csv_from_site(src_url,dst_file)
-    log("Download complete: %s" %dst_file)
+    errcode = read_csv_from_site(src_url,dst_file)
+    if errcode == 0:
+        log("Download complete: %s" %dst_file)
+    else:
+        if os.path.exists(dst_file):
+            try:
+                os.remove(dst_file)
+            except OSError as error:
+                log("Unable to remove file: %s" %dst_file)
+        log("Not downloaded: %s" %dst_file)
+    return errcode
+
+#Процедура получения csv-файла точек с перезапросами
+def GetPoints_with_retries(pointset, dst_folder, aDate):
+    log("Getting points for %s..." %pointset)
+    [period] = get_config("NASA", ["load_period"])
+    [src_url] = get_config("NASA", ["%s_src_%s"%(pointset,period)])
+    dst_file = "%s_%s.csv"%(pointset,aDate)
+    dst_file = os.path.join(dst_folder, dst_file)
+    errcode = read_csv_from_site_with_retries(src_url,dst_file)
+    if errcode == 0:
+        log("Download complete: %s" %dst_file)
+    else:
+        if os.path.exists(dst_file):
+            try:
+                os.remove(dst_file)
+            except OSError as error:
+                log("Unable to remove file: %s" %dst_file)
+        log("Not downloaded: %s" %dst_file)
+    return errcode
 
 #Процедура для конструктора
 def getconn():
@@ -541,9 +611,9 @@ def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
     log("Checking oopt-zones...")
     sql_stat = """
         UPDATE %(s)s
-        SET oopt_id =  %(o)s.fid
+        SET oopt_id = %(o)s.fid
         FROM %(o)s
-        WHERE ST_Intersects(%(s)s.geog, %(o)s.geog)
+        WHERE ST_Intersects(%(o)s.geog, %(s)s.geog)
         """%{'s':src_tab, 'o':oopt_zones}
     try:
         cursor.execute(sql_stat)
@@ -556,7 +626,7 @@ def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
 def copy_to_common_table(conn,cursor,today_tab, year_tab):
     log("Copying data into common table...")
     ins_string = """
-        INSERT INTO %(y)s (name,acq_date,acq_time,daynight,latitude,longitude,satellite,conf_modis,conf_viirs,brightness,bright_t31,bright_ti4,bright_ti5,scan,track,version,frp,region,rating,critical,revision,peat_id,peat_district,peat_region,peat_area,peat_class,peat_fire,ident,date_time,geog,marker,tech,vip_zone,oopt)
+        INSERT INTO %(y)s (name,acq_date,acq_time,daynight,latitude,longitude,satellite,conf_modis,conf_viirs,brightness,bright_t31,bright_ti4,bright_ti5,scan,track,version,frp,region,rating,critical,revision,peat_id,peat_district,peat_region,peat_area,peat_class,peat_fire,ident,date_time,geog,marker,tech,vip_zone,oopt_id)
             SELECT
                 name,
                 acq_date,
@@ -590,7 +660,7 @@ def copy_to_common_table(conn,cursor,today_tab, year_tab):
                 marker,
                 tech,
                 vip_zone,
-                oopt
+                oopt_id
             FROM %(t)s
                 WHERE NOT EXISTS(
 					SELECT ident FROM %(y)s
@@ -636,20 +706,21 @@ def get_and_merge_points_job():
 
     for pointset in pointsets:
         #Получаем точки (скачиваем csv-файлы)
-        GetPoints(pointset, firms_path, date)
+        errcode = GetPoints_with_retries(pointset, firms_path, date)
         #Удаляем дневные таблицы
-        drop_today_tables(conn,cursor,pointset)
-        #Загружаем скачанные файлы в БД
-        count = upload_points_to_db(cursor, firms_path, pointset,date)
-        if count > 0:
-            #Добавляем поле с геоданными
-            add_geog_field(conn,cursor,pointset)
-            #Выбираем точки на территории России
-            make_tables_for_Russia(conn,cursor,pointset)
-            loaded_set.append(pointset)
-        else:
-            msg = 'Zero-rows file: %s'%pointset
-            send_to_telegram(url, chat_id, msg)
+        if errcode == 0:
+            drop_today_tables(conn,cursor,pointset)
+            #Загружаем скачанные файлы в БД
+            count = upload_points_to_db(cursor, firms_path, pointset,date)
+            if count > 0:
+                #Добавляем поле с геоданными
+                add_geog_field(conn,cursor,pointset)
+                #Выбираем точки на территории России
+                make_tables_for_Russia(conn,cursor,pointset)
+                loaded_set.append(pointset)
+            else:
+                msg = 'Zero-rows file: %s'%pointset
+                send_to_telegram(url, chat_id, msg)
 
     #Собираем в единую таблицу
     loaded = make_common_table(conn,cursor,common_tab,loaded_set)
