@@ -49,9 +49,9 @@ def log(msg):
     if re.search(r'rror', msg):
         url = 'https://api.telegram.org/bot990586097:AAHQ8uKZ2q_usZLMDPkbUfFfBJ6-8GLvvlk/'
         chat_id = '-1001416479771'
-        errmsg = 'Обнаружены ошибки в log-файлах...'
+        errmsg = 'Обнаружены ошибки в log-файлах...\n%s'%msg
         send_to_telegram(url, chat_id, errmsg)
-        send_to_telegram(url, chat_id, msg)
+        #send_to_telegram(url, chat_id, msg)
     #print(msg)
 
 def start_logging(proc):

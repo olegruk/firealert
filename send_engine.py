@@ -556,8 +556,11 @@ def send_to_subscribers_job():
             log('List of zones for checking: %s'%oopt_list)
             if oopt_list != '':
                 msg = make_oopt_stat_msg(oopt_list, period)
-                log('Sending oopt stat to telegram...')
-                send_to_telegram(url, subs.telegramm, msg)
+                if msg == '':
+                    log('No points in OOPT. Stat is not sending to %s.'%str(subs.subs_name))
+                else:
+                    log('Sending oopt stat to telegram...')
+                    send_to_telegram(url, subs.telegramm, msg)
             else:
                 log('Error sending oopt stat to telegram. Oopt list is Null!!!')
 

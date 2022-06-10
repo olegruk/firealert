@@ -178,7 +178,7 @@ def drop_today_tables(conn,cursor, pointset):
         cursor.execute(sql_stat)
         conn.commit()
         log("Tables dropped")
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error dropping table:$s'%e)
 
 #Удаляем временные таблицы
@@ -193,7 +193,7 @@ def drop_temp_tables(conn,cursor, pointset):
         cursor.execute(sql_stat_2)
         conn.commit()
         log("Temp tables dropped.")
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error dropping temp tables:$s'%e)
 
 #Добавляем геоинформацию
@@ -218,7 +218,7 @@ def add_geog_field(conn,cursor,pointset):
             cursor.execute(sql_stat)
         conn.commit()
         log('Geometry added to %s'%(src_tab))
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error adding geometry:$s'%e)
 
 #Делаем выборку точек по России
@@ -243,7 +243,7 @@ def make_tables_for_Russia(conn,cursor,pointset):
             cursor.execute(sql_stat)
             conn.commit()
         log('The table created:%s'%(dst_tab))
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error intersecting points with region:$s'%e)
 
 #Создаем сводную таблицу
@@ -299,7 +299,7 @@ def make_common_table(conn,cursor,dst_tab,pointsets):
             cursor.execute(sql_stat)
             conn.commit()
         log('The table created:%s'%(dst_tab))
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error creating table:$s'%e)
 
     loaded = 0
@@ -361,7 +361,7 @@ def make_common_table(conn,cursor,dst_tab,pointsets):
                 cursor.execute(ins_from_viirs)
             conn.commit()
             log('The data added:%s'%(src_tab))
-        except IOError as e:
+        except psycopg2.Error as e:
             log('Error adding data:$s'%e)
 
         loaded = loaded + 1
@@ -400,7 +400,7 @@ def cost_point_in_buffers(conn,cursor,tablename):
         cursor.execute(set_zero_rating)
         log('Zero rating setted')
         conn.commit()
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error costing points:$s'%e)
 
 #Добавляем в результирующее поле Name = acq_date : gid : critical
@@ -426,7 +426,7 @@ def set_name_field(conn,cursor,tablename):
         cursor.execute(set_name)
         conn.commit()
         log("A Name field setted")
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error setting points name:$s'%e)
 
 #Создаем поле ident = acq_date:acq_time:latitude:longitude:satellite
@@ -440,7 +440,7 @@ def set_ident_field(conn,cursor,tablename):
         cursor.execute(set_ident)
         conn.commit()
         log("A Ident field setted")
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error creating ident fields:$s'%e)
 
 #Дополняем поле time ведущими нулями
@@ -454,7 +454,7 @@ def correct_time_field(conn,cursor,tablename):
         cursor.execute(set_ident)
         conn.commit()
         log(" Time field corrected.")
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error correcting time fields:$s'%e)
 
 #Устанавливаем значение поля date_time "acq_date acq_time"
@@ -468,7 +468,7 @@ def set_datetime_field(conn,cursor,tablename):
         cursor.execute(set_datetime)
         conn.commit()
         log("Date_time field setted.")
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error creating timestamp:$s'%e)
 
 #Устанавливаем значение поля marker
@@ -482,7 +482,7 @@ def set_marker_field(conn,cursor,tablename,marker):
         cursor.execute(set_marker)
         conn.commit()
         log("Marker field setted.")
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error creating marker:$s'%e)
 
 
@@ -505,7 +505,7 @@ def del_duplicates(conn,cursor,tablename):
             cursor.execute(sql_stat)
             conn.commit()
         log('The duplicates deleted in %s'%(tablename))
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error deleting duplicates:$s'%e)
 
 #Повышаем оценку для групповых точек
@@ -574,7 +574,7 @@ def rise_multipoint_cost(conn,cursor,tablename,distance):
             cursor.execute(sql_stat)
             conn.commit()
         log('Cost corrected.')
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error correcting cost:$s'%e)
 
 def check_tech_zones(conn, cursor, src_tab, tech_zones):
@@ -589,7 +589,7 @@ def check_tech_zones(conn, cursor, src_tab, tech_zones):
         cursor.execute(sql_stat)
         conn.commit()
         log('Tech zones checked.')
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error intersecting points with tech-zones:$s'%e)
 
 def check_vip_zones(conn, cursor, src_tab, vip_zones):
@@ -604,7 +604,7 @@ def check_vip_zones(conn, cursor, src_tab, vip_zones):
         cursor.execute(sql_stat)
         conn.commit()
         log('Vip zones checked.')
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error intersecting points with vip-zones:$s'%e)
 
 def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
@@ -619,7 +619,7 @@ def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
         cursor.execute(sql_stat)
         conn.commit()
         log('OOPT zones checked.')
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error intersecting points with oopt-zones:$s'%e)
 
 #Копирование данных в общую годичную таблицу
@@ -670,7 +670,7 @@ def copy_to_common_table(conn,cursor,today_tab, year_tab):
         cursor.execute(ins_string)
         conn.commit()
         log('Data from %s added to common table %s'%(today_tab, year_tab))
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error addin points to common table:$s'%e)
 
 def drop_today_table(conn,cursor,common_tab):
@@ -679,7 +679,7 @@ def drop_today_table(conn,cursor,common_tab):
         cursor.execute("DROP TABLE IF EXISTS %s"%(common_tab))
         conn.commit()
         log("Today table dropped.")
-    except IOError as e:
+    except psycopg2.Error as e:
         log('Error dropping today table:$s'%e)
 
 

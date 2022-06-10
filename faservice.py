@@ -160,6 +160,7 @@ def send_to_telegram(url, chat, text):
     if response.status_code != 200:
         #raise Exception("post_text error: %s" %response.status_code)
         log("post_text error: %s" %response.status_code)
+        log("Text:\n<<%s>>" %text)
     return response
 
 def send_doc_to_telegram(url, chat, file):
