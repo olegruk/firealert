@@ -290,7 +290,8 @@ def make_common_table(conn,cursor,dst_tab,pointsets):
                 tech VARCHAR(254),
                 vip_zone VARCHAR(254),
                 oopt VARCHAR(254),
-                oopt_id INTEGER
+                oopt_id INTEGER,
+                oopt_buf_id INTEGER
 		)
 		"""%(dst_tab)
 	)
@@ -622,11 +623,26 @@ def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
     except psycopg2.Error as e:
         log('Error intersecting points with oopt-zones:$s'%e)
 
+def check_oopt_buffers(conn, cursor, src_tab, oopt_buffers):
+    log("Checking oopt buffers...")
+    sql_stat = """
+        UPDATE %(s)s
+        SET oopt_buf_id = %(o)s.fid
+        FROM %(o)s
+        WHERE ST_Intersects(%(o)s.geog, %(s)s.geog)
+        """%{'s':src_tab, 'o':oopt_buffers}
+    try:
+        cursor.execute(sql_stat)
+        conn.commit()
+        log('OOPT buffers checked.')
+    except psycopg2.Error as e:
+        log('Error intersecting points with oopt buffers:$s'%e)
+
 #Копирование данных в общую годичную таблицу
 def copy_to_common_table(conn,cursor,today_tab, year_tab):
     log("Copying data into common table...")
     ins_string = """
-        INSERT INTO %(y)s (name,acq_date,acq_time,daynight,latitude,longitude,satellite,conf_modis,conf_viirs,brightness,bright_t31,bright_ti4,bright_ti5,scan,track,version,frp,region,rating,critical,revision,peat_id,peat_district,peat_region,peat_area,peat_class,peat_fire,ident,date_time,geog,marker,tech,vip_zone,oopt_id)
+        INSERT INTO %(y)s (name,acq_date,acq_time,daynight,latitude,longitude,satellite,conf_modis,conf_viirs,brightness,bright_t31,bright_ti4,bright_ti5,scan,track,version,frp,region,rating,critical,revision,peat_id,peat_district,peat_region,peat_area,peat_class,peat_fire,ident,date_time,geog,marker,tech,vip_zone,oopt_id,oopt_buf_id)
             SELECT
                 name,
                 acq_date,
@@ -660,7 +676,8 @@ def copy_to_common_table(conn,cursor,today_tab, year_tab):
                 marker,
                 tech,
                 vip_zone,
-                oopt_id
+                oopt_id,
+                oopt_buf_id
             FROM %(t)s
                 WHERE NOT EXISTS(
 					SELECT ident FROM %(y)s
@@ -691,7 +708,7 @@ def get_and_merge_points_job():
     start_logging('get_and_merge_points.py')
 
     # extract db params from config
-    [year_tab,common_tab,tech_zones,vip_zones,oopt_zones] = get_config("tables", ["year_tab", "common_tab", "tech_zones", "vip_zones", "oopt_zones"])
+    [year_tab,common_tab,tech_zones,vip_zones,oopt_zones,oopt_buffers] = get_config("tables", ["year_tab", "common_tab", "tech_zones", "vip_zones", "oopt_zones","oopt_buffers"])
     [data_root,firms_folder] = get_config("path", ["data_root", "firms_folder"])
     [clst_dist] = get_config("clusters", ["cluster_dist"])
     [num_of_src] = get_config("sources", ["num_of_src"])
@@ -762,6 +779,9 @@ def get_and_merge_points_job():
 
     #Проверка точек на попадание в ООПТ
     check_oopt_zones(conn, cursor, common_tab, oopt_zones)
+
+    #Проверка точек на попадание в буферные зоны ООПТ
+    check_oopt_buffers(conn, cursor, common_tab, oopt_buffers)
 
     #Копирование данных в общую годичную таблицу
     copy_to_common_table(conn,cursor,common_tab, year_tab)

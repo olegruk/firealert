@@ -9,7 +9,7 @@ import os, time
 from falogging import log, start_logging, stop_logging
 from faservice import get_config, get_tuple_cursor, close_conn, get_path, smf_new_topic, str_to_lst
 from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_email_message, send_doc_to_telegram, send_to_telegram
-from requester import make_tlg_stat_msg, make_zone_stat_msg, make_oopt_stat_msg, make_smf_stat_msg, check_vip_zones, get_oopt_for_region, get_oopt_for_ids
+from requester import make_tlg_stat_msg, make_zone_stat_msg, make_oopt_stat_msg, make_oopt_buf_stat_msg, make_smf_stat_msg, check_vip_zones, get_oopt_for_region, get_oopt_for_ids
 #Создаем таблицу для выгрузки подписчикам
 def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental,filter_tech):
     log("Creating table for subs_id:%s..." %whom)
@@ -561,6 +561,13 @@ def send_to_subscribers_job():
                 else:
                     log('Sending oopt stat to telegram...')
                     send_to_telegram(url, subs.telegramm, msg)
+                if subs.check_oopt_buf:
+                    msg2 = make_oopt_buf_stat_msg(oopt_list, period)
+                    if msg2 == '':
+                        log('No points in OOPT buffers. Stat is not sending to %s.'%str(subs.subs_name))
+                    else:
+                        log('Sending oopt buffers stat to telegram...')
+                        send_to_telegram(url, subs.telegramm, msg2)
             else:
                 log('Error sending oopt stat to telegram. Oopt list is Null!!!')
 

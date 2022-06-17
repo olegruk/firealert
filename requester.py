@@ -456,11 +456,58 @@ def check_oopt_stat(oopt_id, period):
 
     return all_cnt
 
+def check_oopt_buf_stat(oopt_id, period):
+    log("Getting statistic for OOPT buffers %s..."%(oopt_id))
+    # extract params from config
+    [year_tab] = get_config("tables", ["year_tab"])
+    #connecting to database
+    conn, cursor = get_cursor()
+    currtime = time.localtime()
+    oopt_time = time.strftime('%H',currtime)
+
+    statements = (
+        """
+        SELECT count(*) FROM
+            (SELECT name
+            FROM %(y)s
+            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND oopt_buf_id = '%(o)s' AND (oopt_time IS NULL OR oopt_time = '%(t)s')) as all_sel
+        """%{'y':year_tab,'p':period,'o':oopt_id,'t':oopt_time},
+        """
+        UPDATE %(y)s SET
+            oopt_time = '%(t)s'
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND oopt_buf_id = '%(o)s' AND oopt_time IS NULL
+        """%{'y':year_tab,'p':period,'o':oopt_id,'t':oopt_time}
+        )
+
+    try:
+        cursor.execute(statements[0])
+        all_cnt = cursor.fetchone()[0]
+        cursor.execute(statements[1])
+        log('Finished for:%(o)s. Points: %(p)s'%{'o':oopt_id, 'p':all_cnt})
+    except IOError as e:
+        log('Error getting statistic for oopt buffers:$s'%e)
+
+    close_conn(conn, cursor)
+
+    return all_cnt
+
 def make_oopt_stat_msg(oopt_list, period):
     full_cnt = 0
     msg = 'Новые точки в ООПТ:'
     for oopt in oopt_list:
         all_cnt = check_oopt_stat(oopt[0], period)
+        if all_cnt > 0:
+            msg = msg + '\r\n%(r)s - %(o)s: %(c)s'%{'r':oopt[1],'o':oopt[2],'c':all_cnt}
+        full_cnt = full_cnt + all_cnt
+    if full_cnt == 0:
+        msg = ''
+    return msg
+
+def make_oopt_buf_stat_msg(oopt_list, period):
+    full_cnt = 0
+    msg = 'Новые точки в буферных зонах ООПТ:'
+    for oopt in oopt_list:
+        all_cnt = check_oopt_buf_stat(oopt[0], period)
         if all_cnt > 0:
             msg = msg + '\r\n%(r)s - %(o)s: %(c)s'%{'r':oopt[1],'o':oopt[2],'c':all_cnt}
         full_cnt = full_cnt + all_cnt
