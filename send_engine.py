@@ -56,18 +56,18 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
             %(s)s.peat_fire,
             %(s)s.geog
         FROM %(s)s
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND %(c)s >= %(l)s AND region in %(r)s AND NOT((tech IS NOT NULL) AND %(t)s)
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'now' AND %(c)s >= %(l)s AND region in %(r)s AND NOT((tech IS NOT NULL) AND NOT (%(f)s AND (tech IS NOT NULL)))
         ORDER BY %(s)s.peat_id
-    """%{'w':subs_tab,'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker, 't':filter_tech},
+    """%{'w':subs_tab,'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker, 'f':filter_tech},
     """
 	UPDATE %(s)s
 		SET whom = whom || '%(m)s'
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND %(c)s >= %(l)s AND region in %(r)s AND POSITION('%(m)s' in whom) = 0
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'now' AND %(c)s >= %(l)s AND region in %(r)s AND POSITION('%(m)s' in whom) = 0
     """%{'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker},
     """
 	UPDATE %(s)s
 		SET whom = '%(m)s'
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND %(c)s >= %(l)s AND region in %(r)s AND whom is Null
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'now' AND %(c)s >= %(l)s AND region in %(r)s AND whom is Null
     """%{'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker},
     """
 	UPDATE %s
@@ -131,17 +131,17 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
             %(s)s.region,
             %(s)s.geog
         FROM %(s)s
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND NOT((tech IS NOT NULL) AND %(t)s)
-    """%{'w':subs_tab,'s':src_tab,'p':period,'m':marker, 't':filter_tech},
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'now' AND NOT((tech IS NOT NULL) AND NOT (%(f)s AND (tech IS NOT NULL)))
+    """%{'w':subs_tab,'s':src_tab,'p':period,'m':marker, 'f':filter_tech},
     """
 	UPDATE %(s)s
 		SET whom = whom || '%(m)s'
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND POSITION('%(m)s' in whom) = 0
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'now' AND POSITION('%(m)s' in whom) = 0
     """%{'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker},
     """
 	UPDATE %(s)s
 		SET whom = '%(m)s'
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND whom is Null
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'now' AND whom is Null
     """%{'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker},
     """
 	UPDATE %s
@@ -206,9 +206,9 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
             %(s)s.peat_fire,
             %(s)s.geog
         FROM %(s)s
-        WHERE "date_time" > TIMESTAMP 'today' AND %(c)s >= %(l)s AND region in %(r)s AND (whom is Null OR POSITION('%(m)s' in whom) = 0) AND NOT((tech IS NOT NULL) AND %(t)s)
+        WHERE "date_time" > TIMESTAMP 'today' AND %(c)s >= %(l)s AND region in %(r)s AND (whom is Null OR POSITION('%(m)s' in whom) = 0) AND NOT((tech IS NOT NULL) AND NOT (%(f)s AND (tech IS NOT NULL)))
         ORDER BY %(s)s.peat_id
-    """%{'w':subs_tab,'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker, 't':filter_tech},
+    """%{'w':subs_tab,'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker, 'f':filter_tech},
     """
 	UPDATE %(s)s
 		SET whom = whom || '%(m)s'
@@ -281,8 +281,8 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
             %(s)s.region,
             %(s)s.geog
         FROM %(s)s
-        WHERE "date_time" > TIMESTAMP 'today' AND (whom is Null OR POSITION('%(m)s' in whom) = 0) AND NOT((tech IS NOT NULL) AND %(t)s)
-    """%{'w':subs_tab,'s':src_tab,'p':period,'m':marker, 't':filter_tech},
+        WHERE "date_time" > TIMESTAMP 'today' AND (whom is Null OR POSITION('%(m)s' in whom) = 0) AND NOT((tech IS NOT NULL) AND NOT (%(f)s AND (tech IS NOT NULL)))
+    """%{'w':subs_tab,'s':src_tab,'p':period,'m':marker, 'f':filter_tech},
     """
 	UPDATE %(s)s
 		SET whom = whom || '%(m)s'
@@ -337,6 +337,57 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
         log('Error creating subscribers tables: $s'%e)
     cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
     return cursor.fetchone()[0]
+
+def make_subs_oopt_table(conn,cursor,year_tab,oopt_ids,period,whom,filter_tech):
+    log("Creating oopt table for subs_id:%s..." %whom)
+    subs_tab = 'for_s%s' %str(whom)
+    marker = '[s%s]' %str(whom)
+    period = '%s hours' %period
+    currtime = time.localtime()
+    oopt_time = time.strftime('%H',currtime)
+
+    statements = (
+    """
+	DROP TABLE IF EXISTS %s
+	"""%(subs_tab),
+    """
+    CREATE TABLE %(s)s
+        AS SELECT acq_date AS date, acq_time AS time, latitude, longitude, region, oopt, oopt_id, geog
+            FROM %(y)s
+            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND oopt_id IN (%(i)s) AND (oopt_time IS NULL OR oopt_time = '%(t)s') AND NOT (%(f)s AND (tech IS NOT NULL))
+            ORDER BY oopt_id
+    """%{'s':subs_tab, 'y':year_tab, 'p':period, 'i':oopt_ids,'t':oopt_time,'f':filter_tech},
+    """
+    UPDATE %(y)s SET
+        oopt_time = '%(t)s'
+    WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND oopt_id IN (%(i)s) AND oopt_time IS NULL AND NOT (%(f)s AND (tech IS NOT NULL))
+    """%{'y':year_tab,'p':period,'i':oopt_ids,'t':oopt_time,'f':filter_tech},
+    """
+    ALTER TABLE %s
+        ADD COLUMN description VARCHAR(500)
+    """%(subs_tab),
+    """
+	UPDATE %s
+		SET description =
+        'Дата: ' || date || '\n' ||
+        'Время: ' || time || '\n' ||
+        'Широта: ' || latitude || '\n' ||
+        'Долгота (ID): ' || longitude || '\n' ||
+        'Регион: ' || region || '\n' ||
+        'ООПТ: ' || oopt
+    """%(subs_tab)
+    )
+
+    try:
+        for sql_stat in statements:
+            cursor.execute(sql_stat)
+            conn.commit()
+        log('The table created: subs_id:%s'%(whom))
+    except IOError as e:
+        log('Error creating subscribers tables: $s'%e)
+    cursor.execute("SELECT oopt_id, region, oopt, count(*) FROM %s GROUP BY oopt_id, region, oopt"%(subs_tab))
+    return cursor.fetchall()
+
 
 #Удаляем временные таблицы
 def drop_whom_table(conn,cursor, whom):
@@ -570,6 +621,46 @@ def send_to_subscribers_job():
                         send_to_telegram(url, subs.telegramm, msg2)
             else:
                 log('Error sending oopt stat to telegram. Oopt list is Null!!!')
+
+            #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if subs.oopt_zones != None:
+                oopt_ids = subs.oopt_zones
+            elif subs.oopt_regions != None:
+                oopt_ids = get_oopt_ids_for_region(subs.oopt_regions)
+            log('Sending OOPT points now!')
+            stat = make_subs_oopt_table(conn,cursor,year_tab,oopt_ids,period,whom,filter_tech)
+            if stat != []:
+                full_cnt = 0
+                msg = 'Новые точки в ООПТ:'
+                for str in stat:
+                    msg = msg + f"\r\n{str[1]} - {str[2]} ({str[0]}): {str[3]}"
+                    full_cnt = full_cnt + str[3]
+                send_to_telegram(url, subs.telegramm, msg)
+                dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,iteration)
+                dst_file = os.path.join(result_dir,dst_file_name)
+                log('Creating maillist...')
+                maillist = subs.email.replace(' ','').split(',')
+                log('Creating kml file...')
+                write_to_kml(dst_file,subs.subs_id)
+                if subs.email_point:
+                    subject, body_text = make_mail_attr(date, subs.point_period, num_points)
+                    try:
+                        send_email_with_attachment(maillist, subject, body_text, [dst_file])
+                    except IOError as e:
+                        log('Error seneding e-mail. Error:$s'%e)
+                if subs.teleg_point:
+                    doc = open(dst_file, 'rb')
+                    send_doc_to_telegram(url, subs.telegramm, doc)
+                    send_to_telegram(url, subs.telegramm, 'В файле %s точек.' %num_points)
+                log('Dropping temp files...')
+                drop_temp_file(dst_file)
+            else:
+                log('Don`t send zero-point file.')
+            log('Dropping tables...')
+            drop_whom_table(conn,cursor,subs.subs_id)
+            #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
 
         if now_hour == sendtimelist[0] and (subs.teleg_stat or subs.email_stat):
             reg_list = str_to_lst(subs.regions[2:-2])
