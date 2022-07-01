@@ -343,8 +343,6 @@ def make_subs_oopt_table(conn,cursor,year_tab,oopt_ids,period,whom,filter_tech):
     subs_tab = 'for_s%s' %str(whom)
     marker = '[s%s]' %str(whom)
     period = '%s hours' %period
-    currtime = time.localtime()
-    oopt_time = time.strftime('%H',currtime)
 
     statements = (
     """
@@ -354,14 +352,19 @@ def make_subs_oopt_table(conn,cursor,year_tab,oopt_ids,period,whom,filter_tech):
     CREATE TABLE %(s)s
         AS SELECT acq_date AS date, acq_time AS time, latitude, longitude, region, oopt, oopt_id, geog
             FROM %(y)s
-            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND oopt_id IN (%(i)s) AND (oopt_time IS NULL OR oopt_time = '%(t)s') AND NOT (%(f)s AND (tech IS NOT NULL))
+            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND oopt_id IN (%(i)s) AND (whom is Null OR POSITION('%(m)s' in whom) = 0) AND NOT (%(f)s AND (tech IS NOT NULL))
             ORDER BY oopt_id
-    """%{'s':subs_tab, 'y':year_tab, 'p':period, 'i':oopt_ids,'t':oopt_time,'f':filter_tech},
+    """%{'s':subs_tab, 'y':year_tab, 'p':period, 'i':oopt_ids,'m':marker,'f':filter_tech},
     """
-    UPDATE %(y)s SET
-        oopt_time = '%(t)s'
-    WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND oopt_id IN (%(i)s) AND oopt_time IS NULL AND NOT (%(f)s AND (tech IS NOT NULL))
-    """%{'y':year_tab,'p':period,'i':oopt_ids,'t':oopt_time,'f':filter_tech},
+	UPDATE %(y)s
+		SET whom = whom || '%(m)s'
+        WHERE "date_time" > TIMESTAMP 'now'  - INTERVAL '%(p)s' AND oopt_id IN (%(i)s) AND POSITION('%(m)s' in whom) = 0 AND NOT (%(f)s AND (tech IS NOT NULL))
+    """%{'y':year_tab,'p':period,'i':oopt_ids,'m':marker,'f':filter_tech},
+    """
+	UPDATE %(y)s
+		SET whom = '%(m)s'
+        WHERE "date_time" > TIMESTAMP 'now'  - INTERVAL '%(p)s' AND oopt_id IN (%(i)s) AND whom is Null AND NOT (%(f)s AND (tech IS NOT NULL))
+    """%{'y':year_tab,'p':period,'i':oopt_ids,'m':marker,'f':filter_tech},
     """
     ALTER TABLE %s
         ADD COLUMN description VARCHAR(500)
@@ -607,9 +610,9 @@ def send_to_subscribers_job():
             if stat != []:
                 full_cnt = 0
                 msg = 'Новые точки в ООПТ:'
-                for str in stat:
-                    msg = msg + f"\r\n{str[1]} - {str[2]} ({str[0]}): {str[3]}"
-                    full_cnt = full_cnt + str[3]
+                for st_str in stat:
+                    msg = msg + f"\r\n{st_str[1]} - {st_str[2]} ({st_str[0]}): {st_str[3]}"
+                    full_cnt = full_cnt + st_str[3]
                 send_to_telegram(url, subs.telegramm, msg)
                 dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,iteration)
                 dst_file = os.path.join(result_dir,dst_file_name)
