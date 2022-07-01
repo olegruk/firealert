@@ -56,18 +56,18 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
             %(s)s.peat_fire,
             %(s)s.geog
         FROM %(s)s
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND %(c)s >= %(l)s AND region in %(r)s AND NOT((tech IS NOT NULL) AND %(t)s)
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'now' AND %(c)s >= %(l)s AND region in %(r)s AND NOT((tech IS NOT NULL) AND %(t)s)
         ORDER BY %(s)s.peat_id
     """%{'w':subs_tab,'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker, 't':filter_tech},
     """
 	UPDATE %(s)s
 		SET whom = whom || '%(m)s'
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND %(c)s >= %(l)s AND region in %(r)s AND POSITION('%(m)s' in whom) = 0
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'now' AND %(c)s >= %(l)s AND region in %(r)s AND POSITION('%(m)s' in whom) = 0
     """%{'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker},
     """
 	UPDATE %(s)s
 		SET whom = '%(m)s'
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND %(c)s >= %(l)s AND region in %(r)s AND whom is Null
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'now' AND %(c)s >= %(l)s AND region in %(r)s AND whom is Null
     """%{'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker},
     """
 	UPDATE %s
@@ -131,17 +131,17 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
             %(s)s.region,
             %(s)s.geog
         FROM %(s)s
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND NOT((tech IS NOT NULL) AND %(t)s)
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'now' AND NOT((tech IS NOT NULL) AND %(t)s)
     """%{'w':subs_tab,'s':src_tab,'p':period,'m':marker, 't':filter_tech},
     """
 	UPDATE %(s)s
 		SET whom = whom || '%(m)s'
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND POSITION('%(m)s' in whom) = 0
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'now' AND POSITION('%(m)s' in whom) = 0
     """%{'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker},
     """
 	UPDATE %(s)s
 		SET whom = '%(m)s'
-        WHERE date_time >= TIMESTAMP 'today' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'today' AND whom is Null
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND "date_time" < TIMESTAMP 'now' AND whom is Null
     """%{'s':src_tab,'p':period,'c':crit_or_peat,'l':limit,'r':reg_list,'m':marker},
     """
 	UPDATE %s
