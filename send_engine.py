@@ -556,11 +556,11 @@ def send_to_subscribers_job():
                 dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,iteration)
                 dst_file = os.path.join(result_dir,dst_file_name)
 
-                log('Creating maillist...')
-                maillist = subs.email.replace(' ','').split(',')
                 log('Creating kml file...')
                 write_to_kml(dst_file,subs.subs_id)
                 if subs.email_point:
+                    log('Creating maillist...')
+                    maillist = subs.email.replace(' ','').split(',')
                     subject, body_text = make_mail_attr(date, subs.point_period, num_points)
                     try:
                         send_email_with_attachment(maillist, subject, body_text, [dst_file])
@@ -614,24 +614,25 @@ def send_to_subscribers_job():
                     msg = msg + f"\r\n{st_str[1]} - {st_str[2]} ({st_str[0]}): {st_str[3]}"
                     full_cnt = full_cnt + st_str[3]
                 send_to_telegram(url, subs.telegramm, msg)
-                dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,iteration)
-                dst_file = os.path.join(result_dir,dst_file_name)
-                log('Creating maillist...')
-                maillist = subs.email.replace(' ','').split(',')
-                log('Creating kml file...')
-                write_to_kml(dst_file,subs.subs_id)
-                if subs.email_point:
-                    subject, body_text = make_mail_attr(date, subs.point_period, num_points)
-                    try:
-                        send_email_with_attachment(maillist, subject, body_text, [dst_file])
-                    except IOError as e:
-                        log('Error seneding e-mail. Error:$s'%e)
-                if subs.teleg_point:
-                    doc = open(dst_file, 'rb')
-                    send_doc_to_telegram(url, subs.telegramm, doc)
-                    send_to_telegram(url, subs.telegramm, 'В файле %s точек.' %num_points)
-                log('Dropping temp files...')
-                drop_temp_file(dst_file)
+                if subs.email_point or subs.teleg_point:
+                    log('Creating kml file...')
+                    dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,iteration)
+                    dst_file = os.path.join(result_dir,dst_file_name)
+                    write_to_kml(dst_file,subs.subs_id)
+                    if subs.email_point and subs.email != None:
+                        log('Creating maillist...')
+                        maillist = subs.email.replace(' ','').split(',')
+                        subject, body_text = make_mail_attr(date, subs.point_period, num_points)
+                        try:
+                            send_email_with_attachment(maillist, subject, body_text, [dst_file])
+                        except IOError as e:
+                            log('Error seneding e-mail. Error:$s'%e)
+                    if subs.teleg_point and subs.telegramm != None:
+                        doc = open(dst_file, 'rb')
+                        send_doc_to_telegram(url, subs.telegramm, doc)
+                        send_to_telegram(url, subs.telegramm, 'В файле %s точек.' %num_points)
+                    log('Dropping temp files...')
+                    drop_temp_file(dst_file)
             else:
                 log('Don`t send zero-point file.')
             log('Dropping tables...')
