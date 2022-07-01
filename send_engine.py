@@ -9,7 +9,7 @@ import os, time
 from falogging import log, start_logging, stop_logging
 from faservice import get_config, get_tuple_cursor, close_conn, get_path, smf_new_topic, str_to_lst
 from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_email_message, send_doc_to_telegram, send_to_telegram
-from requester import make_tlg_stat_msg, make_zone_stat_msg, make_oopt_stat_msg, make_oopt_buf_stat_msg, make_smf_stat_msg, check_vip_zones, get_oopt_for_region, get_oopt_for_ids
+from requester import make_tlg_stat_msg, make_zone_stat_msg, make_oopt_stat_msg, make_oopt_buf_stat_msg, make_smf_stat_msg, check_vip_zones, get_oopt_for_region, get_oopt_for_ids, get_oopt_ids_for_region
 #Создаем таблицу для выгрузки подписчикам
 def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental,filter_tech):
     log("Creating table for subs_id:%s..." %whom)
@@ -598,37 +598,12 @@ def send_to_subscribers_job():
 
         if subs.check_oopt:
             log('Checking oopt stat for %s...'%str(subs.subs_name))
-            oopt_list = ''
-            if subs.oopt_zones != None:
-                #oopt_list = str_to_lst(subs.oopt_zones[2:-2])
-                oopt_list = get_oopt_for_ids(subs.oopt_zones)
-            elif subs.oopt_regions != None:
-                oopt_list = get_oopt_for_region(subs.oopt_regions)
-            log('List of zones for checking: %s'%oopt_list)
-            if oopt_list != '':
-                msg = make_oopt_stat_msg(oopt_list, period)
-                if msg == '':
-                    log('No points in OOPT. Stat is not sending to %s.'%str(subs.subs_name))
-                else:
-                    log('Sending oopt stat to telegram...')
-                    send_to_telegram(url, subs.telegramm, msg)
-                if subs.check_oopt_buf:
-                    msg2 = make_oopt_buf_stat_msg(oopt_list, period)
-                    if msg2 == '':
-                        log('No points in OOPT buffers. Stat is not sending to %s.'%str(subs.subs_name))
-                    else:
-                        log('Sending oopt buffers stat to telegram...')
-                        send_to_telegram(url, subs.telegramm, msg2)
-            else:
-                log('Error sending oopt stat to telegram. Oopt list is Null!!!')
-
-            #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             if subs.oopt_zones != None:
                 oopt_ids = subs.oopt_zones
             elif subs.oopt_regions != None:
                 oopt_ids = get_oopt_ids_for_region(subs.oopt_regions)
             log('Sending OOPT points now!')
-            stat = make_subs_oopt_table(conn,cursor,year_tab,oopt_ids,period,whom,filter_tech)
+            stat = make_subs_oopt_table(conn,cursor,year_tab,oopt_ids,period,subs.subs_id,subs.filter_tech)
             if stat != []:
                 full_cnt = 0
                 msg = 'Новые точки в ООПТ:'
@@ -658,9 +633,6 @@ def send_to_subscribers_job():
                 log('Don`t send zero-point file.')
             log('Dropping tables...')
             drop_whom_table(conn,cursor,subs.subs_id)
-            #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
 
         if now_hour == sendtimelist[0] and (subs.teleg_stat or subs.email_stat):
             reg_list = str_to_lst(subs.regions[2:-2])
