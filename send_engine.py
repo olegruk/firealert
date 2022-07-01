@@ -338,7 +338,7 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
     cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
     return cursor.fetchone()[0]
 
-def make_subs_oopt_table(conn,cursor,year_tab,oopt_ids,period,whom,filter_tech):
+def make_subs_oopt_table(conn,cursor,year_tab,oopt_tab,oopt_ids,period,whom,filter_tech):
     log("Creating oopt table for subs_id:%s..." %whom)
     subs_tab = 'for_s%s' %str(whom)
     marker = '[s%s]' %str(whom)
@@ -369,6 +369,12 @@ def make_subs_oopt_table(conn,cursor,year_tab,oopt_ids,period,whom,filter_tech):
     ALTER TABLE %s
         ADD COLUMN description VARCHAR(500)
     """%(subs_tab),
+    """
+	UPDATE %(s)s
+		SET oopt = %(o)s.name
+        FROM %(o)s
+        WHERE %(s)s.oopt_id = %(o)s.fid
+    """%{'s':subs_tab,'o':oopt_tab},
     """
 	UPDATE %s
 		SET description =
@@ -492,7 +498,7 @@ def send_to_subscribers_job():
     now_hour = time.strftime('%H',currtime)
 
     # extract params from config
-    [year_tab, subs_tab] = get_config("tables", ["year_tab","subs_tab"])
+    [year_tab, subs_tab,oopt_tab] = get_config("tables", ["year_tab","subs_tab","oopt_zones"])
     [data_root,temp_folder] = get_config("path", ["data_root", "temp_folder"])
     [to_dir] = get_config("yadisk", ["yadisk_out_path"])
     [url] = get_config('telegramm', ['url'])
@@ -606,7 +612,7 @@ def send_to_subscribers_job():
             elif subs.oopt_regions != None:
                 oopt_ids = get_oopt_ids_for_region(subs.oopt_regions)
             log('Sending OOPT points now!')
-            stat = make_subs_oopt_table(conn,cursor,year_tab,oopt_ids,period,subs.subs_id,subs.filter_tech)
+            stat = make_subs_oopt_table(conn,cursor,year_tab,oopt_tab,oopt_ids,period,subs.subs_id,subs.filter_tech)
             if stat != []:
                 full_cnt = 0
                 msg = 'Новые точки в ООПТ:'
