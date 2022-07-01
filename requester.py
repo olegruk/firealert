@@ -668,3 +668,11 @@ def get_oopt_for_ids(oopt_ids):
     cursor.execute("SELECT fid, region, name  FROM %(t)s WHERE fid IN (%(i)s)"%{'t':oopt_zones, 'i':oopt_ids})
     oopt_list = cursor.fetchall()
     return oopt_list
+
+def get_oopt_ids_for_region(reglist):
+    log("Making OOPT ids list for regions...")
+    [oopt_zones] = get_config("tables", ["oopt_zones"])
+    conn, cursor = get_cursor()
+    cursor.execute("SELECT fid FROM %(t)s WHERE region IN (%(r)s)"%{'t':oopt_zones, 'r':reglist})
+    oopt_ids = cursor.fetchall()
+    return oopt_ids
