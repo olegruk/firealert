@@ -675,4 +675,8 @@ def get_oopt_ids_for_region(reglist):
     conn, cursor = get_cursor()
     cursor.execute("SELECT fid FROM %(t)s WHERE region IN (%(r)s)"%{'t':oopt_zones, 'r':reglist})
     oopt_ids = cursor.fetchall()
-    return oopt_ids
+    oopt_lst = ''
+    for elem in oopt_ids:
+        oopt_lst = oopt_lst + str(elem[0]) + ','
+    oopt_lst = oopt_lst[0:-1]
+    return oopt_lst
