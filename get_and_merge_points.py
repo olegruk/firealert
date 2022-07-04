@@ -119,18 +119,23 @@ def GetPoints_with_retries(pointset, dst_folder, aDate):
     log("Getting points for %s..." %pointset)
     [period] = get_config("NASA", ["load_period"])
     [src_url] = get_config("NASA", ["%s_src_%s"%(pointset,period)])
+    [src_url2] = get_config("NASA", ["%s_src2_%s"%(pointset,period)])
     dst_file = "%s_%s.csv"%(pointset,aDate)
     dst_file = os.path.join(dst_folder, dst_file)
     errcode = read_csv_from_site_with_retries(src_url,dst_file)
     if errcode == 0:
         log("Download complete: %s" %dst_file)
     else:
-        if os.path.exists(dst_file):
-            try:
-                os.remove(dst_file)
-            except OSError as error:
-                log("Unable to remove file: %s" %dst_file)
-        log("Not downloaded: %s" %dst_file)
+        errcode = read_csv_from_site_with_retries(src_url2,dst_file)
+        if errcode == 0:
+            log("Download complete: %s" %dst_file)
+        else:
+            if os.path.exists(dst_file):
+                try:
+                    os.remove(dst_file)
+                except OSError as error:
+                    log("Unable to remove file: %s" %dst_file)
+            log("Not downloaded: %s" %dst_file)
     return errcode
 
 #Процедура для конструктора
