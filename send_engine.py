@@ -8,7 +8,7 @@
 import os, time
 from falogging import log, start_logging, stop_logging
 from faservice import get_config, get_tuple_cursor, close_conn, get_path, smf_new_topic, str_to_lst
-from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_email_message, send_doc_to_telegram, send_to_telegram
+from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_email_message, send_doc_to_telegram, send_to_telegram, points_tail
 from requester import make_tlg_stat_msg, make_zone_stat_msg, make_oopt_stat_msg, make_oopt_buf_stat_msg, make_smf_stat_msg, check_vip_zones, get_oopt_for_region, get_oopt_for_ids, get_oopt_ids_for_region
 #Создаем таблицу для выгрузки подписчикам
 def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental,filter_tech):
@@ -544,10 +544,10 @@ def send_to_subscribers_job():
             sendtimelist = fill_send_times(conn,cursor,subs_tab,subs.subs_id,subs.send_first_time, subs.send_period).split(',')
         else:
             sendtimelist = subs.send_times.split(',')
+        iteration = sendtimelist.index(now_hour)
 
         if now_hour in sendtimelist and (subs.regions != None) and ((subs.email_point and subs.email != None) or (subs.teleg_point and subs.telegramm != None)):
             log('Sending points now!')
-            iteration = sendtimelist.index(now_hour)
             is_increment = (iteration != 0)
             if subs.crit_or_fire == 'crit':
                 log('Making critical-limited table...')
@@ -575,7 +575,8 @@ def send_to_subscribers_job():
                 if subs.teleg_point and subs.telegramm != None:
                     doc = open(dst_file, 'rb')
                     send_doc_to_telegram(url, subs.telegramm, doc)
-                    send_to_telegram(url, subs.telegramm, 'В файле %s точек.' %num_points)
+                    tail = points_tail(num_points)
+                    send_to_telegram(url, subs.telegramm, f'В файле {num_points} {tail}.')
                 log('Dropping temp files...')
                 drop_temp_file(dst_file)
             else:
@@ -628,7 +629,7 @@ def send_to_subscribers_job():
                     if subs.email_point and subs.email != None:
                         log('Creating maillist...')
                         maillist = subs.email.replace(' ','').split(',')
-                        subject, body_text = make_mail_attr(date, subs.point_period, num_points)
+                        subject, body_text = make_mail_attr(date, subs.point_period, full_cnt)
                         try:
                             send_email_with_attachment(maillist, subject, body_text, [dst_file])
                         except IOError as e:
@@ -636,7 +637,8 @@ def send_to_subscribers_job():
                     if subs.teleg_point and subs.telegramm != None:
                         doc = open(dst_file, 'rb')
                         send_doc_to_telegram(url, subs.telegramm, doc)
-                        send_to_telegram(url, subs.telegramm, 'В файле %s точек.' %num_points)
+                        tail = points_tail(full_cnt)
+                        send_to_telegram(url, subs.telegramm, f'В файле {full_cnt} {tail}.')
                     log('Dropping temp files...')
                     drop_temp_file(dst_file)
             else:

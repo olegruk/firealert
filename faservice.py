@@ -371,3 +371,13 @@ def smf_new_topic(smf_url, smf_user, smf_pass, board, subject, msg, icon="xx", n
                 return False
         except KeyError:
             return False
+
+def points_tail(nump):
+    str_nump = str(nump)
+    if str_nump[-1] == '1':
+        tail = 'точка'
+    elif str_nump[-1] in ['2','3','4']:
+        tail = 'точки'
+    else:
+        tail = 'точек'
+    return tail
