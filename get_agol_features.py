@@ -50,7 +50,7 @@ def return_token(service_url, username, password, request_url):
         if "error" in token_response:
             error_mess = token_response.get("error", {}).get("message")
             if "This request needs to be made over https." in error_mess:
-                token_url = token_url.replace("http://", "https://")
+                service_url = service_url.replace("http://", "https://")
                 token = return_token(service_url, username, password, request_url)
                 return token
             else:
