@@ -9,7 +9,8 @@ import os, time
 from falogging import log, start_logging, stop_logging
 from faservice import get_config, get_tuple_cursor, close_conn, get_path, smf_new_topic, str_to_lst
 from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_email_message, send_doc_to_telegram, send_to_telegram, points_tail
-from requester import make_tlg_stat_msg, make_zone_stat_msg, make_oopt_stat_msg, make_oopt_buf_stat_msg, make_smf_stat_msg, check_vip_zones, get_oopt_for_region, get_oopt_for_ids, get_oopt_ids_for_region
+from requester import make_tlg_stat_msg, make_zone_stat_msg, make_smf_stat_msg, get_oopt_ids_for_region
+
 #Создаем таблицу для выгрузки подписчикам
 def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental,filter_tech):
     log("Creating table for subs_id:%s..." %whom)
@@ -412,26 +413,28 @@ def drop_whom_table(conn,cursor, whom):
 # Заполняем в таблице подписчиков поле с временами рассылки, если не было заполнено
 def fill_send_times(conn,cursor,subs_tab,subs_id,zero_time, period):
     log('Creating send times for %s.'%(subs_id))
-    if (zero_time != None) and (period != None):
-        zero_hour = int(zero_time.split(":")[0])
-        send_hours = ''
-        if 24 % period == 0:
-            num_of_times = int(24//period)
-        else:
-            num_of_times = int(24//period) + 1
-        for i in range(num_of_times):
-            new_hour = (zero_hour + i*period) % 24
-            if new_hour < 10:
-                send_hours = send_hours + '0' + str(new_hour)
-            else:
-                send_hours = send_hours + str(new_hour)
-            if i < num_of_times - 1:
-                send_hours = send_hours + ","
-        cursor.execute("UPDATE %(s)s SET send_times = '%(h)s' WHERE subs_id = %(i)s"%{'s':subs_tab,'h':send_hours,'i':subs_id})
-        conn.commit()
-        return send_hours
+    if period == None:
+        period = 24
+    if zero_time == None:
+        zero_time = '00:15'
+    zero_hour = int(zero_time.split(":")[0])
+    send_hours = ''
+    if 24 % period == 0:
+        num_of_times = int(24//period)
     else:
-        return ''
+        num_of_times = int(24//period) + 1
+    for i in range(num_of_times):
+        new_hour = (zero_hour + i*period) % 24
+        if new_hour < 10:
+            send_hours = send_hours + '0' + str(new_hour)
+        else:
+            send_hours = send_hours + str(new_hour)
+        if i < num_of_times - 1:
+            send_hours = send_hours + ","
+    cursor.execute("UPDATE %(s)s SET send_times = '%(h)s' WHERE subs_id = %(i)s"%{'s':subs_tab,'h':send_hours,'i':subs_id})
+    conn.commit()
+    return send_hours
+
 
 def make_file_name(period, date, whom, result_dir,iter):
     if iter == 0:
@@ -544,10 +547,10 @@ def send_to_subscribers_job():
             sendtimelist = fill_send_times(conn,cursor,subs_tab,subs.subs_id,subs.send_first_time, subs.send_period).split(',')
         else:
             sendtimelist = subs.send_times.split(',')
-        iteration = sendtimelist.index(now_hour)
 
         if now_hour in sendtimelist and (subs.regions != None) and ((subs.email_point and subs.email != None) or (subs.teleg_point and subs.telegramm != None)):
             log('Sending points now!')
+            iteration = sendtimelist.index(now_hour)
             is_increment = (iteration != 0)
             if subs.crit_or_fire == 'crit':
                 log('Making critical-limited table...')
@@ -590,18 +593,11 @@ def send_to_subscribers_job():
         else:
             log('Do anything? It`s not time yet!')
 
-#        if now_hour == sendtimelist[0] and subs.vip_zones:
-#            points_count, zones = check_vip_zones(outline, subs.stat_period)
-#            if points_count > 0:
-#                msg = 'Новых точек\r\nв зонах особого внимания: %s\r\n\r\n' %points_count
-#                for (zone, num_points) in zones:
-#                    msg = msg + '%s - %s\r\n' %(zone, num_points)
-#                send_to_telegram(url, subs.telegramm, msg)
         period = '%sh'%subs.stat_period
         if subs.vip_zones:
             log('Checking zones stat for %s...'%str(subs.subs_name))
             zone_list = str_to_lst(subs.zones[2:-2])
-            msg = make_zone_stat_msg(zone_list, period)
+            msg = make_zone_stat_msg(year_tab, zone_list, period)
             if msg != '':
                 log('Sending zones stat to telegram...')
                 send_to_telegram(url, subs.telegramm, msg)
@@ -618,12 +614,13 @@ def send_to_subscribers_job():
                 full_cnt = 0
                 msg = 'Новые точки в ООПТ:'
                 for st_str in stat:
-                    msg = msg + f"\r\n{st_str[1]} - {st_str[2]} ({st_str[0]}): {st_str[3]}"
+                    #msg = msg + f"\r\n{st_str[1]} - {st_str[2]} ({st_str[0]}): {st_str[3]}" #Статистика с индексами ООПТ
+                    msg = msg + f"\r\n{st_str[1]} - {st_str[2]}: {st_str[3]}" #Статистика без индексов ООПТ
                     full_cnt = full_cnt + st_str[3]
                 send_to_telegram(url, subs.telegramm, msg)
                 if (subs.email_point and subs.email != None) or (subs.teleg_point and subs.telegramm != None):
                     log('Creating kml file...')
-                    dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,iteration)
+                    dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,int(now_hour))
                     dst_file = os.path.join(result_dir,dst_file_name)
                     write_to_kml(dst_file,subs.subs_id)
                     if subs.email_point and subs.email != None:
