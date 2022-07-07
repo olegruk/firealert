@@ -641,7 +641,7 @@ def send_to_subscribers_job():
             else:
                 log('Don`t send zero-point file.')
             log('Dropping tables...')
-            drop_whom_table(conn,cursor,subs.subs_id)
+            #drop_whom_table(conn,cursor,subs.subs_id)
 
         if now_hour == sendtimelist[0] and (subs.teleg_stat or subs.email_stat):
             reg_list = str_to_lst(subs.regions[2:-2])

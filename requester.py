@@ -359,6 +359,10 @@ def check_reg_stat(reg, period, critical):
     return critical_cnt, all_cnt
 
 def make_tlg_stat_msg(reg_list, period, limit):
+    if limit == None:
+        limit = 0
+    if period == None:
+        period = 24
     full_cnt = 0
     full_cr_cnt = 0
     msg = 'Количество точек:'
@@ -421,6 +425,10 @@ def make_zone_stat_msg(year_tab, zone_list, period):
     return msg
 
 def make_smf_stat_msg(reg_list, period, limit):
+    if limit == None:
+        limit = 0
+    if period == None:
+        period = 24
     full_cnt = 0
     full_cr_cnt = 0
     smf_msg = 'Количество точек:\r\n\r\n[table]'

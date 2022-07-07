@@ -208,7 +208,7 @@ def add_geog_field(conn,cursor,pointset):
     statements = (
         """
         ALTER TABLE %s
-            ADD COLUMN geog geometry(POINT,4326)
+            ADD COLUMN geog GEOGRAPHY(POINT, 4326)
         """%(src_tab),
         """
         UPDATE %s
