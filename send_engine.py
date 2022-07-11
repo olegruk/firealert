@@ -334,8 +334,9 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
             cursor.execute(sql_stat)
             conn.commit()
         log('The table created: subs_id:%s'%(whom))
-    except IOError as e:
+    except Exception as e:
         log('Error creating subscribers tables: $s'%e)
+        return -1
     cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
     return cursor.fetchone()[0]
 
@@ -548,7 +549,7 @@ def send_to_subscribers_job():
         else:
             sendtimelist = subs.send_times.split(',')
 
-        if now_hour in sendtimelist and (subs.regions != None) and ((subs.email_point and subs.email != None) or (subs.teleg_point and subs.telegramm != None)):
+        if now_hour in sendtimelist and (subs.regions != None and subs.regions != '') and ((subs.email_point and subs.email != None) or (subs.teleg_point and subs.telegramm != None)):
             log('Sending points now!')
             iteration = sendtimelist.index(now_hour)
             is_increment = (iteration != 0)
@@ -561,7 +562,7 @@ def send_to_subscribers_job():
             else:
                 log('Making zero-critical table...')
                 num_points = make_subs_table(conn,cursor,year_tab,'critical',0,subs.point_period,subs.regions,subs.subs_id,is_increment,subs.filter_tech)
-            if num_points > 0 or subs.send_empty:
+            if num_points > 0 or (num_points == 0 and subs.send_empty):
                 dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,iteration)
                 dst_file = os.path.join(result_dir,dst_file_name)
 
@@ -582,7 +583,7 @@ def send_to_subscribers_job():
                     send_to_telegram(url, subs.telegramm, f'В файле {num_points} {tail}.')
                 log('Dropping temp files...')
                 drop_temp_file(dst_file)
-            else:
+            elif num_points == 0 and not subs.send_empty:
                 log('Don`t send zero-point file.')
             if now_hour == sendtimelist[0] and subs.ya_disk:
                 log('Writing to yadisk...')
