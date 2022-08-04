@@ -512,27 +512,33 @@ def send_to_subscribers_job():
     conn, cursor = get_tuple_cursor()
 
     #Загружаем данные о подписчиках
-    #subs_id - serial - автоидентификатор
-    #subs_name - varchar(10) - имя подписчика, для удобства ориентирования в подписках
-    #active - boolean - признак активной подписки
-    #regions - varchar() - список регионов
-    #email - varchar() - список адресов подписчика
-    #telegramm - varchar(20) - список телеграмм-чатов подписчика
-	#email_stat - boolean - слать статистику по почте?
-	#teleg_stat - boolean - слать статистику в телеграмм?
-	#email_point - boolean - слать точки по почте?
-	#teleg_point - boolean - слать точки в телеграмм?
-	#stat_period - integer - период в часах, за который выдается статистика
-	#point_period - integer - период в часах, за который выбираются точки
-	#crit_or_fire - varchar(4) - критерий отбора точек, критичность точки - 'crit' или горимость торфа - 'fire'
-	#critical - integer - порог критичности для отбора точек
-	#peatfire - integer - порог горимости торфяника для отбора точек
-	#send_first_time - varchar(5) - время рассылки
-	#send_period - integer - периодичность рассылки
-	#send_times - varchar() - список временных меток для рассылки
-    #vip_zones - boolean - рассылать ли информацию по зонам особого внимания
-    #send_empty - отправлять или нет пустой файл
-    #ya_disk - писать или нет файл на яндекс-диск
+    #subs_id			serial			автоидентификатор
+    #subs_name			varchar(10)		имя подписчика, для удобства ориентирования в подписках
+    #active				boolean			подписка активна? 
+    #regions			varchar()		список регионов на контроле подписчика
+    #email				varchar()		список e-mail адресов подписчика
+    #telegramm			varchar(20)		список телеграмм-чатов подписчика
+	#email_stat			boolean			слать статистику по почте?
+	#teleg_stat			boolean			слать статистику в телеграмм?
+	#email_point		boolean			слать точки по почте?
+	#teleg_point		boolean			слать точки в телеграмм?
+	#stat_period		integer			период в часах, за который выдается статистика
+	#point_period		integer			период в часах, за который выбираются точки
+	#crit_or_fire		varchar(4)		критерий отбора точек, критичность точки - 'crit' или горимость торфа - 'fire'
+	#critical			integer			порог критичности точки для отбора точек 
+	#peatfire			integer			порог горимости торфяника для отбора точек
+	#send_first_time	varchar(5)		время первой рассылки за сутки
+	#send_period		integer			периодичность рассылки в часах
+	#send_times			varchar()		список временных меток для рассылки (в какие часы делается рассылка)
+    #vip_zones			boolean			рассылать ли информацию по зонам особого внимания?
+    #send_empty			boolean			отправлять или нет пустой файл?
+    #ya_disk			boolean			писать или нет файл на яндекс-диск
+	#zones				varchar()		список зон особого внимания на контроле подписчика
+	#filter_tech		boolean			фильтровать техноген?
+	#oopt_zones			varchar()		список ООПТ на контроле подписчика
+	#check_oopt			boolean			проверять попадание в ООПТ?
+	#oopt_regions		varchar()		список регионов для контроля ООПТ (читается, если пуст явный список)
+	#check_oopt_buf		boolean			проверять попадание в буферные зоны ООПТ?
 
     cursor.execute("SELECT * FROM %s WHERE active"%(subs_tab))
     subscribers = cursor.fetchall()
@@ -603,7 +609,7 @@ def send_to_subscribers_job():
                 log('Sending zones stat to telegram...')
                 send_to_telegram(url, subs.telegramm, msg)
 
-        if subs.check_oopt and ((subs.oopt_zones != None) or (subs.oopt_regions != None)):
+        if subs.check_oopt and (now_hour in sendtimelist) and ((subs.oopt_zones != None) or (subs.oopt_regions != None)):
             log('Checking oopt stat for %s...'%str(subs.subs_name))
             if subs.oopt_zones != None:
                 oopt_ids = subs.oopt_zones
