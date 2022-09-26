@@ -215,7 +215,7 @@ def write_to_yadisk(file, from_dir, to_dir, whom):
     p_sys = p.replace("/", os.path.sep)
     in_path = os.path.join(from_dir, p_sys, file)
     try:
-        y.upload(in_path, file_path, overwrite = True)
+        y.upload(in_path, file_path, overwrite = True, timeout = (20.0, 25.0))
         log('Written to yadisk %s'%(file_path))
     except yadisk.exceptions.PathExistsError:
         log('Path not exist %s.'%(dir_path))

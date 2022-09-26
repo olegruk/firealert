@@ -22,7 +22,7 @@ def create_today_backup(dbname, dbuser, dst_folder, dst_file):
         log('Owerwrite backup %s...'%(dst_file))
     else:
         log('Create new backup %s...'%(dst_file))
-    command = "pg_dump -U %(u)s -w %(d)s > %(f)s"%{'u': dbuser, 'd': dbname, 'f': dst_file}
+    command = "pg_dump -U %(u)s -w %(d)s | split -b 1G --filter='gzip' > %(f)s"%{'u': dbuser, 'd': dbname, 'f': dst_file}
     os.system(command)
     log('Done.')
 
@@ -36,9 +36,11 @@ def create_backup_job():
     [to_dir] = get_config("yadisk", ["yadisk_bckup_path"])
 
     dst_path = get_path('', backup_folder)
-    dst_file = '%s.dump'%(dbname)
+    dst_file = '%s.dump.gz'%(dbname)
     create_today_backup(dbname, dbuser, dst_path, dst_file)
-    write_to_yadisk(dst_file, dst_path, to_dir, '')
+    dir = os.listdir(dst_path)
+    for a_file in dir:
+        write_to_yadisk(a_file, dst_path, to_dir, '')
 
     stop_logging('create_backup.py')
 

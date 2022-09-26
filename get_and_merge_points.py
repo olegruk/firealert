@@ -184,7 +184,7 @@ def drop_today_tables(conn,cursor, pointset):
         conn.commit()
         log("Tables dropped")
     except psycopg2.Error as e:
-        log('Error dropping table:$s'%e)
+        log('Error dropping table:%s'%e)
 
 #Удаляем временные таблицы
 def drop_temp_tables(conn,cursor, pointset):
@@ -199,7 +199,7 @@ def drop_temp_tables(conn,cursor, pointset):
         conn.commit()
         log("Temp tables dropped.")
     except psycopg2.Error as e:
-        log('Error dropping temp tables:$s'%e)
+        log('Error dropping temp tables:%s'%e)
 
 #Добавляем геоинформацию
 def add_geog_field(conn,cursor,pointset):
@@ -224,7 +224,7 @@ def add_geog_field(conn,cursor,pointset):
         conn.commit()
         log('Geometry added to %s'%(src_tab))
     except psycopg2.Error as e:
-        log('Error adding geometry:$s'%e)
+        log('Error adding geometry:%s'%e)
 
 #Делаем выборку точек по России
 def make_tables_for_Russia(conn,cursor,pointset):
@@ -249,7 +249,7 @@ def make_tables_for_Russia(conn,cursor,pointset):
             conn.commit()
         log('The table created:%s'%(dst_tab))
     except psycopg2.Error as e:
-        log('Error intersecting points with region:$s'%e)
+        log('Error intersecting points with region:%s'%e)
 
 #Создаем сводную таблицу
 def make_common_table(conn,cursor,dst_tab,pointsets):
@@ -306,7 +306,7 @@ def make_common_table(conn,cursor,dst_tab,pointsets):
             conn.commit()
         log('The table created:%s'%(dst_tab))
     except psycopg2.Error as e:
-        log('Error creating table:$s'%e)
+        log('Error creating table:%s'%e)
 
     loaded = 0
 
@@ -368,7 +368,7 @@ def make_common_table(conn,cursor,dst_tab,pointsets):
             conn.commit()
             log('The data added:%s'%(src_tab))
         except psycopg2.Error as e:
-            log('Error adding data:$s'%e)
+            log('Error adding data:%s'%e)
 
         loaded = loaded + 1
     return loaded
@@ -407,7 +407,7 @@ def cost_point_in_buffers(conn,cursor,tablename):
         log('Zero rating setted')
         conn.commit()
     except psycopg2.Error as e:
-        log('Error costing points:$s'%e)
+        log('Error costing points:%s'%e)
 
 #Добавляем в результирующее поле Name = acq_date : gid : critical
 def set_name_field(conn,cursor,tablename):
@@ -433,7 +433,7 @@ def set_name_field(conn,cursor,tablename):
         conn.commit()
         log("A Name field setted")
     except psycopg2.Error as e:
-        log('Error setting points name:$s'%e)
+        log('Error setting points name:%s'%e)
 
 #Создаем поле ident = acq_date:acq_time:latitude:longitude:satellite
 def set_ident_field(conn,cursor,tablename):
@@ -447,7 +447,7 @@ def set_ident_field(conn,cursor,tablename):
         conn.commit()
         log("A Ident field setted")
     except psycopg2.Error as e:
-        log('Error creating ident fields:$s'%e)
+        log('Error creating ident fields:%s'%e)
 
 #Дополняем поле time ведущими нулями
 def correct_time_field(conn,cursor,tablename):
@@ -461,7 +461,7 @@ def correct_time_field(conn,cursor,tablename):
         conn.commit()
         log(" Time field corrected.")
     except psycopg2.Error as e:
-        log('Error correcting time fields:$s'%e)
+        log('Error correcting time fields:%s'%e)
 
 #Устанавливаем значение поля date_time "acq_date acq_time"
 def set_datetime_field(conn,cursor,tablename):
@@ -475,7 +475,7 @@ def set_datetime_field(conn,cursor,tablename):
         conn.commit()
         log("Date_time field setted.")
     except psycopg2.Error as e:
-        log('Error creating timestamp:$s'%e)
+        log('Error creating timestamp%s'%e)
 
 #Устанавливаем значение поля marker
 def set_marker_field(conn,cursor,tablename,marker):
@@ -489,7 +489,7 @@ def set_marker_field(conn,cursor,tablename,marker):
         conn.commit()
         log("Marker field setted.")
     except psycopg2.Error as e:
-        log('Error creating marker:$s'%e)
+        log('Error creating marker:%s'%e)
 
 
 #Удаляем дубли в таблице
@@ -512,7 +512,7 @@ def del_duplicates(conn,cursor,tablename):
             conn.commit()
         log('The duplicates deleted in %s'%(tablename))
     except psycopg2.Error as e:
-        log('Error deleting duplicates:$s'%e)
+        log('Error deleting duplicates:%s'%e)
 
 #Повышаем оценку для групповых точек
 def rise_multipoint_cost(conn,cursor,tablename,distance):
@@ -581,7 +581,7 @@ def rise_multipoint_cost(conn,cursor,tablename,distance):
             conn.commit()
         log('Cost corrected.')
     except psycopg2.Error as e:
-        log('Error correcting cost:$s'%e)
+        log('Error correcting cost:%s'%e)
 
 def check_tech_zones(conn, cursor, src_tab, tech_zones):
     log("Checking tech-zones...")
@@ -596,7 +596,7 @@ def check_tech_zones(conn, cursor, src_tab, tech_zones):
         conn.commit()
         log('Tech zones checked.')
     except psycopg2.Error as e:
-        log('Error intersecting points with tech-zones:$s'%e)
+        log('Error intersecting points with tech-zones:%s'%e)
 
 def check_vip_zones(conn, cursor, src_tab, vip_zones):
     log("Checking vip-zones...")
@@ -611,7 +611,7 @@ def check_vip_zones(conn, cursor, src_tab, vip_zones):
         conn.commit()
         log('Vip zones checked.')
     except psycopg2.Error as e:
-        log('Error intersecting points with vip-zones:$s'%e)
+        log('Error intersecting points with vip-zones:%s'%e)
 
 def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
     log("Checking oopt-zones...")
@@ -626,7 +626,7 @@ def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
         conn.commit()
         log('OOPT zones checked.')
     except psycopg2.Error as e:
-        log('Error intersecting points with oopt-zones:$s'%e)
+        log('Error intersecting points with oopt-zones:%s'%e)
 
 def check_oopt_buffers(conn, cursor, src_tab, oopt_buffers):
     log("Checking oopt buffers...")
@@ -641,7 +641,7 @@ def check_oopt_buffers(conn, cursor, src_tab, oopt_buffers):
         conn.commit()
         log('OOPT buffers checked.')
     except psycopg2.Error as e:
-        log('Error intersecting points with oopt buffers:$s'%e)
+        log('Error intersecting points with oopt buffers:%s'%e)
 
 #Копирование данных в общую годичную таблицу
 def copy_to_common_table(conn,cursor,today_tab, year_tab):
@@ -693,7 +693,7 @@ def copy_to_common_table(conn,cursor,today_tab, year_tab):
         conn.commit()
         log('Data from %s added to common table %s'%(today_tab, year_tab))
     except psycopg2.Error as e:
-        log('Error addin points to common table:$s'%e)
+        log('Error addin points to common table:%s'%e)
 
 def drop_today_table(conn,cursor,common_tab):
     log("Dropping today table...")
@@ -702,7 +702,7 @@ def drop_today_table(conn,cursor,common_tab):
         conn.commit()
         log("Today table dropped.")
     except psycopg2.Error as e:
-        log('Error dropping today table:$s'%e)
+        log('Error dropping today table:%s'%e)
 
 
 #Задачи
