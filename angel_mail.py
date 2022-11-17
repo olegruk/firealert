@@ -145,7 +145,7 @@ def angel_mail_job():
             from_whom = ''.join((t[0].decode(codepage)) for t in decode_header(from_whom))
         subj = email_message['Subject']
         #log('Debug!!! Subj is:\n%s'%subj)
-        parse_subj = email.utils.parseaddr(email_message['Subject'])
+        #parse_subj = email.utils.parseaddr(email_message['Subject'])
         #log('Debug!!! Parse_subj is:\n%s'%parse_subj[0])
         #log('Debug!!! Parse_subj is:\n%s'%parse_subj[1])
         #log('Debug!!! ---------------------------------------------------------------------')
@@ -154,7 +154,7 @@ def angel_mail_job():
         else:
             subj = ''
             #subj = ''.join((t[0].decode(codepage)) for t in decode_header(parse_subj[0],parse_subj[1]))
-        attr_from = [''.join((t[0].decode()) for t in decode_header(email.utils.parseaddr(email_message['From'])[0])), email.utils.parseaddr(email_message['From'])[1]]
+        #attr_from = [''.join((t[0].decode()) for t in decode_header(email.utils.parseaddr(email_message['From'])[0])), email.utils.parseaddr(email_message['From'])[1]]
         #attr_from = [''.join((t[0]) for t in decode_header(email.utils.parseaddr(email_message['From'])[0])), email.utils.parseaddr(email_message['From'])[1]]
         #attr_id = email_message['Message-Id']
         #message = parse_multipart(email_message,result_dir,dig_uid,codepage)
