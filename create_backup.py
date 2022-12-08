@@ -22,7 +22,7 @@ def create_today_backup(dbname, dbuser, dst_folder, dst_file):
         log('Owerwrite backup %s...'%(dst_file))
     else:
         log('Create new backup %s...'%(dst_file))
-    command = "pg_dump -U %(u)s -w %(d)s | split -b 1G --filter='gzip' > %(f)s"%{'u': dbuser, 'd': dbname, 'f': dst_file}
+    command = "pg_dump -U %(u)s -w %(d)s | split -b 250M --filter='gzip' > %(f)s"%{'u': dbuser, 'd': dbname, 'f': dst_file}
     os.system(command)
     log('Done.')
 
