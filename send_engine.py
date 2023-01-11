@@ -8,8 +8,9 @@
 import os, time
 from falogging import log, start_logging, stop_logging
 from faservice import get_config, get_tuple_cursor, close_conn, get_path, smf_new_topic, str_to_lst
-from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_email_message, send_doc_to_telegram, send_to_telegram
-from requester import make_tlg_stat_msg, make_zone_stat_msg, make_oopt_stat_msg, make_oopt_buf_stat_msg, make_smf_stat_msg, check_vip_zones, get_oopt_for_region, get_oopt_for_ids, get_oopt_ids_for_region
+from faservice import write_to_kml, write_to_yadisk, send_email_with_attachment, send_email_message, send_doc_to_telegram, send_to_telegram, points_tail
+from requester import make_tlg_stat_msg, make_zone_stat_msg, make_smf_stat_msg, get_oopt_ids_for_region
+
 #Создаем таблицу для выгрузки подписчикам
 def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,is_incremental,filter_tech):
     log("Creating table for subs_id:%s..." %whom)
@@ -333,8 +334,9 @@ def make_subs_table(conn,cursor,src_tab,crit_or_peat,limit,period,reg_list,whom,
             cursor.execute(sql_stat)
             conn.commit()
         log('The table created: subs_id:%s'%(whom))
-    except IOError as e:
+    except Exception as e:
         log('Error creating subscribers tables: $s'%e)
+        return -1
     cursor.execute("SELECT count(*) FROM %s"%(subs_tab))
     return cursor.fetchone()[0]
 
@@ -412,26 +414,28 @@ def drop_whom_table(conn,cursor, whom):
 # Заполняем в таблице подписчиков поле с временами рассылки, если не было заполнено
 def fill_send_times(conn,cursor,subs_tab,subs_id,zero_time, period):
     log('Creating send times for %s.'%(subs_id))
-    if (zero_time != None) and (period != None):
-        zero_hour = int(zero_time.split(":")[0])
-        send_hours = ''
-        if 24 % period == 0:
-            num_of_times = int(24//period)
-        else:
-            num_of_times = int(24//period) + 1
-        for i in range(num_of_times):
-            new_hour = (zero_hour + i*period) % 24
-            if new_hour < 10:
-                send_hours = send_hours + '0' + str(new_hour)
-            else:
-                send_hours = send_hours + str(new_hour)
-            if i < num_of_times - 1:
-                send_hours = send_hours + ","
-        cursor.execute("UPDATE %(s)s SET send_times = '%(h)s' WHERE subs_id = %(i)s"%{'s':subs_tab,'h':send_hours,'i':subs_id})
-        conn.commit()
-        return send_hours
+    if period == None:
+        period = 24
+    if zero_time == None:
+        zero_time = '00:15'
+    zero_hour = int(zero_time.split(":")[0])
+    send_hours = ''
+    if 24 % period == 0:
+        num_of_times = int(24//period)
     else:
-        return ''
+        num_of_times = int(24//period) + 1
+    for i in range(num_of_times):
+        new_hour = (zero_hour + i*period) % 24
+        if new_hour < 10:
+            send_hours = send_hours + '0' + str(new_hour)
+        else:
+            send_hours = send_hours + str(new_hour)
+        if i < num_of_times - 1:
+            send_hours = send_hours + ","
+    cursor.execute("UPDATE %(s)s SET send_times = '%(h)s' WHERE subs_id = %(i)s"%{'s':subs_tab,'h':send_hours,'i':subs_id})
+    conn.commit()
+    return send_hours
+
 
 def make_file_name(period, date, whom, result_dir,iter):
     if iter == 0:
@@ -508,27 +512,33 @@ def send_to_subscribers_job():
     conn, cursor = get_tuple_cursor()
 
     #Загружаем данные о подписчиках
-    #subs_id - serial - автоидентификатор
-    #subs_name - varchar(10) - имя подписчика, для удобства ориентирования в подписках
-    #active - boolean - признак активной подписки
-    #regions - varchar() - список регионов
-    #email - varchar() - список адресов подписчика
-    #telegramm - varchar(20) - список телеграмм-чатов подписчика
-	#email_stat - boolean - слать статистику по почте?
-	#teleg_stat - boolean - слать статистику в телеграмм?
-	#email_point - boolean - слать точки по почте?
-	#teleg_point - boolean - слать точки в телеграмм?
-	#stat_period - integer - период в часах, за который выдается статистика
-	#point_period - integer - период в часах, за который выбираются точки
-	#crit_or_fire - varchar(4) - критерий отбора точек, критичность точки - 'crit' или горимость торфа - 'fire'
-	#critical - integer - порог критичности для отбора точек
-	#peatfire - integer - порог горимости торфяника для отбора точек
-	#send_first_time - varchar(5) - время рассылки
-	#send_period - integer - периодичность рассылки
-	#send_times - varchar() - список временных меток для рассылки
-    #vip_zones - boolean - рассылать ли информацию по зонам особого внимания
-    #send_empty - отправлять или нет пустой файл
-    #ya_disk - писать или нет файл на яндекс-диск
+    #subs_id			serial			автоидентификатор
+    #subs_name			varchar(10)		имя подписчика, для удобства ориентирования в подписках
+    #active				boolean			подписка активна? 
+    #regions			varchar()		список регионов на контроле подписчика
+    #email				varchar()		список e-mail адресов подписчика
+    #telegramm			varchar(20)		список телеграмм-чатов подписчика
+	#email_stat			boolean			слать статистику по почте?
+	#teleg_stat			boolean			слать статистику в телеграмм?
+	#email_point		boolean			слать точки по почте?
+	#teleg_point		boolean			слать точки в телеграмм?
+	#stat_period		integer			период в часах, за который выдается статистика
+	#point_period		integer			период в часах, за который выбираются точки
+	#crit_or_fire		varchar(4)		критерий отбора точек, критичность точки - 'crit' или горимость торфа - 'fire'
+	#critical			integer			порог критичности точки для отбора точек 
+	#peatfire			integer			порог горимости торфяника для отбора точек
+	#send_first_time	varchar(5)		время первой рассылки за сутки
+	#send_period		integer			периодичность рассылки в часах
+	#send_times			varchar()		список временных меток для рассылки (в какие часы делается рассылка)
+    #vip_zones			boolean			рассылать ли информацию по зонам особого внимания?
+    #send_empty			boolean			отправлять или нет пустой файл?
+    #ya_disk			boolean			писать или нет файл на яндекс-диск
+	#zones				varchar()		список зон особого внимания на контроле подписчика
+	#filter_tech		boolean			фильтровать техноген?
+	#oopt_zones			varchar()		список ООПТ на контроле подписчика
+	#check_oopt			boolean			проверять попадание в ООПТ?
+	#oopt_regions		varchar()		список регионов для контроля ООПТ (читается, если пуст явный список)
+	#check_oopt_buf		boolean			проверять попадание в буферные зоны ООПТ?
 
     cursor.execute("SELECT * FROM %s WHERE active"%(subs_tab))
     subscribers = cursor.fetchall()
@@ -545,7 +555,7 @@ def send_to_subscribers_job():
         else:
             sendtimelist = subs.send_times.split(',')
 
-        if now_hour in sendtimelist and (subs.email_point or subs.teleg_point):
+        if now_hour in sendtimelist and (subs.regions != None and subs.regions != '') and ((subs.email_point and subs.email != None) or (subs.teleg_point and subs.telegramm != None)):
             log('Sending points now!')
             iteration = sendtimelist.index(now_hour)
             is_increment = (iteration != 0)
@@ -558,13 +568,13 @@ def send_to_subscribers_job():
             else:
                 log('Making zero-critical table...')
                 num_points = make_subs_table(conn,cursor,year_tab,'critical',0,subs.point_period,subs.regions,subs.subs_id,is_increment,subs.filter_tech)
-            if num_points > 0 or subs.send_empty:
+            if num_points > 0 or (num_points == 0 and subs.send_empty):
                 dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,iteration)
                 dst_file = os.path.join(result_dir,dst_file_name)
 
                 log('Creating kml file...')
                 write_to_kml(dst_file,subs.subs_id)
-                if subs.email_point:
+                if subs.email_point and subs.email != None:
                     log('Creating maillist...')
                     maillist = subs.email.replace(' ','').split(',')
                     subject, body_text = make_mail_attr(date, subs.point_period, num_points)
@@ -572,13 +582,14 @@ def send_to_subscribers_job():
                         send_email_with_attachment(maillist, subject, body_text, [dst_file])
                     except IOError as e:
                         log('Error seneding e-mail. Error:$s'%e)
-                if subs.teleg_point:
+                if subs.teleg_point and subs.telegramm != None:
                     doc = open(dst_file, 'rb')
                     send_doc_to_telegram(url, subs.telegramm, doc)
-                    send_to_telegram(url, subs.telegramm, 'В файле %s точек.' %num_points)
+                    tail = points_tail(num_points)
+                    send_to_telegram(url, subs.telegramm, f'В файле {num_points} {tail}.')
                 log('Dropping temp files...')
                 drop_temp_file(dst_file)
-            else:
+            elif num_points == 0 and not subs.send_empty:
                 log('Don`t send zero-point file.')
             if now_hour == sendtimelist[0] and subs.ya_disk:
                 log('Writing to yadisk...')
@@ -589,23 +600,16 @@ def send_to_subscribers_job():
         else:
             log('Do anything? It`s not time yet!')
 
-#        if now_hour == sendtimelist[0] and subs.vip_zones:
-#            points_count, zones = check_vip_zones(outline, subs.stat_period)
-#            if points_count > 0:
-#                msg = 'Новых точек\r\nв зонах особого внимания: %s\r\n\r\n' %points_count
-#                for (zone, num_points) in zones:
-#                    msg = msg + '%s - %s\r\n' %(zone, num_points)
-#                send_to_telegram(url, subs.telegramm, msg)
         period = '%sh'%subs.stat_period
         if subs.vip_zones:
             log('Checking zones stat for %s...'%str(subs.subs_name))
             zone_list = str_to_lst(subs.zones[2:-2])
-            msg = make_zone_stat_msg(zone_list, period)
+            msg = make_zone_stat_msg(year_tab, zone_list, period)
             if msg != '':
                 log('Sending zones stat to telegram...')
                 send_to_telegram(url, subs.telegramm, msg)
 
-        if subs.check_oopt:
+        if subs.check_oopt and (now_hour in sendtimelist) and ((subs.oopt_zones != None) or (subs.oopt_regions != None)):
             log('Checking oopt stat for %s...'%str(subs.subs_name))
             if subs.oopt_zones != None:
                 oopt_ids = subs.oopt_zones
@@ -617,18 +621,19 @@ def send_to_subscribers_job():
                 full_cnt = 0
                 msg = 'Новые точки в ООПТ:'
                 for st_str in stat:
-                    msg = msg + f"\r\n{st_str[1]} - {st_str[2]} ({st_str[0]}): {st_str[3]}"
+                    #msg = msg + f"\r\n{st_str[1]} - {st_str[2]} ({st_str[0]}): {st_str[3]}" #Статистика с индексами ООПТ
+                    msg = msg + f"\r\n{st_str[1]} - {st_str[2]}: {st_str[3]}" #Статистика без индексов ООПТ
                     full_cnt = full_cnt + st_str[3]
                 send_to_telegram(url, subs.telegramm, msg)
-                if subs.email_point or subs.teleg_point:
+                if (subs.email_point and subs.email != None) or (subs.teleg_point and subs.telegramm != None):
                     log('Creating kml file...')
-                    dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,iteration)
+                    dst_file_name = make_file_name(subs.point_period, date, subs.subs_name, result_dir,int(now_hour))
                     dst_file = os.path.join(result_dir,dst_file_name)
                     write_to_kml(dst_file,subs.subs_id)
                     if subs.email_point and subs.email != None:
                         log('Creating maillist...')
                         maillist = subs.email.replace(' ','').split(',')
-                        subject, body_text = make_mail_attr(date, subs.point_period, num_points)
+                        subject, body_text = make_mail_attr(date, subs.point_period, full_cnt)
                         try:
                             send_email_with_attachment(maillist, subject, body_text, [dst_file])
                         except IOError as e:
@@ -636,13 +641,14 @@ def send_to_subscribers_job():
                     if subs.teleg_point and subs.telegramm != None:
                         doc = open(dst_file, 'rb')
                         send_doc_to_telegram(url, subs.telegramm, doc)
-                        send_to_telegram(url, subs.telegramm, 'В файле %s точек.' %num_points)
+                        tail = points_tail(full_cnt)
+                        send_to_telegram(url, subs.telegramm, f'В файле {full_cnt} {tail}.')
                     log('Dropping temp files...')
                     drop_temp_file(dst_file)
             else:
                 log('Don`t send zero-point file.')
             log('Dropping tables...')
-            drop_whom_table(conn,cursor,subs.subs_id)
+            #drop_whom_table(conn,cursor,subs.subs_id)
 
         if now_hour == sendtimelist[0] and (subs.teleg_stat or subs.email_stat):
             reg_list = str_to_lst(subs.regions[2:-2])

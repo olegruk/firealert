@@ -202,9 +202,15 @@ def write_to_yadisk(file, from_dir, to_dir, whom):
     log("Writing file %s to Yandex disk..." %file)
     [yadisk_token] = get_config("yadisk", ["yadisk_token"])
     y = yadisk.YaDisk(token=yadisk_token)
+    #is_valid_token = y.check_token()
+    #log('Result of token validation: %s.'%(is_valid_token))
     to_dir = to_dir + whom
+    log('to_dir: %s.'%(to_dir))
+    log('from_dir: %s.'%(from_dir))
     p = from_dir.split(from_dir)[1].strip(os.path.sep)
+    log('p: %s.'%(p))
     dir_path = posixpath.join(to_dir, p)
+    log('dir_path: %s.'%(dir_path))
     if not y.exists(dir_path):
         try:
             y.mkdir(dir_path)
@@ -212,10 +218,12 @@ def write_to_yadisk(file, from_dir, to_dir, whom):
         except yadisk.exceptions.PathExistsError:
             log('Path cannot be created %s.'%(dir_path))
     file_path = posixpath.join(dir_path, file)
+    log('file_path: %s.'%(file_path))
     p_sys = p.replace("/", os.path.sep)
     in_path = os.path.join(from_dir, p_sys, file)
+    log('in_path: %s.'%(in_path))
     try:
-        y.upload(in_path, file_path, overwrite = True)
+        y.upload(in_path, file_path, overwrite = True, timeout = (20.0, 25.0))
         log('Written to yadisk %s'%(file_path))
     except yadisk.exceptions.PathExistsError:
         log('Path not exist %s.'%(dir_path))
@@ -371,3 +379,13 @@ def smf_new_topic(smf_url, smf_user, smf_pass, board, subject, msg, icon="xx", n
                 return False
         except KeyError:
             return False
+
+def points_tail(nump):
+    str_nump = str(nump)
+    if str_nump[-1] == '1':
+        tail = 'точка'
+    elif str_nump[-1] in ['2','3','4']:
+        tail = 'точки'
+    else:
+        tail = 'точек'
+    return tail

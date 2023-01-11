@@ -325,7 +325,7 @@ def request_for_circle(whom, lim_for, limit, from_time, period, circle, result_d
     return dst_file, num_points
 
 def check_reg_stat(reg, period, critical):
-    log("Getting statistic for %s..."%(reg))
+    #log("Getting statistic for %s..."%(reg))
     # extract params from config
     [year_tab] = get_config("tables", ["year_tab"])
     #connecting to database
@@ -359,6 +359,10 @@ def check_reg_stat(reg, period, critical):
     return critical_cnt, all_cnt
 
 def make_tlg_stat_msg(reg_list, period, limit):
+    if limit == None:
+        limit = 0
+    if period == None:
+        period = 24
     full_cnt = 0
     full_cr_cnt = 0
     msg = 'Количество точек:'
@@ -374,10 +378,9 @@ def make_tlg_stat_msg(reg_list, period, limit):
         msg = 'Нет новых точек.'
     return msg
 
-def check_zone_stat(zone, period):
-    log("Getting statistic for %s..."%(zone))
+def check_zone_stat(year_tab,zone, period):
+    #log("Getting statistic for %s..."%(zone))
     # extract params from config
-    [year_tab] = get_config("tables", ["year_tab"])
     #connecting to database
     conn, cursor = get_cursor()
     currtime = time.localtime()
@@ -409,11 +412,11 @@ def check_zone_stat(zone, period):
 
     return all_cnt
 
-def make_zone_stat_msg(zone_list, period):
+def make_zone_stat_msg(year_tab, zone_list, period):
     full_cnt = 0
     msg = 'Новые точки в зонах особого внимания:'
     for zone in zone_list:
-        all_cnt = check_zone_stat(zone, period)
+        all_cnt = check_zone_stat(year_tab,zone, period)
         if all_cnt > 0:
             msg = msg + '\r\n%(z)s: %(a)s'%{'z':zone,'a':all_cnt}
         full_cnt = full_cnt + all_cnt
@@ -421,101 +424,11 @@ def make_zone_stat_msg(zone_list, period):
         msg = ''
     return msg
 
-def check_oopt_stat(oopt_id, period):
-    log("Getting statistic for OOPT %s..."%(oopt_id))
-    # extract params from config
-    [year_tab] = get_config("tables", ["year_tab"])
-    #connecting to database
-    conn, cursor = get_cursor()
-    currtime = time.localtime()
-    oopt_time = time.strftime('%H',currtime)
-
-    statements = (
-        """
-        SELECT count(*) FROM
-            (SELECT name
-            FROM %(y)s
-            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND oopt_id = '%(o)s' AND (oopt_time IS NULL OR oopt_time = '%(t)s')) as all_sel
-        """%{'y':year_tab,'p':period,'o':oopt_id,'t':oopt_time},
-        """
-        UPDATE %(y)s SET
-            oopt_time = '%(t)s'
-        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND oopt_id = '%(o)s' AND oopt_time IS NULL
-        """%{'y':year_tab,'p':period,'o':oopt_id,'t':oopt_time}
-        )
-
-    try:
-        cursor.execute(statements[0])
-        all_cnt = cursor.fetchone()[0]
-        cursor.execute(statements[1])
-        log('Finished for:%(o)s. Points: %(p)s'%{'o':oopt_id, 'p':all_cnt})
-    except IOError as e:
-        log('Error getting statistic for oopt:$s'%e)
-
-    close_conn(conn, cursor)
-
-    return all_cnt
-
-def check_oopt_buf_stat(oopt_id, period):
-    log("Getting statistic for OOPT buffers %s..."%(oopt_id))
-    # extract params from config
-    [year_tab] = get_config("tables", ["year_tab"])
-    #connecting to database
-    conn, cursor = get_cursor()
-    currtime = time.localtime()
-    oopt_time = time.strftime('%H',currtime)
-
-    statements = (
-        """
-        SELECT count(*) FROM
-            (SELECT name
-            FROM %(y)s
-            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND oopt_buf_id = '%(o)s' AND (oopt_time IS NULL OR oopt_time = '%(t)s')) as all_sel
-        """%{'y':year_tab,'p':period,'o':oopt_id,'t':oopt_time},
-        """
-        UPDATE %(y)s SET
-            oopt_time = '%(t)s'
-        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND oopt_buf_id = '%(o)s' AND oopt_time IS NULL
-        """%{'y':year_tab,'p':period,'o':oopt_id,'t':oopt_time}
-        )
-
-    try:
-        cursor.execute(statements[0])
-        all_cnt = cursor.fetchone()[0]
-        cursor.execute(statements[1])
-        log('Finished for:%(o)s. Points: %(p)s'%{'o':oopt_id, 'p':all_cnt})
-    except IOError as e:
-        log('Error getting statistic for oopt buffers:$s'%e)
-
-    close_conn(conn, cursor)
-
-    return all_cnt
-
-def make_oopt_stat_msg(oopt_list, period):
-    full_cnt = 0
-    msg = 'Новые точки в ООПТ:'
-    for oopt in oopt_list:
-        all_cnt = check_oopt_stat(oopt[0], period)
-        if all_cnt > 0:
-            msg = msg + '\r\n%(r)s - %(o)s: %(c)s'%{'r':oopt[1],'o':oopt[2],'c':all_cnt}
-        full_cnt = full_cnt + all_cnt
-    if full_cnt == 0:
-        msg = ''
-    return msg
-
-def make_oopt_buf_stat_msg(oopt_list, period):
-    full_cnt = 0
-    msg = 'Новые точки в буферных зонах ООПТ:'
-    for oopt in oopt_list:
-        all_cnt = check_oopt_buf_stat(oopt[0], period)
-        if all_cnt > 0:
-            msg = msg + '\r\n%(r)s - %(o)s: %(c)s'%{'r':oopt[1],'o':oopt[2],'c':all_cnt}
-        full_cnt = full_cnt + all_cnt
-    if full_cnt == 0:
-        msg = ''
-    return msg
-
 def make_smf_stat_msg(reg_list, period, limit):
+    if limit == None:
+        limit = 0
+    if period == None:
+        period = 24
     full_cnt = 0
     full_cr_cnt = 0
     smf_msg = 'Количество точек:\r\n\r\n[table]'
@@ -533,7 +446,6 @@ def make_smf_stat_msg(reg_list, period, limit):
 
 def new_alerts(period, cur_date):
     log("Adding alerts...")
-
     # extract params from config
     [alert_tab,clust_view] = get_config("peats_stat", ["alert_tab", "cluster_view"])
     #connecting to database
