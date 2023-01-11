@@ -1,5 +1,6 @@
 /data/
 /log/
+/bckup/
 /__pycache__/
 /.vscode/
 firealert.ini
@@ -7,4 +8,3 @@ config.py
 test.py
 crontab-_list.txt
 test_ya.py
-bckup/firealert.dump.gz
