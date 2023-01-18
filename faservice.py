@@ -36,7 +36,9 @@ from email.mime.text import MIMEText  # Текст/HTML
 from email.mime.image import MIMEImage  # Изображения
 from email.mime.audio import MIMEAudio  # Аудио
 from email.mime.multipart import MIMEMultipart  # Многокомпонентный объект
-from falogging import log
+from mylogger import get_logger
+
+logger = get_logger()
 
 
 def get_db_config():
@@ -52,7 +54,7 @@ def get_db_config():
         cfg = ConfigParser()
         cfg.read(config_path)
     else:
-        log(f"Ini-file {inifile} not found!..")
+        logger.info(f"Ini-file {inifile} not found!..")
         sys.exit(1)
 
     # extract params
@@ -97,9 +99,9 @@ def get_config(node, param_names):
             else:
                 lstval = None
 
-            log(f"Parameter readed: {key}")
+            logger.info(f"Parameter readed: {key}")
         except IOError as err:
-            log(f"Error getting statistic for region: {err}")
+            logger.error(f"Error getting statistic for region: {err}")
 
         if strval is not None:
             val_list[i] = strval
@@ -123,16 +125,16 @@ def get_config(node, param_names):
 
 def get_path(root_path, folder):
     """Create a new folder in a root path."""
-    log(f"Creating folder {folder}...")
+    logger.info(f"Creating folder {folder}...")
     base_path = os.path.dirname(os.path.abspath(__file__))
     result_path = os.path.join(base_path, root_path)
     result_path = os.path.join(result_path, folder)
     if not os.path.exists(result_path):
         try:
             os.mkdir(result_path)
-            log(f"Created {result_path}.")
+            logger.info(f"Created {result_path}.")
         except OSError:
-            log(f"Unable to create {result_path}.")
+            logger.error(f"Unable to create {result_path}.")
     return result_path
 
 
@@ -147,7 +149,7 @@ def str_to_lst(param_str):
 
 def index_all_region(conn, cursor, outlines):
     """Create geoindexes for tables from outlines list."""
-    log(f"Creating indexes for {outlines}...")
+    logger.info(f"Creating indexes for {outlines}...")
     [dbserver, dbport, dbname, dbuser, dbpass] = get_db_config()
 
     conn = psycopg2.connect(host=dbserver,
@@ -163,7 +165,7 @@ def index_all_region(conn, cursor, outlines):
                 f"CREATE INDEX {outline}_idx ON {outline} USING GIST (geog)")
             conn.commit()
         except IOError as err:
-            log(f"Error indexing geometry: {err}")
+            logger.error(f"Error indexing geometry: {err}")
 
     cursor.close
     conn.close
@@ -205,8 +207,8 @@ def send_to_telegram(url, chat, text):
     params = {"chat_id": chat, "text": text}
     response = requests.post(url + "sendMessage", data=params)
     if response.status_code != 200:
-        log(f"Post_text error: {response.status_code}")
-        log(f"Text:\n<<{text}>>")
+        logger.warning(f"Post_text error: {response.status_code}")
+        logger.warning(f"Text:\n<<{text}>>")
         # raise Exception(f"post_text error: {response.status_code}")
     return response
 
@@ -220,7 +222,7 @@ def send_doc_to_telegram(url, chat, file):
                              files=post_file)
     if response.status_code != 200:
         # raise Exception(f"post_text error: {response.status_code}")
-        log(f"post_text error: {response.status_code}")
+        logger.warning(f"post_text error: {response.status_code}")
     return response
 
 
@@ -233,7 +235,7 @@ def send_img_to_telegram(url, chat, file):
                              files=post_file)
     if response.status_code != 200:
         # raise Exception(f"post_text error: {response.status_code}")
-        log(f"Post_text error: {response.status_code}.")
+        logger.warning(f"Post_text error: {response.status_code}.")
     return response
 
 
@@ -242,12 +244,13 @@ def write_to_kml(dst_file, whom):
     [dbserver, dbport, dbname, dbuser, dbpass] = get_db_config()
 
     subs_tab = f"for_s{str(whom)}"
-    log(f"Writting data from {subs_tab} table to kml-file {dst_file}...")
+    logger.info(f"Writting data from {subs_tab} table "
+                f"to kml-file {dst_file}...")
     if os.path.isfile(dst_file):
         os.remove(dst_file)
-        log(f"Owerwrite kml {dst_file}...")
+        logger.info(f"Owerwrite kml {dst_file}...")
     else:
-        log(f"Create new kml {dst_file}...")
+        logger.info(f"Create new kml {dst_file}...")
     command = f"""ogr2ogr \
                     -f "KML" \
                     {dst_file} \
@@ -258,39 +261,39 @@ def write_to_kml(dst_file, whom):
                         port={dbport}" \
                     {subs_tab}"""
     os.system(command)
-    log('Done.')
+    logger.info('Done.')
 
 
 def write_to_yadisk(file, from_dir, to_dir, whom):
     """Write file from "from_dir" to yadisk into "to_dir:subscriber" folder."""
-    log(f"Writing file {file} to Yandex disk...")
+    logger.info(f"Writing file {file} to Yandex disk...")
     [yadisk_token] = get_config("yadisk", ["yadisk_token"])
     y = yadisk.YaDisk(token=yadisk_token)
     # is_valid_token = y.check_token()
-    # log('Result of token validation: %s.'%(is_valid_token))
+    # logger.info('Result of token validation: %s.'%(is_valid_token))
     to_dir = to_dir + whom
-    log(f"to_dir: {to_dir}.")
-    log(f"from_dir: {from_dir}.")
+    logger.info(f"to_dir: {to_dir}.")
+    logger.info(f"from_dir: {from_dir}.")
     p = from_dir.split(from_dir)[1].strip(os.path.sep)
-    log(f"p: {p}.")
+    logger.info(f"p: {p}.")
     dir_path = posixpath.join(to_dir, p)
-    log(f"dir_path: {dir_path}.")
+    logger.info(f"dir_path: {dir_path}.")
     if not y.exists(dir_path):
         try:
             y.mkdir(dir_path)
-            log(f"Path created on yadisk {dir_path}.")
+            logger.info(f"Path created on yadisk {dir_path}.")
         except yadisk.exceptions.PathExistsError:
-            log(f"Path cannot be created {dir_path}.")
+            logger.error(f"Path cannot be created {dir_path}.")
     file_path = posixpath.join(dir_path, file)
-    log(f"file_path: {file_path}.")
+    logger.info(f"file_path: {file_path}.")
     p_sys = p.replace("/", os.path.sep)
     in_path = os.path.join(from_dir, p_sys, file)
-    log(f"in_path: {in_path}.")
+    logger.info(f"in_path: {in_path}.")
     try:
         y.upload(in_path, file_path, overwrite=True, timeout=(20.0, 25.0))
-        log(f"Written to yadisk {file_path}")
+        logger.info(f"Written to yadisk {file_path}")
     except yadisk.exceptions.PathExistsError:
-        log(f"Path not exist {dir_path}.")
+        logger.error(f"Path not exist {dir_path}.")
         pass
 
 
@@ -324,7 +327,7 @@ def attach_file(msg, filepath):
         msg.attach(file)
     except IOError:
         msg = f"Error opening attachment file {filepath}"
-        log(msg)
+        logger.error(msg)
         sys.exit(1)
 
 
@@ -341,7 +344,7 @@ def process_attachement(msg, files):
 
 def send_email_with_attachment(maillist, subject, body_text, filelist):
     """Send an email with an attachment."""
-    log(f"Sending e-mail to addresses: {maillist}...")
+    logger.info(f"Sending e-mail to addresses: {maillist}...")
 
     # extract server and from_addr from config
     [host, from_addr, user, pwd] = get_config("smtp",
@@ -370,12 +373,12 @@ def send_email_with_attachment(maillist, subject, body_text, filelist):
     mailserver.login(user, pwd)
     mailserver.sendmail(from_addr, maillist, msg.as_string())
     mailserver.quit()
-    log("Mail sended.")
+    logger.info("Mail sended.")
 
 
 def send_email_message(maillist, subject, body_text):
     """Send email common function."""
-    log(f"Sending e-mail to addresses: {maillist}...")
+    logger.info(f"Sending e-mail to addresses: {maillist}...")
 
     # extract server and from_addr from config
     [host, from_addr, user, pwd] = get_config("smtp",
@@ -402,7 +405,7 @@ def send_email_message(maillist, subject, body_text):
     mailserver.login(user, pwd)
     mailserver.sendmail(from_addr, maillist, msg.as_string())
     mailserver.quit()
-    log("Mail sended.")
+    logger.info("Mail sended.")
 
 
 def smf_login(session, smf_url, smf_user, smf_pass):
@@ -427,7 +430,7 @@ def smf_login(session, smf_url, smf_user, smf_pass):
         smf_random_input: smf_session_id,
     }
     response = session.post(smf_url + login_url2, data=payload)
-    log(f"Login Response: {response}")
+    logger.info(f"Login Response: {response}")
     return smf_session_id, smf_random_input
 
 

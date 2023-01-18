@@ -40,10 +40,9 @@ from faservice import (
     get_path,
     send_doc_to_telegram,
     str_to_lst)
-from falogging import (
-    log,
-    start_logging,
-    stop_logging)
+from mylogger import init_logger
+
+logger = init_logger()
 
 
 # from config import url, TOKEN
@@ -371,7 +370,7 @@ def drop_temp_files(result_dir):
                 os.remove(file_path)
             # elif os.path.isdir(file_path): shutil.rmtree(file_path)
         except Exception as err:
-            log(f"Cannot remove files: {err}")
+            logger.error(f"Cannot remove files: {err}")
 
 
 def echo(update: Update, _):
@@ -383,19 +382,19 @@ def echo(update: Update, _):
             chat = update.message.forward_from_chat
             chat_id = chat.id
             cmd = update.message.text
-            log(f"User with id {telegram_id} forward message "
-                f"from channel with id {chat_id}.")
+            logger.info(f"User with id {telegram_id} forward message "
+                        f"from channel with id {chat_id}.")
             update.message.reply_text(
                 text=f"Вы переслали сообщение из канала Id {chat_id}.")
         except Exception as err:
-            log(f"Cannot get user.id. Error {err}")
+            logger.error(f"Cannot get user.id. Error {err}")
             pass
     except Exception as err:
-        log(f"Cannot get user.id. Error {err}")
+        logger.error(f"Cannot get user.id. Error {err}")
     if re.search(r'/init', cmd):
         update.message.reply_text(
             text=f"Канал с Id {chat_id} включен в список подписчиков.")
-    # log(f"Message returned: {update.message}")
+    # logger.info(f"Message returned: {update.message}")
 
 
 def init(update: Update, _):
@@ -404,17 +403,19 @@ def init(update: Update, _):
     reply_kb_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True,
                                           one_time_keyboard=True)
     user = update.message.from_user
-    # log(f"User {user.first_name} id {user.id} started the conversation.")
+    # logger.info(f"User {user.first_name} id {user.id} "
+    #             f"started the conversation.")
     telegram_id = user.id
     # subsconf.add_tlg_user(telegram_id)
     chat_id = 0
     try:
         chat = update.message.forward_from_chat
         chat_id = chat.id
-        log(f"User with id {telegram_id} forward message "
-            f"from channel with id {chat_id}.")
+        logger.info(f"User with id {telegram_id} forward message "
+                    f"from channel with id {chat_id}.")
     except Exception as err:
-        log(f"User {user.first_name} id {user.id} started the conversation.")
+        logger.error(f"User {user.first_name} id {user.id} "
+                     f"started the conversation.")
     if chat_id != 0:
         subsconf.add_tlg_user(chat_id)
         update.message.reply_text(
@@ -434,7 +435,8 @@ def start(update: Update, _) -> None:
     """Process the `/Start` command. Add user to subscribers."""
     # Get user that sent /start and log his name
     user = update.message.from_user
-    log(f"User {user.first_name} id {user.id} started the conversation.")
+    logger.info(f"User {user.first_name} id {user.id} started "
+                f"the conversation.")
     telegram_id = user.id
     subsconf.add_tlg_user(telegram_id)
     reply_markup = InlineKeyboardMarkup(mm_keyboard)
@@ -888,7 +890,7 @@ def get_r_reglist(update: Update, context: CallbackContext):
     update.message.reply_text(
         text="Сейчас сюда прилетят точки.")
     req_params = parse_data_req(context.user_data["request"])
-    log(f"Запрошен файл с точками по параметрам:\n{req_params}")
+    logger.info(f"Запрошен файл с точками по параметрам:\n{req_params}")
     dst_file, nump = requester.request_data(telegram_id,
                                             req_params["lim_for"],
                                             req_params["limit"],
@@ -1017,7 +1019,7 @@ def get_c_radius(update: Update, context: CallbackContext):
     else:
         update.message.reply_text(
             text="Сейчас сюда прилетят точки.")
-        log(f"Запрошен файл с точками по параметрам:\n{req_params}")
+        logger.info(f"Запрошен файл с точками по параметрам:\n{req_params}")
         dst_file, nump = requester.request_for_circle(telegram_id,
                                                       req_params["lim_for"],
                                                       req_params["limit"],
@@ -1354,7 +1356,9 @@ def manual_help_get_around(update: Update, _):
 
 def main():
     """Start the bot."""
-    start_logging("firealert_bot.py")
+    logger.info("-----------------------------------")
+    logger.info("Process [firealert_bot.py] started.")
+
     # Create the Updater and pass it your bot's token.
     updater = Updater(TOKEN)
     # Get the dispatcher to register handlers
@@ -1516,7 +1520,8 @@ def main():
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
     updater.idle()
-    stop_logging("firalert_bot.py")
+
+    logger.info("Process [firalert_bot.py] stopped.")
 
 
 if __name__ == "__main__":

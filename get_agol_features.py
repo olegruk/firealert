@@ -24,16 +24,13 @@ import contextlib
 import requests
 from urllib.request import urlopen
 from urllib.parse import urlencode
-from falogging import (
-    log,
-    start_logging,
-    stop_logging)
 from faservice import (
     get_path,
     get_db_config,
     get_config,
     get_cursor,
     close_conn)
+from mylogger import init_logger
 
 # dst_tabs = ['oopt_reg_points',
 #             'oopt_reg_polygons',
@@ -47,6 +44,8 @@ from faservice import (
 #                 id_cluster, descriptio, name_clust, area_ha, date",
 #                "gid, id, status, category, region, name, actuality,
 #                 id_cluster, descriptio, name_clust, area_ha, date"]
+
+logger = init_logger()
 
 
 def submit_request(request):
@@ -70,7 +69,7 @@ def submit_request1(url, params):
 
 def return_token(service_url, username, password, request_url):
     """Return an authentication token for use in ArcGIS Online."""
-    log('Requesting token...')
+    logger.info('Requesting token...')
     params = {"username": username,
               "password": password,
               "referer": request_url,
@@ -81,7 +80,7 @@ def return_token(service_url, username, password, request_url):
     token_response = json.loads(response.text)
     if "token" in token_response:
         token = token_response.get("token")
-        log("Token requested.")
+        logger.info("Token requested.")
         return token
     else:
         # Request for token must be made through HTTPS.
@@ -146,14 +145,14 @@ def return_json(id, request_url, token, attr_fields, count, n1, n2):
 
 def drop_tables(conn, cursor, tab):
     """Drop temporary tables."""
-    log(f"Dropping table {tab}...")
+    logger.info(f"Dropping table {tab}...")
     sql_stat = f"DROP TABLE IF EXISTS {tab}"
     try:
         cursor.execute(sql_stat)
         conn.commit()
-        log("Tables dropped.")
+        logger.info("Tables dropped.")
     except IOError as err:
-        log(f"Error dropping table: {err}")
+        logger.error(f"Error dropping table: {err}")
 
 
 def drop_temp_files(result_dir):
@@ -165,12 +164,13 @@ def drop_temp_files(result_dir):
                 os.remove(file_path)
             # elif os.path.isdir(file_path): shutil.rmtree(file_path)
         except Exception as err:
-            log(f"Cannot remove files: {err}")
+            logger.error(f"Cannot remove files: {err}")
 
 
 def get_agol_features_job():
     """Get features main job."""
-    start_logging('get_agol_features.py')
+    logger.info("---------------------------------------")
+    logger.info("Process [get_agol_features.py] started.")
 
     [dbserver, dbport, dbname, dbuser, dbpass] = get_db_config()
     [data_root, temp_folder] = get_config(
@@ -183,7 +183,7 @@ def get_agol_features_job():
     result_dir = get_path(data_root, temp_folder)
 
     for id in [2, 3, 0, 1]:
-        log(f"Syncing for table №{id}...")
+        logger.info(f"Syncing for table №{id}...")
         # Get an access token for ArcGIS Online
         token = return_token(service_url, username, password, request_url)
         n = 0
@@ -204,7 +204,7 @@ def get_agol_features_job():
                     json.dump(response, outfile)
                 m += 1
                 loaded += curr_count
-                log(f"Loaded: {curr_count}, summary: {loaded}")
+                logger.info(f"Loaded: {curr_count}, summary: {loaded}")
             n += 1000
         drop_tables(conn, cursor, dst_tabs[id])
         for i in range(1, m):
@@ -238,15 +238,15 @@ def get_agol_features_job():
                                 -nln \
                                 {dst_tabs[id]}"""
             os.system(command)
-            log(f"File {dst_file} uploaded...")
+            logger.info(f"File {dst_file} uploaded...")
 
-        log(f"All done in table №{id}. Total of {loaded} features.")
+        logger.info(f"All done in table №{id}. Total of {loaded} features.")
 
         cursor.execute(f"GRANT SELECT ON {dst_tabs[id]} TO {'db_reader'}")
         drop_temp_files(result_dir)
 
     close_conn(conn, cursor)
-    stop_logging('get_agol_features.py')
+    logger.info("Process [get_agol_features.py] stopped.")
 
 
 if __name__ == "__main__":

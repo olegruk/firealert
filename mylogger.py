@@ -39,8 +39,8 @@ class TgLoggerHandler(StreamHandler):
     def emit(self, record):
         """Send msg to telegram."""
         msg = self.format(record)
-        params = {'chat_id': self.chat_id, 'text': msg}
-        response = requests.post(self.url + '/sendMessage',
+        params = {"chat_id": self.chat_id, "text": msg}
+        response = requests.post(self.url + "/sendMessage",
                                  data=params,
                                  timeout=self.timeout)
         if response.status_code != 200:
@@ -50,7 +50,7 @@ class TgLoggerHandler(StreamHandler):
 def init_logger():
     """Actions to prepare for logging."""
     base_path = os.path.dirname(os.path.abspath(__file__))
-    result_path = os.path.join(base_path, 'log')
+    result_path = os.path.join(base_path, "log")
     if not os.path.exists(result_path):
         try:
             os.mkdir(result_path)
@@ -59,7 +59,7 @@ def init_logger():
             pass
             # log("Unable to create %s" % result_path)
     currtime = time.localtime()
-    date = time.strftime('%Y-%m-%d', currtime)
+    date = time.strftime("%Y-%m-%d", currtime)
     root_path = traceback.StackSummary.extract(
         traceback.walk_stack(None))[-1][0]
     uname = re.search(r'\w+\.py', root_path)[0][0:-3]
@@ -67,7 +67,7 @@ def init_logger():
     fulllog = os.path.join(result_path, logfile)
     a_logger = logging.getLogger(uname)
     a_logger.setLevel(logging.INFO)
-    log_handler = logging.FileHandler(fulllog, mode='a')
+    log_handler = logging.FileHandler(fulllog, mode="a")
     # log_formatter = logging.Formatter(
     #     "%(name)s %(asctime)s %(levelname)s %(message)s")
     log_formatter = logging.Formatter(

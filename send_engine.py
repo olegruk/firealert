@@ -20,7 +20,6 @@ Created:     13.05.2020
 
 import os
 import time
-from falogging import log, start_logging, stop_logging
 from faservice import (
     get_config,
     get_tuple_cursor,
@@ -42,12 +41,15 @@ from requester import (
     make_smf_stat_msg,
     get_oopt_ids_for_region,
     new_alerts)
+from mylogger import init_logger
+
+logger = init_logger()
 
 
 def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
                     reg_list, whom, is_incremental, filter_tech):
     """Create a table with firepoints for subscriber."""
-    log(f"Creating table for subs_id: {whom}...")
+    logger.info(f"Creating table for subs_id: {whom}...")
     subs_tab = f"for_s{str(whom)}"
     marker = f"[s{str(whom)}]"
     period = f"{period} hours"
@@ -509,9 +511,9 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log(f"The table created: subs_id: {whom}")
+        logger.info(f"The table created: subs_id: {whom}")
     except Exception as err:
-        log(f"Error creating subscribers tables: {err}")
+        logger.error(f"Error creating subscribers tables: {err}")
         return -1
     cursor.execute(f"SELECT count(*) FROM {subs_tab}")
     return cursor.fetchone()[0]
@@ -520,7 +522,7 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
 def make_subs_oopt_table(conn, cursor, year_tab, oopt_tab, oopt_ids,
                          period, whom, filter_tech):
     """Create OOPT-table fo subscriber with ID 'subs_id'."""
-    log(f"Creating oopt table for subs_id: {whom}...")
+    logger.info(f"Creating oopt table for subs_id: {whom}...")
     subs_tab = f"for_s{str(whom)}"
     marker = f"[s{str(whom)}]"
     period = f"{period} hours"
@@ -609,9 +611,9 @@ def make_subs_oopt_table(conn, cursor, year_tab, oopt_tab, oopt_ids,
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log(f"The table created: subs_id: {whom}")
+        logger.info(f"The table created: subs_id: {whom}")
     except IOError as err:
-        log(f"Error creating subscribers tables: {err}")
+        logger.error(f"Error creating subscribers tables: {err}")
     cursor.execute(f"""SELECT
                             oopt_id,
                             region,
@@ -625,18 +627,18 @@ def make_subs_oopt_table(conn, cursor, year_tab, oopt_tab, oopt_ids,
 def drop_whom_table(conn, cursor, whom):
     """Delete temporary subscribers tablles."""
     subs_tab = f"for_s{str(whom)}"
-    log(f"Dropping table {subs_tab}")
+    logger.info(f"Dropping table {subs_tab}")
     try:
         cursor.execute(f"DROP TABLE IF EXISTS {subs_tab}")
         conn.commit()
-        log("Table dropped.")
+        logger.info("Table dropped.")
     except IOError as err:
-        log(f"Error dropping table: {err}")
+        logger.error(f"Error dropping table: {err}")
 
 
 def fill_send_times(conn, cursor, subs_tab, subs_id, zero_time, period):
     """Fill sending times field in subscribers table (if not filled)."""
-    log(f"Creating send times for {subs_id}.")
+    logger.info(f"Creating send times for {subs_id}.")
     if period is None:
         period = 24
     if zero_time is None:
@@ -692,7 +694,7 @@ def drop_temp_files(result_dir):
                 os.remove(file_path)
             # elif os.path.isdir(file_path): shutil.rmtree(file_path)
         except Exception as err:
-            log(f"Cannot remove files: {err}")
+            logger.error(f"Cannot remove files: {err}")
 
 
 def drop_temp_file(the_file):
@@ -701,7 +703,7 @@ def drop_temp_file(the_file):
         if os.path.isfile(the_file):
             os.remove(the_file)
     except Exception as err:
-        log(f"Cannot remove files: {err}")
+        logger.error(f"Cannot remove files: {err}")
 
 
 def make_mail_attr(date, period, num_points):
@@ -727,7 +729,7 @@ def make_mail_attr(date, period, num_points):
 
 def set_name(conn, cursor, subs_tab, subs_id):
     """Make subscribers name? based on his ID."""
-    log(f"Setting name for ID {subs_id}")
+    logger.info(f"Setting name for ID {subs_id}")
     new_name = f"s-{str(subs_id)}"
     cursor.execute(f"""UPDATE {subs_tab}
                        SET
@@ -736,12 +738,13 @@ def set_name(conn, cursor, subs_tab, subs_id):
                             subs_id = {subs_id}
                     """)
     conn.commit()
-    log("Setting name done.")
+    logger.info("Setting name done.")
 
 
 def send_to_subscribers_job():
     """Send to subscribers job main function."""
-    start_logging("send_engine.py")
+    logger.info("---------------------------------")
+    logger.info("Process [send_engine.py] started.")
 
     currtime = time.localtime()
     date = time.strftime("%Y-%m-%d", currtime)
@@ -809,7 +812,7 @@ def send_to_subscribers_job():
     for subs in subscribers:
         if subs.subs_name is None:
             set_name(conn, cursor, subs_tab, subs.subs_id)
-        log(f"Processing for {subs.subs_name}...")
+        logger.info(f"Processing for {subs.subs_name}...")
         if subs.send_times is None:
             sendtimelist = fill_send_times(conn,
                                            cursor,
@@ -830,11 +833,11 @@ def send_to_subscribers_job():
                     (subs.email_point and subs.email is not None)
                     or (subs.teleg_point and subs.telegramm is not None)
                 )):
-            log("Sending points now!")
+            logger.info("Sending points now!")
             iteration = sendtimelist.index(now_hour)
             is_increment = (iteration != 0)
             if subs.crit_or_fire == "crit":
-                log("Making critical-limited table...")
+                logger.info("Making critical-limited table...")
                 num_points = make_subs_table(conn,
                                              cursor,
                                              year_tab,
@@ -846,7 +849,7 @@ def send_to_subscribers_job():
                                              is_increment,
                                              subs.filter_tech)
             elif subs.crit_or_fire == "fire":
-                log("Making fire-limited table...")
+                logger.info("Making fire-limited table...")
                 num_points = make_subs_table(conn,
                                              cursor,
                                              year_tab,
@@ -858,7 +861,7 @@ def send_to_subscribers_job():
                                              is_increment,
                                              subs.filter_tech)
             else:
-                log("Making zero-critical table...")
+                logger.info("Making zero-critical table...")
                 num_points = make_subs_table(conn,
                                              cursor,
                                              year_tab,
@@ -877,10 +880,10 @@ def send_to_subscribers_job():
                                                iteration)
                 dst_file = os.path.join(result_dir, dst_file_name)
 
-                log("Creating kml file...")
+                logger.info("Creating kml file...")
                 write_to_kml(dst_file, subs.subs_id)
                 if subs.email_point and subs.email is not None:
-                    log("Creating maillist...")
+                    logger.info("Creating maillist...")
                     maillist = subs.email.replace(" ", "").split(",")
                     subject, body_text = make_mail_attr(date,
                                                         subs.point_period,
@@ -891,7 +894,7 @@ def send_to_subscribers_job():
                                                    body_text,
                                                    [dst_file])
                     except IOError as err:
-                        log(f"Error seneding e-mail. Error: {err}")
+                        logger.error(f"Error seneding e-mail. Error: {err}")
                 if subs.teleg_point and subs.telegramm is not None:
                     doc = open(dst_file, "rb")
                     send_doc_to_telegram(url, subs.telegramm, doc)
@@ -899,26 +902,26 @@ def send_to_subscribers_job():
                     send_to_telegram(url,
                                      subs.telegramm,
                                      f"В файле {num_points} {tail}.")
-                log("Dropping temp files...")
+                logger.info("Dropping temp files...")
                 drop_temp_file(dst_file)
             elif num_points == 0 and not subs.send_empty:
-                log("Don`t send zero-point file.")
+                logger.info("Don`t send zero-point file.")
             if now_hour == sendtimelist[0] and subs.ya_disk:
-                log("Writing to yadisk...")
+                logger.info("Writing to yadisk...")
                 subs_folder = f"for_s{str(subs.subs_name)}"
                 write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
-            log("Dropping tables...")
+            logger.info("Dropping tables...")
             drop_whom_table(conn, cursor, subs.subs_id)
         else:
-            log("Do anything? It`s not time yet!")
+            logger.info("Do anything? It`s not time yet!")
 
         period = f"{subs.stat_period}h"
         if subs.vip_zones:
-            log(f"Checking zones stat for {str(subs.subs_name)}...")
+            logger.info(f"Checking zones stat for {str(subs.subs_name)}...")
             zone_list = str_to_lst(subs.zones[2:-2])
             msg = make_zone_stat_msg(year_tab, zone_list, period)
             if msg != "":
-                log("Sending zones stat to telegram...")
+                logger.info("Sending zones stat to telegram...")
                 send_to_telegram(url, subs.telegramm, msg)
 
         if (subs.check_oopt
@@ -926,12 +929,12 @@ def send_to_subscribers_job():
                 and ((subs.oopt_zones is not None)
                      or (subs.oopt_regions is not None)
                      )):
-            log(f"Checking oopt stat for {str(subs.subs_name)}...")
+            logger.info(f"Checking oopt stat for {str(subs.subs_name)}...")
             if subs.oopt_zones is not None:
                 oopt_ids = subs.oopt_zones
             elif subs.oopt_regions is not None:
                 oopt_ids = get_oopt_ids_for_region(subs.oopt_regions)
-            log("Sending OOPT points now!")
+            logger.info("Sending OOPT points now!")
             stat = make_subs_oopt_table(conn,
                                         cursor,
                                         year_tab,
@@ -953,7 +956,7 @@ def send_to_subscribers_job():
                 send_to_telegram(url, subs.telegramm, msg)
                 if ((subs.email_point and subs.email is not None)
                         or (subs.teleg_point and subs.telegramm is not None)):
-                    log("Creating kml file...")
+                    logger.info("Creating kml file...")
                     dst_file_name = make_file_name(subs.point_period,
                                                    date,
                                                    subs.subs_name,
@@ -962,7 +965,7 @@ def send_to_subscribers_job():
                     dst_file = os.path.join(result_dir, dst_file_name)
                     write_to_kml(dst_file, subs.subs_id)
                     if subs.email_point and subs.email is not None:
-                        log("Creating maillist...")
+                        logger.info("Creating maillist...")
                         maillist = subs.email.replace(" ", "").split(",")
                         subject, body_text = make_mail_attr(date,
                                                             subs.point_period,
@@ -973,7 +976,8 @@ def send_to_subscribers_job():
                                                        body_text,
                                                        [dst_file])
                         except IOError as err:
-                            log(f"Error seneding e-mail. Error: {err}")
+                            logger.error(f"Error seneding e-mail. "
+                                         f"Error: {err}")
                     if subs.teleg_point and subs.telegramm is not None:
                         doc = open(dst_file, "rb")
                         send_doc_to_telegram(url, subs.telegramm, doc)
@@ -981,11 +985,11 @@ def send_to_subscribers_job():
                         send_to_telegram(url,
                                          subs.telegramm,
                                          f"В файле {full_cnt} {tail}.")
-                    log("Dropping temp files...")
+                    logger.info("Dropping temp files...")
                     drop_temp_file(dst_file)
             else:
-                log("Don`t send zero-point file.")
-            log("Dropping tables...")
+                logger.info("Don`t send zero-point file.")
+            logger.info("Dropping tables...")
             # drop_whom_table(conn,cursor,subs.subs_id)
 
         if (now_hour == sendtimelist[0]
@@ -993,10 +997,10 @@ def send_to_subscribers_job():
             reg_list = str_to_lst(subs.regions[2:-2])
             msg = make_tlg_stat_msg(reg_list, period, subs.critical)
             if subs.teleg_stat:
-                log("Sending stat to telegram...")
+                logger.info("Sending stat to telegram...")
                 send_to_telegram(url, subs.telegramm, msg)
             if subs.email_stat:
-                log("Sending stat to email...")
+                logger.info("Sending stat to email...")
                 subject = f"Statistic per last {subs.stat_period}"
                 maillist = subs.email.replace(" ", "").split(",")
                 send_email_message(maillist, subject, msg)
@@ -1018,7 +1022,7 @@ def send_to_subscribers_job():
             new_alerts(alerts_period, date)
 
     close_conn(conn, cursor)
-    stop_logging("send_engine.py")
+    logger.info("Process [send_engine.py] stopped.")
 
 
 if __name__ == "__main__":
