@@ -18,18 +18,20 @@ Created:     13.05.2020
 
 import os
 import time
-from falogging import log
 from faservice import (
     get_config,
     get_cursor,
     close_conn,
     write_to_kml)
+from mylogger import get_logger
+
+logger = get_logger()
 
 
 def make_reqst_table(conn, cursor, src_tab, crit_or_peat, limit,
                      from_time, period, reg_list, whom, is_incremental):
     """Create a table for upload to subscribers."""
-    log(f"Creating table for subs_id: {whom}...")
+    logger.info(f"Creating table for subs_id: {whom}...")
     subs_tab = f"for_s{str(whom)}"
     period = f"{period} hours"
 
@@ -211,9 +213,9 @@ def make_reqst_table(conn, cursor, src_tab, crit_or_peat, limit,
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log(f"The table created for subs_id: {whom}")
+        logger.info(f"The table created for subs_id: {whom}")
     except IOError as err:
-        log(f"Error creating subscribers tables: {err}")
+        logger.error(f"Error creating subscribers tables: {err}")
     cursor.execute(f"SELECT count(*) FROM {subs_tab}")
     return cursor.fetchone()[0]
 
@@ -221,7 +223,7 @@ def make_reqst_table(conn, cursor, src_tab, crit_or_peat, limit,
 def make_reqst_for_circle(conn, cursor, src_tab, crit_or_peat,
                           limit, from_time, period, circle, whom):
     """Make a table with firepoints in radius for uploads."""
-    log(f"Creating table of points in circle for subs_id: {whom}...")
+    logger.info(f"Creating table of points in circle for subs_id: {whom}...")
     subs_tab = f"for_s{str(whom)}"
     # period = '%s hours' %period
     cent_x = circle[0]
@@ -332,9 +334,9 @@ def make_reqst_for_circle(conn, cursor, src_tab, crit_or_peat,
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log(f"The table created: subs_id: {whom}")
+        logger.info(f"The table created: subs_id: {whom}")
     except IOError as err:
-        log(f"Error creating subscribers tables: {err}")
+        logger.error(f"Error creating subscribers tables: {err}")
     cursor.execute(f"SELECT count(*) FROM {subs_tab}")
     return cursor.fetchone()[0]
 
@@ -342,13 +344,13 @@ def make_reqst_for_circle(conn, cursor, src_tab, crit_or_peat,
 def drop_whom_table(conn, cursor, whom):
     """Drop temporary whom table."""
     subs_tab = f"for_s{str(whom)}"
-    log(f"Dropping table {subs_tab}")
+    logger.info(f"Dropping table {subs_tab}")
     try:
         cursor.execute(f"DROP TABLE IF EXISTS {subs_tab}")
         conn.commit()
-        log("Table dropped.")
+        logger.info("Table dropped.")
     except IOError as err:
-        log(f"Error dropping table: {err}")
+        logger.error(f"Error dropping table: {err}")
 
 
 def make_file_name(period, date, whom, result_dir, iter):
@@ -413,7 +415,7 @@ def request_for_circle(whom, lim_for, limit, from_time,
 
 def check_reg_stat(reg, period, critical):
     """Check full points count and count of critical points for region."""
-    # log("Getting statistic for %s..."%(reg))
+    # logger.info("Getting statistic for %s..."%(reg))
     [year_tab] = get_config("tables", ["year_tab"])
     conn, cursor = get_cursor()
 
@@ -443,9 +445,10 @@ def check_reg_stat(reg, period, critical):
         critical_cnt = cursor.fetchone()[0]
         cursor.execute(statements[1])
         all_cnt = cursor.fetchone()[0]
-        log(f"Finished for:{reg}. All - {all_cnt}, critical - {critical_cnt}")
+        logger.info(f"Finished for:{reg}. All - {all_cnt}, "
+                    f"critical - {critical_cnt}")
     except IOError as err:
-        log(f"Error getting statistic for region: {err}")
+        logger.error(f"Error getting statistic for region: {err}")
 
     close_conn(conn, cursor)
 
@@ -476,7 +479,7 @@ def make_tlg_stat_msg(reg_list, period, limit):
 
 def check_zone_stat(year_tab, zone, period):
     """Count statistic for vip-zone."""
-    # log("Getting statistic for %s..."%(zone))
+    # logger.info("Getting statistic for %s..."%(zone))
     conn, cursor = get_cursor()
     currtime = time.localtime()
     zone_time = time.strftime("%H", currtime)
@@ -509,9 +512,9 @@ def check_zone_stat(year_tab, zone, period):
         cursor.execute(statements[0])
         all_cnt = cursor.fetchone()[0]
         cursor.execute(statements[1])
-        log(f"Finished for:{zone}. Points: {all_cnt}")
+        logger.info(f"Finished for:{zone}. Points: {all_cnt}")
     except IOError as err:
-        log(f"Error getting statistic for zone: {err}")
+        logger.error(f"Error getting statistic for zone: {err}")
 
     close_conn(conn, cursor)
 
@@ -565,7 +568,7 @@ def make_smf_stat_msg(reg_list, period, limit):
 
 def new_alerts(period, cur_date):
     """Check a new alerts for period."""
-    log("Adding alerts...")
+    logger.info("Adding alerts...")
     # extract params from config
     [alert_tab, clust_view] = get_config("peats_stat",
                                          ["alert_tab", "cluster_view"])
@@ -613,9 +616,9 @@ def new_alerts(period, cur_date):
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log("Adding alerts finished.")
+        logger.info("Adding alerts finished.")
     except IOError as err:
-        log(f"Error adding alerts: {err}")
+        logger.error(f"Error adding alerts: {err}")
 
     close_conn(conn, cursor)
 
@@ -628,7 +631,7 @@ def check_vip_zones(outline, period):
 
     Deprecated.
     """
-    log("Checking VIP-zones...")
+    logger.info("Checking VIP-zones...")
 
     [year_tab] = get_config("tables", ["year_tab"])
     dst_tab = f"{year_tab}_vip"
@@ -664,9 +667,9 @@ def check_vip_zones(outline, period):
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log(f"The table created: {dst_tab}")
+        logger.info(f"The table created: {dst_tab}")
     except IOError as err:
-        log(f"Error intersecting points with region: {err}")
+        logger.error(f"Error intersecting points with region: {err}")
     cursor.execute(f"SELECT count(*) FROM {dst_tab}")
     points_count = cursor.fetchone()[0]
     # cursor.execute(f"SELECT DISTINCT zone_name FROM {dst_tab}")
@@ -682,7 +685,7 @@ def check_vip_zones(outline, period):
 
 def get_oopt_for_region(reglist):
     """Generate an list of OOPT for regions in reglist."""
-    log("Making OOPT list for regions...")
+    logger.info("Making OOPT list for regions...")
     [oopt_zones] = get_config("tables", ["oopt_zones"])
     conn, cursor = get_cursor()
     cursor.execute(f"""SELECT fid, region, name
@@ -694,7 +697,7 @@ def get_oopt_for_region(reglist):
 
 def get_oopt_for_ids(oopt_ids):
     """Generate an list of OOPT for region-ids in oopt_ids."""
-    log("Making OOPT list for ids...")
+    logger.info("Making OOPT list for ids...")
     [oopt_zones] = get_config("tables", ["oopt_zones"])
     conn, cursor = get_cursor()
     cursor.execute(f"""SELECT fid, region, name
@@ -706,7 +709,7 @@ def get_oopt_for_ids(oopt_ids):
 
 def get_oopt_ids_for_region(reglist):
     """Generate a list of oopt ids for regions in reglist."""
-    log("Making OOPT ids list for regions...")
+    logger.info("Making OOPT ids list for regions...")
     [oopt_zones] = get_config("tables", ["oopt_zones"])
     conn, cursor = get_cursor()
     cursor.execute(f"""SELECT fid

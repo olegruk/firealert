@@ -21,8 +21,13 @@ or 'cat firealert.dump | psql -d firealert -U dbuser' (if many volumes)
 """
 
 import os
-from faservice import get_config, get_path, write_to_yadisk
-from falogging import start_logging, stop_logging, log
+from mylogger import init_logger
+from faservice import (
+    get_config,
+    get_path,
+    write_to_yadisk)
+
+logger = init_logger()
 
 
 def create_today_backup(dbname, dbuser, dst_folder, dst_file):
@@ -30,18 +35,19 @@ def create_today_backup(dbname, dbuser, dst_folder, dst_file):
     dst_file = os.path.join(dst_folder, dst_file)
     if os.path.isfile(dst_file):
         os.remove(dst_file)
-        log(f"Owerwrite backup {dst_file}...")
+        logger.info(f"Owerwrite backup {dst_file}...")
     else:
-        log(f"Create new backup {dst_file}...")
+        logger.info(f"Create new backup {dst_file}...")
     command = f"pg_dump -U {dbuser} -w {dbname} "\
               f"| split -b 250M --filter='gzip > ${dst_file}'"
     os.system(command)
-    log('Done.')
+    logger.info("Done.")
 
 
 def create_backup_job():
     """General function."""
-    start_logging('create_backup.py')
+    logger.info("-----------------------------------")
+    logger.info("Process [create_backup.py] started.")
 
     # extract db params from config
     [dbname, dbuser] = get_config("db", ["dbname", "dbuser"])
@@ -55,7 +61,7 @@ def create_backup_job():
     for a_file in dir_list:
         write_to_yadisk(a_file, dst_path, to_dir, '')
 
-    stop_logging('create_backup.py')
+    logger.info("Process [create_backup.py] stopped.")
 
 
 if __name__ == "__main__":

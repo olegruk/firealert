@@ -27,10 +27,7 @@ import imaplib
 import email
 import base64
 from email.header import decode_header
-from falogging import (
-    log,
-    start_logging,
-    stop_logging)
+from mylogger import init_logger
 from faservice import (
     get_config,
     get_path,
@@ -43,6 +40,8 @@ from faservice import (
 # codepage='windows-1251'
 # codepage='unicode-escape'
 # errors='ignore'
+
+logger = init_logger()
 
 
 def parse_multipart(email_message, result_dir, uid, codepage):
@@ -147,15 +146,15 @@ def store_message(conn,
     try:
         cursor.execute(stat)
         conn.commit()
-        log(f"A message #{uid} added.")
+        logger.info(f"A message #{uid} added.")
     except IOError as err:
-        log(f"Error adding message: {err}")
+        logger.error(f"Error adding message: {err}")
     try:
         cursor.execute(check)
         conn.commit()
-        log(f"A peatlands check for #{uid} done.")
+        logger.info(f"A peatlands check for #{uid} done.")
     except IOError as err:
-        log(f"Error adding message: {err}")
+        logger.error(f"Error adding message: {err}")
     cursor.execute(f"""SELECT peat_id, burn
                        FROM {angel_tab}
                        WHERE
@@ -183,12 +182,14 @@ def drop_temp_files(result_dir):
                 os.remove(file_path)
             # elif os.path.isdir(file_path): shutil.rmtree(file_path)
         except Exception as err:
-            log(f"Cannot remove files: {err}")
+            logger.error(f"Cannot remove files: {err}")
 
 
 def angel_mail_job():
     """Angel mail main job."""
-    start_logging("angel_mail.py")
+    logger.info("--------------------------------")
+    logger.info("Process [angel_mail.py] started.")
+
     [angel_tab, peat_tab] = get_config("tables", ["angel_tab",
                                                   "angelpeat_tab"])
     [url] = get_config("telegramm", ["url"])
@@ -265,20 +266,20 @@ def angel_mail_job():
         if send_to[0:7] == "=?UTF-8":
             send_to = "".join((t[0].decode(codepage))
                               for t in decode_header(send_to))
-        # log(f"Debug!!! Send to is:\n{send_to}"%)
+        # logger.info(f"Debug!!! Send to is:\n{send_to}"%)
         # date_time = email_message["Date"]
         from_whom = email_message["From"]
-        # log(f"Debug!!! From is:\n{from_whom}")
+        # logger.info(f"Debug!!! From is:\n{from_whom}")
         if from_whom[0:7] == "=?UTF-8?":
             from_whom = "".join((t[0].decode(codepage))
                                 for t in
                                 decode_header(from_whom))
         subj = email_message["Subject"]
-        # log(f"Debug!!! Subj is:\n{subj}")
+        # logger.info(f"Debug!!! Subj is:\n{subj}")
         # parse_subj = email.utils.parseaddr(email_message["Subject"])
-        # log(f"Debug!!! Parse_subj is:\n{parse_subj[0]}")
-        # log(f"Debug!!! Parse_subj is:\n{parse_subj[1]}")
-        # log("Debug!!! ----------------------------------------------")
+        # logger.info(f"Debug!!! Parse_subj is:\n{parse_subj[0]}")
+        # logger.info(f"Debug!!! Parse_subj is:\n{parse_subj[1]}")
+        # logger.info("Debug!!! ------------------------------------")
         if subj:
             subj = "".join((t[0].decode(codepage))
                            for t in decode_header(subj))
@@ -437,7 +438,7 @@ def angel_mail_job():
     mail.logout()
     close_conn(conn, cursor)
 
-    stop_logging("angel_mail.py")
+    logger.info("Process [angel_mail.py] stopped.")
 
 
 if __name__ == "__main__":

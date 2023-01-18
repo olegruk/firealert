@@ -31,10 +31,6 @@ from requests.exceptions import (
 import csv
 import pandas
 from sqlalchemy import create_engine
-from falogging import (
-    log,
-    start_logging,
-    stop_logging)
 from faservice import (
     get_config,
     get_db_config,
@@ -42,28 +38,31 @@ from faservice import (
     close_conn,
     get_path,
     send_to_telegram)
+from mylogger import init_logger
+
+logger = init_logger()
 
 
 def MakeTodayDir(DateStr, aDir):
     """Create a subdir, based on current date."""
-    log(f"Creating today dir {aDir}...")
+    logger.info(f"Creating today dir {aDir}...")
     Dir_Today = aDir + DateStr
     if os.path.exists(Dir_Today):
         try:
             shutil.rmtree(Dir_Today)
         except OSError:
-            log("Unable to remove %s" % Dir_Today)
+            logger.error("Unable to remove %s" % Dir_Today)
     try:
         os.mkdir(Dir_Today)
-        log("Created %s" % Dir_Today)
+        logger.info("Created %s" % Dir_Today)
     except OSError:
-        log("Unable to create %s" % Dir_Today)
+        logger.error("Unable to create %s" % Dir_Today)
     return Dir_Today
 
 
 def get_session(url):
     """Get session for download firepoints."""
-    log(f"Requesting session {url}...")
+    logger.info(f"Requesting session {url}...")
     s = requests.session()
     headers = {
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -73,7 +72,7 @@ def get_session(url):
         "Cache-Control": "no-cache"}
     r = s.get(url, headers=headers)
     # r = s.get(url, headers=headers, verify=False)
-    log("Session created.")
+    logger.info("Session created.")
     return r
 
 
@@ -83,13 +82,13 @@ def read_csv_from_site(url, sourcepath):
         filereq = requests.get(url, stream=True)
         filereq.raise_for_status()
     except HTTPError as http_err:
-        log(f"HTTP error occurred: {http_err}")
+        logger.error(f"HTTP error occurred: {http_err}")
         errcode = 2
     except Exception as err:
-        log(f"Other error occurred: {err}")
+        logger.error(f"Other error occurred: {err}")
         errcode = 3
     else:
-        log(f"Get receive status code {filereq.status_code}")
+        logger.info(f"Get receive status code {filereq.status_code}")
         # filereq = requests.get(url, stream=True, verify=False)
         with open(sourcepath, "wb") as receive:
             shutil.copyfileobj(filereq.raw, receive)
@@ -106,19 +105,19 @@ def read_csv_from_site_with_retries(url, sourcepath):
     try:
         filereq = session.get(url, stream=True)
     except ConnectionError as conn_err:
-        log(f"Connection error occurred: {conn_err}")
+        logger.error(f"Connection error occurred: {conn_err}")
         errcode = 1
     except HTTPError as http_err:
-        log(f"HTTP error occurred: {http_err}")
+        logger.error(f"HTTP error occurred: {http_err}")
         errcode = 2
     except RequestException as req_err:
-        log(f"Request error occurred: {req_err}")
+        logger.error(f"Request error occurred: {req_err}")
         errcode = 3
     except Exception as err:
-        log(f"Other error occurred: {err}")
+        logger.error(f"Other error occurred: {err}")
         errcode = 4
     else:
-        log(f"Get receive status code {filereq.status_code}")
+        logger.info(f"Get receive status code {filereq.status_code}")
         # filereq = requests.get(url, stream=True, verify=False)
         with open(sourcepath, "wb") as receive:
             shutil.copyfileobj(filereq.raw, receive)
@@ -129,27 +128,28 @@ def read_csv_from_site_with_retries(url, sourcepath):
 
 def GetPoints(pointset, dst_folder, aDate):
     """Get csv-file from NASA site."""
-    log(f"Getting points for {pointset}...")
+    logger.info(f"Getting points for {pointset}...")
     [period] = get_config("NASA", ["load_period"])
     [src_url] = get_config("NASA", [f"{pointset}_src_{period}"])
     dst_file = f"{pointset}_{aDate}.csv"
     dst_file = os.path.join(dst_folder, dst_file)
     errcode = read_csv_from_site(src_url, dst_file)
     if errcode == 0:
-        log(f"Download complete: {dst_file}")
+        logger.info(f"Download complete: {dst_file}")
     else:
         if os.path.exists(dst_file):
             try:
                 os.remove(dst_file)
             except OSError as err:
-                log(f"Unable to remove file: {dst_file}.\nError {err}")
-        log(f"Not downloaded: {dst_file}.")
+                logger.error(f"Unable to remove file: {dst_file}.\n"
+                             f"Error {err}")
+        logger.warning(f"Not downloaded: {dst_file}.")
     return errcode
 
 
 def GetPoints_with_retries(pointset, dst_folder, aDate):
     """Get csv-file from NASA site with retries."""
-    log(f"Getting points for {pointset}...")
+    logger.info(f"Getting points for {pointset}...")
     [period] = get_config("NASA", ["load_period"])
     [src_url] = get_config("NASA", [f"{pointset}_src_{period}"])
     [src_url2] = get_config("NASA", [f"{pointset}_src2_{period}"])
@@ -157,18 +157,19 @@ def GetPoints_with_retries(pointset, dst_folder, aDate):
     dst_file = os.path.join(dst_folder, dst_file)
     errcode = read_csv_from_site_with_retries(src_url, dst_file)
     if errcode == 0:
-        log(f"Download complete: {dst_file}.")
+        logger.info(f"Download complete: {dst_file}.")
     else:
         errcode = read_csv_from_site_with_retries(src_url2, dst_file)
         if errcode == 0:
-            log(f"Download complete: {dst_file}.")
+            logger.info(f"Download complete: {dst_file}.")
         else:
             if os.path.exists(dst_file):
                 try:
                     os.remove(dst_file)
                 except OSError as err:
-                    log(f"Unable to remove file: {dst_file}.\nError {err}")
-            log(f"Not downloaded: {dst_file}.")
+                    logger.error(f"Unable to remove file: {dst_file}.\n"
+                                 f"Error {err}")
+            logger.warning(f"Not downloaded: {dst_file}.")
     return errcode
 
 
@@ -185,21 +186,21 @@ def getconn():
 
 def write_to_db(engine, tablename, dataframe):
     """Write pandas dataframe (from csv) into table."""
-    log("Writing points...")
+    logger.info("Writing points...")
     try:
         dataframe.to_sql(tablename,
                          engine,
                          index=False,
                          if_exists=u"append",
                          chunksize=1000)
-        log("Done inserted source into postgres")
+        logger.info("Done inserted source into postgres")
     except IOError as err:
-        log(f"Error in inserting data into db: {err}")
+        logger.error(f"Error in inserting data into db: {err}")
 
 
 def upload_points_to_db(cursor, src_folder, pointset, aDate):
     """Upload points from csv-file into database."""
-    log(f"Upload points {pointset} into postgres...")
+    logger.info(f"Upload points {pointset} into postgres...")
     engine = create_engine("postgresql+psycopg2://", creator=getconn)
 
     src_file = f"{pointset}_{aDate}.csv"
@@ -210,29 +211,29 @@ def upload_points_to_db(cursor, src_folder, pointset, aDate):
         write_to_db(engine, dst_table, csv_src)
         cursor.execute(f"SELECT count(*) FROM {dst_table}")
         points_count = cursor.fetchone()[0]
-        log(f"{points_count} rows added to db from {src_file}")
+        logger.info(f"{points_count} rows added to db from {src_file}")
     except IOError as err:
-        log("Error download and add data {err}")
+        logger.error("Error download and add data {err}")
         points_count = 0
     return points_count
 
 
 def drop_today_tables(conn, cursor, pointset):
     """Drop temporary today tables."""
-    log(f"Dropping today tables for {pointset}...")
+    logger.info(f"Dropping today tables for {pointset}...")
     today_tab = f"{pointset}_today"
     sql_stat = f"DROP TABLE IF EXISTS {today_tab}"
     try:
         cursor.execute(sql_stat)
         conn.commit()
-        log("Tables dropped")
+        logger.info("Tables dropped")
     except psycopg2.Error as err:
-        log(f"Error dropping table: {err}")
+        logger.error(f"Error dropping table: {err}")
 
 
 def drop_temp_tables(conn, cursor, pointset):
     """Drop temporary tables."""
-    log(f"Dropping temp tables for {pointset}...")
+    logger.info(f"Dropping temp tables for {pointset}...")
     today_tab = f"{pointset}_today"
     today_tab_ru = f"{pointset}_today_ru"
     sql_stat_1 = f"DROP TABLE IF EXISTS {today_tab}"
@@ -241,14 +242,14 @@ def drop_temp_tables(conn, cursor, pointset):
         cursor.execute(sql_stat_1)
         cursor.execute(sql_stat_2)
         conn.commit()
-        log("Temp tables dropped.")
+        logger.info("Temp tables dropped.")
     except psycopg2.Error as err:
-        log(f"Error dropping temp tables: {err}")
+        logger.error(f"Error dropping temp tables: {err}")
 
 
 def add_geog_field(conn, cursor, pointset):
     """Add geog field to today-table."""
-    log(f"Adding geog field for {pointset}...")
+    logger.info(f"Adding geog field for {pointset}...")
     src_tab = f"{pointset}_today"
     statements = (
         f"""
@@ -268,14 +269,14 @@ def add_geog_field(conn, cursor, pointset):
         for sql_stat in statements:
             cursor.execute(sql_stat)
         conn.commit()
-        log(f"Geometry added to {src_tab}.")
+        logger.info(f"Geometry added to {src_tab}.")
     except psycopg2.Error as err:
-        log(f"Error adding geometry: {err}")
+        logger.error(f"Error adding geometry: {err}")
 
 
 def make_tables_for_Russia(conn, cursor, pointset):
     """Make firepoints subset for Russia."""
-    log(f"Making table for Russia for {pointset}...")
+    logger.info(f"Making table for Russia for {pointset}...")
     src_tab = f"{pointset}_today"
     dst_tab = f"{pointset}_today_ru"
     [outline] = get_config("regions", ["reg_russia"])
@@ -295,14 +296,14 @@ def make_tables_for_Russia(conn, cursor, pointset):
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log(f"The table created: {dst_tab}.")
+        logger.info(f"The table created: {dst_tab}.")
     except psycopg2.Error as err:
-        log(f"Error intersecting points with region: {err}")
+        logger.error(f"Error intersecting points with region: {err}")
 
 
 def make_common_table(conn, cursor, dst_tab, pointsets):
     """Merge points from source tables into common table."""
-    log("Making common table...")
+    logger.info("Making common table...")
     statements = (
         f"""
         DROP TABLE IF EXISTS {dst_tab}
@@ -353,9 +354,9 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log(f"The table created: {dst_tab}.")
+        logger.info(f"The table created: {dst_tab}.")
     except psycopg2.Error as err:
-        log(f"Error creating table: {err}")
+        logger.error(f"Error creating table: {err}")
 
     loaded = 0
 
@@ -443,9 +444,9 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
             elif pointset in ["as_viirs", "eu_viirs", "as_vnoaa", "eu_vnoaa"]:
                 cursor.execute(ins_from_viirs)
             conn.commit()
-            log(f"The data added: {src_tab}")
+            logger.info(f"The data added: {src_tab}")
         except psycopg2.Error as err:
-            log(f"Error adding data: {err}")
+            logger.error(f"Error adding data: {err}")
 
         loaded = loaded + 1
     return loaded
@@ -453,7 +454,7 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
 
 def cost_point_in_buffers(conn, cursor, tablename):
     """Cost points located in peat buffers."""
-    log("Costing points in buffers...")
+    logger.info("Costing points in buffers...")
     try:
         # Такая последовательность выборок позволяет выбирать точки
         # по мере убывания их критичности
@@ -487,7 +488,7 @@ def cost_point_in_buffers(conn, cursor, tablename):
                     AND ST_Intersects({tablename}.geog, {peat_db}.geog)
             """
             cursor.execute(set_rating)
-            log(f"The rating {rate} setted to {peat_db}.")
+            logger.info(f"The rating {rate} setted to {peat_db}.")
         set_zero_rating = f"""
             UPDATE {tablename}
             SET
@@ -497,15 +498,15 @@ def cost_point_in_buffers(conn, cursor, tablename):
                 critical IS NULL
         """
         cursor.execute(set_zero_rating)
-        log("Zero rating setted.")
+        logger.info("Zero rating setted.")
         conn.commit()
     except psycopg2.Error as err:
-        log(f"Error costing points: {err}")
+        logger.error(f"Error costing points: {err}")
 
 
 def set_name_field(conn, cursor, tablename):
     """Add a 'name' field (name = acq_date : gid : critical)."""
-    log("Setting 'name' field...")
+    logger.info("Setting 'name' field...")
 
     # set_name = f"""
     #    UPDATE {tablename}
@@ -536,9 +537,9 @@ def set_name_field(conn, cursor, tablename):
     try:
         cursor.execute(set_name)
         conn.commit()
-        log("A Name field setted.")
+        logger.info("A Name field setted.")
     except psycopg2.Error as err:
-        log(f"Error setting points name: {err}")
+        logger.error(f"Error setting points name: {err}")
 
 
 def set_ident_field(conn, cursor, tablename):
@@ -546,7 +547,7 @@ def set_ident_field(conn, cursor, tablename):
 
     ident = acq_date:acq_time:latitude:longitude:satellite
     """
-    log("Setting Ident field...")
+    logger.info("Setting Ident field...")
     set_ident = f"""
         UPDATE {tablename}
         SET ident = acq_date \
@@ -562,14 +563,14 @@ def set_ident_field(conn, cursor, tablename):
     try:
         cursor.execute(set_ident)
         conn.commit()
-        log("A Ident field setted.")
+        logger.info("A Ident field setted.")
     except psycopg2.Error as err:
-        log(f"Error creating ident fields: {err}")
+        logger.error(f"Error creating ident fields: {err}")
 
 
 def correct_time_field(conn, cursor, tablename):
     """Correct 'time' field, adding an second zero."""
-    log("Correcting Time field...")
+    logger.info("Correcting Time field...")
     set_ident = f"""
         UPDATE {tablename}
         SET acq_time = left(lpad(acq_time, 4, '0'),2) \
@@ -579,14 +580,14 @@ def correct_time_field(conn, cursor, tablename):
     try:
         cursor.execute(set_ident)
         conn.commit()
-        log("Time field corrected.")
+        logger.info("Time field corrected.")
     except psycopg2.Error as err:
-        log(f"Error correcting time fields: {err}")
+        logger.error(f"Error correcting time fields: {err}")
 
 
 def set_datetime_field(conn, cursor, tablename):
     """Set 'date_time field ()."""
-    log("Setting Date_time field...")
+    logger.info("Setting Date_time field...")
     set_datetime = f"""
         UPDATE {tablename}
         SET date_time = TO_TIMESTAMP(acq_date || ' ' || acq_time,
@@ -595,14 +596,14 @@ def set_datetime_field(conn, cursor, tablename):
     try:
         cursor.execute(set_datetime)
         conn.commit()
-        log("Date_time field setted.")
+        logger.info("Date_time field setted.")
     except psycopg2.Error as err:
-        log(f"Error creating timestamp {err}")
+        logger.error(f"Error creating timestamp {err}")
 
 
 def set_marker_field(conn, cursor, tablename, marker):
     """Set 'marker' field."""
-    log("Setting Marker field...")
+    logger.info("Setting Marker field...")
     set_marker = f"""
         UPDATE {tablename}
         SET marker = '{marker}'
@@ -610,14 +611,14 @@ def set_marker_field(conn, cursor, tablename, marker):
     try:
         cursor.execute(set_marker)
         conn.commit()
-        log("Marker field setted.")
+        logger.info("Marker field setted.")
     except psycopg2.Error as err:
-        log(f"Error creating marker: {err}")
+        logger.error(f"Error creating marker: {err}")
 
 
 def del_duplicates(conn, cursor, tablename):
     """Delete duplicate points."""
-    log(f"Deleting duplicates in {tablename}...")
+    logger.info(f"Deleting duplicates in {tablename}...")
     statements = (
         f"""
             CREATE TABLE {tablename}_tmp AS
@@ -635,14 +636,14 @@ def del_duplicates(conn, cursor, tablename):
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log(f"The duplicates deleted in {tablename}")
+        logger.info(f"The duplicates deleted in {tablename}")
     except psycopg2.Error as err:
-        log(f"Error deleting duplicates: {err}")
+        logger.error(f"Error deleting duplicates: {err}")
 
 
 def rise_multipoint_cost(conn, cursor, tablename, distance):
     """Rise cost for multipoint."""
-    log("Correcting cost for multipoints...")
+    logger.info("Correcting cost for multipoints...")
     temp_tab = f"{tablename}_tmp1"
     clust_tab = f"{tablename}_clst"
     statements = (
@@ -711,14 +712,14 @@ def rise_multipoint_cost(conn, cursor, tablename, distance):
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log("Cost corrected.")
+        logger.info("Cost corrected.")
     except psycopg2.Error as err:
-        log(f"Error correcting cost: {err}")
+        logger.error(f"Error correcting cost: {err}")
 
 
 def check_tech_zones(conn, cursor, src_tab, tech_zones):
     """Check if a points in technogen zone."""
-    log("Checking tech-zones...")
+    logger.info("Checking tech-zones...")
     sql_stat = f"""
         UPDATE {src_tab}
         SET
@@ -730,14 +731,14 @@ def check_tech_zones(conn, cursor, src_tab, tech_zones):
     try:
         cursor.execute(sql_stat)
         conn.commit()
-        log("Tech zones checked.")
+        logger.info("Tech zones checked.")
     except psycopg2.Error as err:
-        log(f"'Error intersecting points with tech-zones: {err}")
+        logger.error(f"'Error intersecting points with tech-zones: {err}")
 
 
 def check_vip_zones(conn, cursor, src_tab, vip_zones):
     """Check if a points in vip-zone."""
-    log("Checking vip-zones...")
+    logger.info("Checking vip-zones...")
     sql_stat = f"""
         UPDATE {src_tab}
         SET
@@ -749,14 +750,14 @@ def check_vip_zones(conn, cursor, src_tab, vip_zones):
     try:
         cursor.execute(sql_stat)
         conn.commit()
-        log("Vip zones checked.")
+        logger.info("Vip zones checked.")
     except psycopg2.Error as err:
-        log(f"Error intersecting points with vip-zones: {err}")
+        logger.error(f"Error intersecting points with vip-zones: {err}")
 
 
 def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
     """Check if a points in OOPT-zone."""
-    log("Checking oopt-zones...")
+    logger.info("Checking oopt-zones...")
     sql_stat = f"""
         UPDATE {src_tab}
         SET
@@ -768,14 +769,14 @@ def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
     try:
         cursor.execute(sql_stat)
         conn.commit()
-        log("OOPT zones checked.")
+        logger.info("OOPT zones checked.")
     except psycopg2.Error as err:
-        log(f"Error intersecting points with oopt-zones: {err}")
+        logger.error(f"Error intersecting points with oopt-zones: {err}")
 
 
 def check_oopt_buffers(conn, cursor, src_tab, oopt_buffers):
     """Check if a points in a OOPT-buffers zone."""
-    log("Checking oopt buffers...")
+    logger.info("Checking oopt buffers...")
     sql_stat = f"""
         UPDATE {src_tab}
         SET
@@ -787,14 +788,14 @@ def check_oopt_buffers(conn, cursor, src_tab, oopt_buffers):
     try:
         cursor.execute(sql_stat)
         conn.commit()
-        log("OOPT buffers checked.")
+        logger.info("OOPT buffers checked.")
     except psycopg2.Error as err:
-        log(f"Error intersecting points with oopt buffers: {err}")
+        logger.error(f"Error intersecting points with oopt buffers: {err}")
 
 
 def copy_to_common_table(conn, cursor, today_tab, year_tab):
     """Copy temporary common table to year table."""
-    log("Copying data into common table...")
+    logger.info("Copying data into common table...")
     ins_string = f"""
         INSERT INTO {year_tab} (name,
                                 acq_date,
@@ -875,20 +876,20 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
     try:
         cursor.execute(ins_string)
         conn.commit()
-        log(f"Data from {today_tab} added to common table {year_tab}")
+        logger.info(f"Data from {today_tab} added to common table {year_tab}")
     except psycopg2.Error as err:
-        log(f"Error addin points to common table: {err}")
+        logger.error(f"Error addin points to common table: {err}")
 
 
 def drop_today_table(conn, cursor, common_tab):
     """Drop common today table."""
-    log("Dropping today table...")
+    logger.info("Dropping today table...")
     try:
         cursor.execute(f"DROP TABLE IF EXISTS {common_tab}")
         conn.commit()
-        log("Today table dropped.")
+        logger.info("Today table dropped.")
     except psycopg2.Error as err:
-        log(f"Error dropping today table: {err}")
+        logger.error(f"Error dropping today table: {err}")
 
 
 def get_and_merge_points_job():
@@ -896,7 +897,8 @@ def get_and_merge_points_job():
     currtime = time.localtime()
     date = time.strftime("%Y-%m-%d", currtime)
 
-    start_logging("get_and_merge_points.py")
+    logger.info("------------------------------------------")
+    logger.info("Process [get_and_merge_points.py] started.")
 
     [year_tab,
      common_tab,
@@ -959,7 +961,7 @@ def get_and_merge_points_job():
     drop_today_table(conn, cursor, common_tab)
 
     close_conn(conn, cursor)
-    stop_logging("get_and_merge_points.py")
+    logger.info("Process [get_and_merge_points.py] stopped.")
 
 
 if __name__ == "__main__":

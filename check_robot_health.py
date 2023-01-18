@@ -20,13 +20,13 @@ Created:     24.01.2020
 
 import os
 import time
-from falogging import (
-    start_logging,
-    stop_logging)
+from mylogger import init_logger
 from faservice import (
     get_config,
     send_to_telegram,
     send_email_with_attachment)
+
+logger = init_logger()
 
 
 def is_files_exist(filelist):
@@ -53,7 +53,8 @@ def rm_files(existlist):
 
 def check_robot_health_job():
     """Check a robot health main job."""
-    start_logging("check_robot_health_job.py")
+    logger.info("----------------------------------------")
+    logger.info("Process [check_robot_health.py] started.")
 
     [url, chat_id] = get_config("telegramm", ["url", "tst_chat_id"])
     [filelist, mail_addr] = get_config("health", ["filelist", "emails"])
@@ -78,7 +79,7 @@ def check_robot_health_job():
         send_email_with_attachment(mail_addr, subject, body_text, existlist)
         rm_files(existlist)
 
-    stop_logging("check_robot_health_job.py")
+    logger.info("Process [check_robot_health.py] stopped.")
 
 
 if __name__ == "__main__":

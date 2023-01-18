@@ -19,8 +19,13 @@ Created:     20.12.2019
 """
 
 import time
-from falogging import log, start_logging, stop_logging
-from faservice import get_config, get_cursor, close_conn
+from faservice import (
+    get_config,
+    get_cursor,
+    close_conn)
+from mylogger import init_logger
+
+logger = init_logger()
 
 
 def copy_table(conn, cursor, src_tab, now_year):
@@ -41,14 +46,16 @@ def copy_table(conn, cursor, src_tab, now_year):
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log(f"The table copied: {src_tab}")
+        logger.info(f"The table copied: {src_tab}")
     except IOError as err:
-        log(f"Error copying year table: {err}")
+        logger.error(f"Error copying year table: {err}")
 
 
 def happy_new_year_job():
     """Yearly moving of data table."""
-    start_logging("happy_new_year.py")
+    logger.info("------------------------------------")
+    logger.info("Process [happy_new_year.py] started.")
+
     [year_tab] = get_config("tables", ["year_tab"])
     currtime = time.localtime()
     now_year = int(time.strftime("%Y", currtime)) - 1
@@ -57,7 +64,7 @@ def happy_new_year_job():
     copy_table(conn, cursor, year_tab, now_year)
 
     close_conn(conn, cursor)
-    stop_logging("happy_new_year.py")
+    logger.info("Process [happy_new_year.py] stopped.")
 
 
 if __name__ == "__main__":
