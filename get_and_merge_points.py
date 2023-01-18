@@ -1,24 +1,52 @@
-﻿# -*- coding: utf-8 -*-
-#-------------------------------------------------------------------------------
-# Name:        get_and_merge_points
-# Purpose:
-# Author:      Chaus
-# Created:     24.04.2019
-#-------------------------------------------------------------------------------
+﻿"""
+Main firealert robot part.
 
-import os, time
+Started via crontab: '05 * * * * get_and_merge_points.py'
+
+Get firepoints from NASA servers? analyze it and add it to firealert db.
+
+Created:     24.04.2019
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ ***************************************************************************/
+
+"""
+
+import os
+import time
 import psycopg2
-import requests, shutil
+import requests
+import shutil
 from requests.adapters import HTTPAdapter
-from requests.exceptions import ConnectionError, HTTPError, RequestException
-import csv, pandas
+from requests.exceptions import (
+    ConnectionError,
+    HTTPError,
+    RequestException)
+import csv
+import pandas
 from sqlalchemy import create_engine
-from falogging import log, start_logging, stop_logging
-from faservice import get_config, get_db_config, get_cursor, close_conn, get_path, send_to_telegram
+from falogging import (
+    log,
+    start_logging,
+    stop_logging)
+from faservice import (
+    get_config,
+    get_db_config,
+    get_cursor,
+    close_conn,
+    get_path,
+    send_to_telegram)
 
-#Создаем подкаталог по текущей дате
+
 def MakeTodayDir(DateStr, aDir):
-    log("Creating today dir %s..." %aDir)
+    """Create a subdir, based on current date."""
+    log(f"Creating today dir {aDir}...")
     Dir_Today = aDir + DateStr
     if os.path.exists(Dir_Today):
         try:
@@ -32,241 +60,262 @@ def MakeTodayDir(DateStr, aDir):
         log("Unable to create %s" % Dir_Today)
     return Dir_Today
 
-#def get session
+
 def get_session(url):
-    log("Requesting session %s..." %url)
+    """Get session for download firepoints."""
+    log(f"Requesting session {url}...")
     s = requests.session()
     headers = {
-		'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-		'X-Requested-With': 'XMLHttpRequest',
-		'Referer': url,
-		'Pragma': 'no-cache',
-		'Cache-Control': 'no-cache'}
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": url,
+        "Pragma": "no-cache",
+        "Cache-Control": "no-cache"}
     r = s.get(url, headers=headers)
-    #r = s.get(url, headers=headers,verify=False)
-    log("Session created")
-    return(r)
+    # r = s.get(url, headers=headers, verify=False)
+    log("Session created.")
+    return r
 
-#read file from site and save to csv
-def read_csv_from_site(url,sourcepath):
+
+def read_csv_from_site(url, sourcepath):
+    """Read file from site and save to csv."""
     try:
-        filereq = requests.get(url,stream = True)
+        filereq = requests.get(url, stream=True)
         filereq.raise_for_status()
     except HTTPError as http_err:
-        log(f'HTTP error occurred: {http_err}')  # Python 3.6
+        log(f"HTTP error occurred: {http_err}")
         errcode = 2
     except Exception as err:
-        log(f'Other error occurred: {err}')  # Python 3.6
+        log(f"Other error occurred: {err}")
         errcode = 3
     else:
-        log(f'Get receive status code {filereq.status_code}')
-        #filereq = requests.get(url,stream = True,verify=False)
-        with open(sourcepath,"wb") as receive:
-            shutil.copyfileobj(filereq.raw,receive)
+        log(f"Get receive status code {filereq.status_code}")
+        # filereq = requests.get(url, stream=True, verify=False)
+        with open(sourcepath, "wb") as receive:
+            shutil.copyfileobj(filereq.raw, receive)
             del filereq
         errcode = 0
     return errcode
 
-#read file from site with retries and save to csv
-def read_csv_from_site_with_retries(url,sourcepath):
+
+def read_csv_from_site_with_retries(url, sourcepath):
+    """Read file from site with retries and save to csv."""
     nasa_adapter = HTTPAdapter(max_retries=3)
     session = requests.Session()
     session.mount(url, nasa_adapter)
     try:
-        filereq = session.get(url,stream = True)
+        filereq = session.get(url, stream=True)
     except ConnectionError as conn_err:
-        log(f'Connection error occurred: {conn_err}')  # Python 3.6
+        log(f"Connection error occurred: {conn_err}")
         errcode = 1
     except HTTPError as http_err:
-        log(f'HTTP error occurred: {http_err}')  # Python 3.6
+        log(f"HTTP error occurred: {http_err}")
         errcode = 2
     except RequestException as req_err:
-        log(f'Request error occurred: {req_err}')  # Python 3.6
+        log(f"Request error occurred: {req_err}")
         errcode = 3
     except Exception as err:
-        log(f'Other error occurred: {err}')  # Python 3.6
+        log(f"Other error occurred: {err}")
         errcode = 4
     else:
-        log(f'Get receive status code {filereq.status_code}')
-        #filereq = requests.get(url,stream = True,verify=False)
-        with open(sourcepath,"wb") as receive:
-            shutil.copyfileobj(filereq.raw,receive)
+        log(f"Get receive status code {filereq.status_code}")
+        # filereq = requests.get(url, stream=True, verify=False)
+        with open(sourcepath, "wb") as receive:
+            shutil.copyfileobj(filereq.raw, receive)
             del filereq
         errcode = 0
     return errcode
 
-#Процедура получения csv-файла точек
+
 def GetPoints(pointset, dst_folder, aDate):
-    log("Getting points for %s..." %pointset)
+    """Get csv-file from NASA site."""
+    log(f"Getting points for {pointset}...")
     [period] = get_config("NASA", ["load_period"])
-    [src_url] = get_config("NASA", ["%s_src_%s"%(pointset,period)])
-    dst_file = "%s_%s.csv"%(pointset,aDate)
+    [src_url] = get_config("NASA", [f"{pointset}_src_{period}"])
+    dst_file = f"{pointset}_{aDate}.csv"
     dst_file = os.path.join(dst_folder, dst_file)
-    errcode = read_csv_from_site(src_url,dst_file)
+    errcode = read_csv_from_site(src_url, dst_file)
     if errcode == 0:
-        log("Download complete: %s" %dst_file)
+        log(f"Download complete: {dst_file}")
     else:
         if os.path.exists(dst_file):
             try:
                 os.remove(dst_file)
-            except OSError as error:
-                log("Unable to remove file: %s" %dst_file)
-        log("Not downloaded: %s" %dst_file)
+            except OSError as err:
+                log(f"Unable to remove file: {dst_file}.\nError {err}")
+        log(f"Not downloaded: {dst_file}.")
     return errcode
 
-#Процедура получения csv-файла точек с перезапросами
+
 def GetPoints_with_retries(pointset, dst_folder, aDate):
-    log("Getting points for %s..." %pointset)
+    """Get csv-file from NASA site with retries."""
+    log(f"Getting points for {pointset}...")
     [period] = get_config("NASA", ["load_period"])
-    [src_url] = get_config("NASA", ["%s_src_%s"%(pointset,period)])
-    [src_url2] = get_config("NASA", ["%s_src2_%s"%(pointset,period)])
-    dst_file = "%s_%s.csv"%(pointset,aDate)
+    [src_url] = get_config("NASA", [f"{pointset}_src_{period}"])
+    [src_url2] = get_config("NASA", [f"{pointset}_src2_{period}"])
+    dst_file = f"{pointset}_{aDate}.csv"
     dst_file = os.path.join(dst_folder, dst_file)
-    errcode = read_csv_from_site_with_retries(src_url,dst_file)
+    errcode = read_csv_from_site_with_retries(src_url, dst_file)
     if errcode == 0:
-        log("Download complete: %s" %dst_file)
+        log(f"Download complete: {dst_file}.")
     else:
-        errcode = read_csv_from_site_with_retries(src_url2,dst_file)
+        errcode = read_csv_from_site_with_retries(src_url2, dst_file)
         if errcode == 0:
-            log("Download complete: %s" %dst_file)
+            log(f"Download complete: {dst_file}.")
         else:
             if os.path.exists(dst_file):
                 try:
                     os.remove(dst_file)
-                except OSError as error:
-                    log("Unable to remove file: %s" %dst_file)
-            log("Not downloaded: %s" %dst_file)
+                except OSError as err:
+                    log(f"Unable to remove file: {dst_file}.\nError {err}")
+            log(f"Not downloaded: {dst_file}.")
     return errcode
 
-#Процедура для конструктора
-def getconn():
-    # extract db params from config
-    [dbserver,dbport,dbname,dbuser,dbpass] = get_db_config()
-    c = psycopg2.connect(host=dbserver, port=dbport, dbname=dbname, user=dbuser, password=dbpass)
-    return c
 
-#Запись csv в таблицы
+def getconn():
+    """Create psycopg2 connection (for constructor)."""
+    [dbserver, dbport, dbname, dbuser, dbpass] = get_db_config()
+    conn = psycopg2.connect(host=dbserver,
+                            port=dbport,
+                            dbname=dbname,
+                            user=dbuser,
+                            password=dbpass)
+    return conn
+
+
 def write_to_db(engine, tablename, dataframe):
-	# Use pandas and sqlalchemy to insert a dataframe into a database
+    """Write pandas dataframe (from csv) into table."""
     log("Writing points...")
     try:
-        dataframe.to_sql(tablename,engine,index=False,if_exists=u'append',chunksize=1000)
+        dataframe.to_sql(tablename,
+                         engine,
+                         index=False,
+                         if_exists=u"append",
+                         chunksize=1000)
         log("Done inserted source into postgres")
-    except IOError as e:
-        log("Error in inserting data into db:%s"%e)
+    except IOError as err:
+        log(f"Error in inserting data into db: {err}")
 
-#Загрузка точек из csv-файла в БД
-def upload_points_to_db(cursor,src_folder,pointset,aDate):
-    log("Upload points %s into postgres..." %pointset)
-    engine = create_engine('postgresql+psycopg2://', creator=getconn)
 
-    src_file = "%s_%s.csv"%(pointset,aDate)
-    src_file = os.path.join(src_folder,src_file)
-    dst_table = pointset + '_today'
+def upload_points_to_db(cursor, src_folder, pointset, aDate):
+    """Upload points from csv-file into database."""
+    log(f"Upload points {pointset} into postgres...")
+    engine = create_engine("postgresql+psycopg2://", creator=getconn)
+
+    src_file = f"{pointset}_{aDate}.csv"
+    src_file = os.path.join(src_folder, src_file)
+    dst_table = f"{pointset}_today"
     try:
         csv_src = pandas.read_csv(src_file)
         write_to_db(engine, dst_table, csv_src)
-        cursor.execute("SELECT count(*) FROM %s"%(dst_table))
+        cursor.execute(f"SELECT count(*) FROM {dst_table}")
         points_count = cursor.fetchone()[0]
-        log('%s rows added to db from %s'%(points_count, src_file))
-    except IOError as e:
-        log('Error download and add data %s' %e)
+        log(f"{points_count} rows added to db from {src_file}")
+    except IOError as err:
+        log("Error download and add data {err}")
         points_count = 0
     return points_count
 
-#Удаляем дневные таблицы
-def drop_today_tables(conn,cursor, pointset):
-    log("Dropping today tables for %s..." %pointset)
-    today_tab = '%s_today'%(pointset)
-    sql_stat = "DROP TABLE IF EXISTS %s"%(today_tab)
+
+def drop_today_tables(conn, cursor, pointset):
+    """Drop temporary today tables."""
+    log(f"Dropping today tables for {pointset}...")
+    today_tab = f"{pointset}_today"
+    sql_stat = f"DROP TABLE IF EXISTS {today_tab}"
     try:
         cursor.execute(sql_stat)
         conn.commit()
         log("Tables dropped")
-    except psycopg2.Error as e:
-        log('Error dropping table:%s'%e)
+    except psycopg2.Error as err:
+        log(f"Error dropping table: {err}")
 
-#Удаляем временные таблицы
-def drop_temp_tables(conn,cursor, pointset):
-    log("Dropping temp tables for %s..." %pointset)
-    today_tab = pointset + '_today'
-    today_tab_ru = pointset + '_today_ru'
-    sql_stat_1 = "DROP TABLE IF EXISTS %s"%(today_tab)
-    sql_stat_2 = "DROP TABLE IF EXISTS %s"%(today_tab_ru)
+
+def drop_temp_tables(conn, cursor, pointset):
+    """Drop temporary tables."""
+    log(f"Dropping temp tables for {pointset}...")
+    today_tab = f"{pointset}_today"
+    today_tab_ru = f"{pointset}_today_ru"
+    sql_stat_1 = f"DROP TABLE IF EXISTS {today_tab}"
+    sql_stat_2 = f"DROP TABLE IF EXISTS {today_tab_ru}"
     try:
         cursor.execute(sql_stat_1)
         cursor.execute(sql_stat_2)
         conn.commit()
         log("Temp tables dropped.")
-    except psycopg2.Error as e:
-        log('Error dropping temp tables:%s'%e)
+    except psycopg2.Error as err:
+        log(f"Error dropping temp tables: {err}")
 
-#Добавляем геоинформацию
-def add_geog_field(conn,cursor,pointset):
-    log("Adding geog field for %s..." %pointset)
-    src_tab = pointset + '_today'
+
+def add_geog_field(conn, cursor, pointset):
+    """Add geog field to today-table."""
+    log(f"Adding geog field for {pointset}...")
+    src_tab = f"{pointset}_today"
     statements = (
-        """
-        ALTER TABLE %s
+        f"""
+        ALTER TABLE {src_tab}
             ADD COLUMN geog GEOGRAPHY(POINT, 4326)
-        """%(src_tab),
+        """,
+        f"""
+        UPDATE {src_tab}
+            SET geog = ST_GeomFromText(
+                        'POINT(' || longitude || ' ' || latitude || ')',4326)
+        """,
         """
-        UPDATE %s
-            SET geog = ST_GeomFromText('POINT(' || longitude || ' ' || latitude || ')',4326)
-        """%(src_tab),
+        CREATE INDEX {src_tab}_idx ON {src_tab} USING GIST (geog)
         """
-        CREATE INDEX %s_idx ON %s USING GIST (geog)
-        """%(src_tab,src_tab)
-		)
+    )
     try:
         for sql_stat in statements:
             cursor.execute(sql_stat)
         conn.commit()
-        log('Geometry added to %s'%(src_tab))
-    except psycopg2.Error as e:
-        log('Error adding geometry:%s'%e)
+        log(f"Geometry added to {src_tab}.")
+    except psycopg2.Error as err:
+        log(f"Error adding geometry: {err}")
 
-#Делаем выборку точек по России
-def make_tables_for_Russia(conn,cursor,pointset):
-    log("Making table for Russia for %s..." %pointset)
-    src_tab = pointset + '_today'
-    dst_tab = pointset + '_today_ru'
+
+def make_tables_for_Russia(conn, cursor, pointset):
+    """Make firepoints subset for Russia."""
+    log(f"Making table for Russia for {pointset}...")
+    src_tab = f"{pointset}_today"
+    dst_tab = f"{pointset}_today_ru"
     [outline] = get_config("regions", ["reg_russia"])
     statements = (
-		"""
-		DROP TABLE IF EXISTS %s
-		"""%(dst_tab),
-		"""
-		CREATE TABLE %(d)s
-			AS SELECT %(s)s.*, %(o)s.region
-				FROM %(s)s, %(o)s
-				WHERE ST_Intersects(%(o)s.geog, %(s)s.geog)
-		"""%{'d':dst_tab, 's':src_tab, 'o':outline}
-		)
+        f"""
+        DROP TABLE IF EXISTS {dst_tab}
+        """,
+        f"""
+        CREATE TABLE {dst_tab} AS
+            SELECT {src_tab}.*, {outline}.region
+            FROM {src_tab}, {outline}
+            WHERE
+                ST_Intersects({outline}.geog, {src_tab}.geog)
+        """
+    )
     try:
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log('The table created:%s'%(dst_tab))
-    except psycopg2.Error as e:
-        log('Error intersecting points with region:%s'%e)
+        log(f"The table created: {dst_tab}.")
+    except psycopg2.Error as err:
+        log(f"Error intersecting points with region: {err}")
 
-#Создаем сводную таблицу
-def make_common_table(conn,cursor,dst_tab,pointsets):
+
+def make_common_table(conn, cursor, dst_tab, pointsets):
+    """Merge points from source tables into common table."""
     log("Making common table...")
     statements = (
-        """
-		DROP TABLE IF EXISTS %s
-		"""%(dst_tab),
-		"""
-		CREATE TABLE %s (
-				gid SERIAL PRIMARY KEY,
+        f"""
+        DROP TABLE IF EXISTS {dst_tab}
+        """,
+        f"""
+        CREATE TABLE {dst_tab} (
+                gid SERIAL PRIMARY KEY,
                 name VARCHAR(30),
                 acq_date VARCHAR(10),
-				acq_time VARCHAR(5),
+                acq_time VARCHAR(5),
                 daynight VARCHAR(1),
-				latitude NUMERIC,
-				longitude NUMERIC,
+                latitude NUMERIC,
+                longitude NUMERIC,
                 satellite VARCHAR(5),
                 conf_modis INTEGER,
                 conf_viirs VARCHAR(7),
@@ -274,20 +323,20 @@ def make_common_table(conn,cursor,dst_tab,pointsets):
                 bright_t31 NUMERIC,
                 bright_ti4 NUMERIC,
                 bright_ti5 NUMERIC,
-				scan NUMERIC,
-				track NUMERIC,
-				version VARCHAR(6),
-				frp NUMERIC,
+                scan NUMERIC,
+                track NUMERIC,
+                version VARCHAR(6),
+                frp NUMERIC,
                 region  VARCHAR(100),
-				rating SMALLINT,
-				critical SMALLINT,
+                rating SMALLINT,
+                critical SMALLINT,
                 revision SMALLINT,
-				peat_id VARCHAR(254),
-				peat_district VARCHAR(254),
-				peat_region VARCHAR(254),
+                peat_id VARCHAR(254),
+                peat_district VARCHAR(254),
+                peat_region VARCHAR(254),
                 peat_area SMALLINT,
-				peat_class SMALLINT,
-				peat_fire SMALLINT,
+                peat_class SMALLINT,
+                peat_fire SMALLINT,
                 ident VARCHAR(45),
                 date_time TIMESTAMP,
                 geog GEOGRAPHY(POINT, 4326),
@@ -297,234 +346,311 @@ def make_common_table(conn,cursor,dst_tab,pointsets):
                 oopt VARCHAR(254),
                 oopt_id INTEGER,
                 oopt_buf_id INTEGER
-		)
-		"""%(dst_tab)
-	)
+        )
+        """
+    )
     try:
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log('The table created:%s'%(dst_tab))
-    except psycopg2.Error as e:
-        log('Error creating table:%s'%e)
+        log(f"The table created: {dst_tab}.")
+    except psycopg2.Error as err:
+        log(f"Error creating table: {err}")
 
     loaded = 0
 
     for pointset in pointsets:
-        src_tab = pointset + '_today_ru'
+        src_tab = f"{pointset}_today_ru"
 
-        cursor.execute("SELECT count(*) FROM %s"%(src_tab))
+        cursor.execute(f"SELECT count(*) FROM {src_tab}")
         points_count = cursor.fetchone()[0]
         if points_count == 0:
             continue
 
-        ins_from_modis = """
-            INSERT INTO %(d)s (acq_date,acq_time,daynight,latitude,longitude,satellite,conf_modis,brightness,bright_t31,scan,track,version,frp,region,geog)
+        ins_from_modis = f"""
+            INSERT INTO {dst_tab} (acq_date,
+                                   acq_time,
+                                   daynight,
+                                   latitude,
+                                   longitude,
+                                   satellite,
+                                   conf_modis,
+                                   brightness,
+                                   bright_t31,
+                                   scan,
+                                   track,
+                                   version,
+                                   frp,
+                                   region,
+                                   geog)
                 SELECT
-                    %(s)s.acq_date,
-                    %(s)s.acq_time,
-                    %(s)s.daynight,
-                    %(s)s.latitude,
-                    %(s)s.longitude,
-                    %(s)s.satellite,
-                    %(s)s.confidence,
-                    %(s)s.brightness,
-                    %(s)s.bright_t31,
-                    %(s)s.scan,
-                    %(s)s.track,
-                    %(s)s.version,
-                    %(s)s.frp,
-                    %(s)s.region,
-                    %(s)s.geog
-                FROM %(s)s
-        """%{'d':dst_tab,'s':src_tab}
+                    {src_tab}.acq_date,
+                    {src_tab}.acq_time,
+                    {src_tab}.daynight,
+                    {src_tab}.latitude,
+                    {src_tab}.longitude,
+                    {src_tab}.satellite,
+                    {src_tab}.confidence,
+                    {src_tab}.brightness,
+                    {src_tab}.bright_t31,
+                    {src_tab}.scan,
+                    {src_tab}.track,
+                    {src_tab}.version,
+                    {src_tab}.frp,
+                    {src_tab}.region,
+                    {src_tab}.geog
+                FROM {src_tab}
+        """
 
-        ins_from_viirs = """
-            INSERT INTO %(d)s (acq_date,acq_time,daynight,latitude,longitude,satellite,conf_viirs,bright_ti4,bright_ti5,scan,track,version,frp,region,geog)
+        ins_from_viirs = f"""
+            INSERT INTO {dst_tab} (acq_date,
+                               acq_time,
+                               daynight,
+                               latitude,
+                               longitude,
+                               satellite,
+                               conf_viirs,
+                               bright_ti4,
+                               bright_ti5,
+                               scan,
+                               track,
+                               version,
+                               frp,
+                               region,
+                               geog)
                 SELECT
-                    %(s)s.acq_date,
-                    %(s)s.acq_time,
-                    %(s)s.daynight,
-                    %(s)s.latitude,
-                    %(s)s.longitude,
-                    %(s)s.satellite,
-                    %(s)s.confidence,
-                    %(s)s.bright_ti4,
-                    %(s)s.bright_ti5,
-                    %(s)s.scan,
-                    %(s)s.track,
-                    %(s)s.version,
-                    %(s)s.frp,
-                    %(s)s.region,
-                    %(s)s.geog
-                FROM %(s)s
-        """%{'d':dst_tab,'s':src_tab}
+                    {src_tab}.acq_date,
+                    {src_tab}.acq_time,
+                    {src_tab}.daynight,
+                    {src_tab}.latitude,
+                    {src_tab}.longitude,
+                    {src_tab}.satellite,
+                    {src_tab}.confidence,
+                    {src_tab}.bright_ti4,
+                    {src_tab}.bright_ti5,
+                    {src_tab}.scan,
+                    {src_tab}.track,
+                    {src_tab}.version,
+                    {src_tab}.frp,
+                    {src_tab}.region,
+                    {src_tab}.geog
+                FROM {src_tab}
+        """
 
         try:
-            if pointset in ['as_modis', 'eu_modis']:
+            if pointset in ["as_modis", "eu_modis"]:
                 cursor.execute(ins_from_modis)
-            elif pointset in ['as_viirs', 'eu_viirs', 'as_vnoaa', 'eu_vnoaa']:
+            elif pointset in ["as_viirs", "eu_viirs", "as_vnoaa", "eu_vnoaa"]:
                 cursor.execute(ins_from_viirs)
             conn.commit()
-            log('The data added:%s'%(src_tab))
-        except psycopg2.Error as e:
-            log('Error adding data:%s'%e)
+            log(f"The data added: {src_tab}")
+        except psycopg2.Error as err:
+            log(f"Error adding data: {err}")
 
         loaded = loaded + 1
     return loaded
 
-#Процедура оценки точек, попавших в буфер
-def cost_point_in_buffers(conn,cursor,tablename):
+
+def cost_point_in_buffers(conn, cursor, tablename):
+    """Cost points located in peat buffers."""
     log("Costing points in buffers...")
     try:
-        #Такая последовательность выборок позволяет выбирать точки по мере убывания их критичности
-        parse_order = [(64,4), (64,3), (40,4), (32,4), (64,2), (40,3), (32,3), (20,4), (40,2), (16,4), (32,2), (64,1), (20,3), (16,3), (10,4), (20,2), (40,1), (8,4), (16,2), (32,1), (10,3), (6,4), (8,3), (5,4), (10,2), (20,1), (6,3), (4,4), (8,2), (16,1), (5,3), (3,4), (4,3), (6,2), (5,2), (10,1), (3,3), (2,4), (4,2), (8,1), (2,3), (3,2), (6,1), (5,1), (1,4), (2,2), (4,1), (1,3), (3,1), (1,2), (2,1), (1,1)]
-        dist = ['buf_out','buf_far','buf_middle','buf_near','buf_core']
+        # Такая последовательность выборок позволяет выбирать точки
+        # по мере убывания их критичности
+        parse_order = [(64, 4), (64, 3), (40, 4), (32, 4), (64, 2), (40, 3),
+                       (32, 3), (20, 4), (40, 2), (16, 4), (32, 2), (64, 1),
+                       (20, 3), (16, 3), (10, 4), (20, 2), (40, 1), (8, 4),
+                       (16, 2), (32, 1), (10, 3), (6, 4), (8, 3), (5, 4),
+                       (10, 2), (20, 1), (6, 3), (4, 4), (8, 2), (16, 1),
+                       (5, 3), (3, 4), (4, 3), (6, 2), (5, 2), (10, 1),
+                       (3, 3), (2, 4), (4, 2), (8, 1), (2, 3), (3, 2),
+                       (6, 1), (5, 1), (1, 4), (2, 2), (4, 1), (1, 3),
+                       (3, 1), (1, 2), (2, 1), (1, 1)]
+        dist = ["buf_out", "buf_far", "buf_middle", "buf_near", "buf_core"]
 
-        for (fire_cost,rate) in parse_order:
+        for (fire_cost, rate) in parse_order:
             peat_db = dist[rate]
-            set_rating = """
-				UPDATE %(t)s SET
-                    rating = %(r)s,
-                    critical = %(f)s*%(r)s,
-                    peat_id = %(p)s.unique_id,
-                    peat_district = %(p)s.district,
-                    peat_region = %(p)s.region,
-                    peat_class = %(p)s.dry_indx,
-                    peat_fire = %(p)s.burn_indx
-                FROM %(p)s
-                WHERE %(t)s.critical IS NULL AND %(p)s.burn_indx = %(f)s AND ST_Intersects(%(t)s.geog, %(p)s.geog)
-			"""%{'t':tablename,'r':rate,'f':fire_cost,'p':peat_db}
+            set_rating = f"""
+                UPDATE {tablename}
+                SET
+                    rating = {rate},
+                    critical = {fire_cost}*{rate},
+                    peat_id = {peat_db}.unique_id,
+                    peat_district = {peat_db}.district,
+                    peat_region = {peat_db}.region,
+                    peat_class = {peat_db}.dry_indx,
+                    peat_fire = {peat_db}.burn_indx
+                FROM {peat_db}
+                WHERE
+                    {tablename}.critical IS NULL
+                    AND {peat_db}.burn_indx = {fire_cost}
+                    AND ST_Intersects({tablename}.geog, {peat_db}.geog)
+            """
             cursor.execute(set_rating)
-            log('The rating %s setted to %s'%(rate, peat_db))
-        set_zero_rating = """
-			UPDATE %s SET
+            log(f"The rating {rate} setted to {peat_db}.")
+        set_zero_rating = f"""
+            UPDATE {tablename}
+            SET
                 rating = 0,
                 critical = 0
-            WHERE critical IS NULL
-		"""%(tablename)
+            WHERE
+                critical IS NULL
+        """
         cursor.execute(set_zero_rating)
-        log('Zero rating setted')
+        log("Zero rating setted.")
         conn.commit()
-    except psycopg2.Error as e:
-        log('Error costing points:%s'%e)
+    except psycopg2.Error as err:
+        log(f"Error costing points: {err}")
 
-#Добавляем в результирующее поле Name = acq_date : gid : critical
-def set_name_field(conn,cursor,tablename):
-    log("Setting Name field...")
 
-    #set_name = """
-	#	UPDATE %s
-	#		SET name = '[' || to_char(critical,'999') || '] : ' || acq_date || ' :' || to_char(gid,'99999')
-    #"""%(tablename)
+def set_name_field(conn, cursor, tablename):
+    """Add a 'name' field (name = acq_date : gid : critical)."""
+    log("Setting 'name' field...")
 
-    #set_name = """
-	#	UPDATE %s
-	#		SET name = '(' || to_char(gid,'99999') || ') :' || acq_date || ' : [' || to_char(critical,'999') || ']'
-    #"""%(tablename)
+    # set_name = f"""
+    #    UPDATE {tablename}
+    #    SET name = '[' \
+    #               || to_char(critical,'999') \
+    #               || '] : ' \
+    #               || acq_date \
+    #               || ' :' \
+    #               || to_char(gid,'99999')
+    # """
 
-    set_name = """
-		UPDATE %s
-			SET name = to_char(gid,'9999999')
-    """%(tablename)
+    # set_name = f"""
+    #    UPDATE {tablename}
+    #    SET name = '(' \
+    #               || to_char(gid,'99999') \
+    #               || ') :' \
+    #               || acq_date \
+    #               || ' : [' \
+    #               || to_char(critical,'999') \
+    #               || ']'
+    # """
+
+    set_name = f"""
+        UPDATE {tablename}
+        SET name = to_char(gid,'9999999')
+    """
 
     try:
         cursor.execute(set_name)
         conn.commit()
-        log("A Name field setted")
-    except psycopg2.Error as e:
-        log('Error setting points name:%s'%e)
+        log("A Name field setted.")
+    except psycopg2.Error as err:
+        log(f"Error setting points name: {err}")
 
-#Создаем поле ident = acq_date:acq_time:latitude:longitude:satellite
-def set_ident_field(conn,cursor,tablename):
+
+def set_ident_field(conn, cursor, tablename):
+    """Add an 'ident' field.
+
+    ident = acq_date:acq_time:latitude:longitude:satellite
+    """
     log("Setting Ident field...")
-    set_ident = """
-		UPDATE %s
-			SET ident = acq_date || ':' || acq_time || ':' || to_char(latitude,'999.9999') || ':' || to_char(longitude,'999.9999') || ':' || satellite
-    """%(tablename)
+    set_ident = f"""
+        UPDATE {tablename}
+        SET ident = acq_date \
+                    || ':' \
+                    || acq_time \
+                    || ':' \
+                    || to_char(latitude,'999.9999') \
+                    || ':' \
+                    || to_char(longitude,'999.9999') \
+                    || ':' \
+                    || satellite
+    """
     try:
         cursor.execute(set_ident)
         conn.commit()
-        log("A Ident field setted")
-    except psycopg2.Error as e:
-        log('Error creating ident fields:%s'%e)
+        log("A Ident field setted.")
+    except psycopg2.Error as err:
+        log(f"Error creating ident fields: {err}")
 
-#Дополняем поле time ведущими нулями
-def correct_time_field(conn,cursor,tablename):
+
+def correct_time_field(conn, cursor, tablename):
+    """Correct 'time' field, adding an second zero."""
     log("Correcting Time field...")
-    set_ident = """
-		UPDATE %s
-			SET acq_time = left(lpad(acq_time, 4, '0'),2) || ':' || right(lpad(acq_time, 4, '0'),2)
-    """%(tablename)
+    set_ident = f"""
+        UPDATE {tablename}
+        SET acq_time = left(lpad(acq_time, 4, '0'),2) \
+                       || ':' \
+                       || right(lpad(acq_time, 4, '0'),2)
+    """
     try:
         cursor.execute(set_ident)
         conn.commit()
-        log(" Time field corrected.")
-    except psycopg2.Error as e:
-        log('Error correcting time fields:%s'%e)
+        log("Time field corrected.")
+    except psycopg2.Error as err:
+        log(f"Error correcting time fields: {err}")
 
-#Устанавливаем значение поля date_time "acq_date acq_time"
-def set_datetime_field(conn,cursor,tablename):
+
+def set_datetime_field(conn, cursor, tablename):
+    """Set 'date_time field ()."""
     log("Setting Date_time field...")
-    set_datetime = """
-		UPDATE %s
-            SET date_time = TO_TIMESTAMP(acq_date || ' ' || acq_time,'YYYY-MM-DD HH24:MI')
-    """%(tablename)
+    set_datetime = f"""
+        UPDATE {tablename}
+        SET date_time = TO_TIMESTAMP(acq_date || ' ' || acq_time,
+                                     'YYYY-MM-DD HH24:MI')
+    """
     try:
         cursor.execute(set_datetime)
         conn.commit()
         log("Date_time field setted.")
-    except psycopg2.Error as e:
-        log('Error creating timestamp%s'%e)
+    except psycopg2.Error as err:
+        log(f"Error creating timestamp {err}")
 
-#Устанавливаем значение поля marker
-def set_marker_field(conn,cursor,tablename,marker):
+
+def set_marker_field(conn, cursor, tablename, marker):
+    """Set 'marker' field."""
     log("Setting Marker field...")
-    set_marker = """
-		UPDATE %(s)s
-            SET marker = '%(m)s'
-    """%{'s': tablename, 'm': marker}
+    set_marker = f"""
+        UPDATE {tablename}
+        SET marker = '{marker}'
+    """
     try:
         cursor.execute(set_marker)
         conn.commit()
         log("Marker field setted.")
-    except psycopg2.Error as e:
-        log('Error creating marker:%s'%e)
+    except psycopg2.Error as err:
+        log(f"Error creating marker: {err}")
 
 
-#Удаляем дубли в таблице
-def del_duplicates(conn,cursor,tablename):
-    log("Deleting duplicates in %s..." %(tablename))
+def del_duplicates(conn, cursor, tablename):
+    """Delete duplicate points."""
+    log(f"Deleting duplicates in {tablename}...")
     statements = (
+        f"""
+            CREATE TABLE {tablename}_tmp AS
+                SELECT DISTINCT ON (ident) *
+                FROM {tablename}
+        """,
+        f"""
+            DROP TABLE {tablename}
+        """,
+        f"""
+            ALTER TABLE {tablename}_tmp RENAME TO {tablename}
         """
-            CREATE TABLE %s_tmp AS SELECT DISTINCT ON (ident) * FROM %s
-		"""%(tablename,tablename),
-		"""
-            DROP TABLE %s
-		"""%(tablename),
-        """
-            ALTER TABLE %s_tmp RENAME TO %s
-        """%(tablename,tablename)
-	)
+    )
     try:
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log('The duplicates deleted in %s'%(tablename))
-    except psycopg2.Error as e:
-        log('Error deleting duplicates:%s'%e)
+        log(f"The duplicates deleted in {tablename}")
+    except psycopg2.Error as err:
+        log(f"Error deleting duplicates: {err}")
 
-#Повышаем оценку для групповых точек
-def rise_multipoint_cost(conn,cursor,tablename,distance):
+
+def rise_multipoint_cost(conn, cursor, tablename, distance):
+    """Rise cost for multipoint."""
     log("Correcting cost for multipoints...")
-    temp_tab = '%s_tmp1'%tablename
-    clust_tab = '%s_clst'%tablename
+    temp_tab = f"{tablename}_tmp1"
+    clust_tab = f"{tablename}_clst"
     statements = (
-        """
-		DROP TABLE IF EXISTS %s
-		"""%(temp_tab),
-        """
-        CREATE TABLE %(t)s
+        f"""
+        DROP TABLE IF EXISTS {temp_tab}
+        """,
+        f"""
+        CREATE TABLE {temp_tab}
             AS SELECT
                 ident,
                 peat_id,
@@ -532,122 +658,179 @@ def rise_multipoint_cost(conn,cursor,tablename,distance):
                 rating,
                 critical,
                 revision,
-                (ST_Transform(%(s)s.geog::geometry,3857)::geometry) AS geom
-            FROM %(s)s
+                (ST_Transform({tablename}.geog::geometry,
+                              3857)::geometry) AS geom
+            FROM {tablename}
             WHERE rating > 0
-        """%{'t':temp_tab,'s':tablename},
-        """
-		DROP TABLE IF EXISTS %s
-		"""%(clust_tab),
-        """
-        CREATE TABLE %(c)s
-            AS SELECT
+        """,
+        f"""
+        DROP TABLE IF EXISTS {clust_tab}
+        """,
+        f"""
+        CREATE TABLE {clust_tab} AS
+            SELECT
                 ST_NumGeometries(gc) as num,
-                ST_Buffer(ST_ConvexHull(gc), %(b)s, 'quad_segs=8') AS buffer
+                ST_Buffer(ST_ConvexHull(gc), 50, 'quad_segs=8') AS buffer
             FROM (
-                SELECT unnest(ST_ClusterWithin(geom, %(d)s)) AS gc
-                FROM %(s)s)
+                SELECT unnest(ST_ClusterWithin(geom, {distance})) AS gc
+                FROM {temp_tab})
                 AS result
-        """%{'c': clust_tab, 's': temp_tab, 'd': distance, 'b': 50},
-         """
-        DELETE FROM %s
+        """,
+        f"""
+        DELETE FROM {clust_tab}
             WHERE num < 2
-        """%(clust_tab),
-        """
-		UPDATE %(t)s SET
+        """,
+        f"""
+        UPDATE {temp_tab}
+        SET
             rating = rating + 1,
             critical = peat_fire*(rating+1),
             revision = 1
-        FROM %(c)s
-        WHERE ST_Intersects(%(t)s.geom, %(c)s.buffer)
-        """%{'t':temp_tab,'c':clust_tab},
+        FROM {clust_tab}
+        WHERE
+            ST_Intersects({temp_tab}.geom, {clust_tab}.buffer)
+        """,
+        f"""
+        UPDATE {tablename}
+        SET
+            rating = {temp_tab}.rating,
+            critical = {temp_tab}.critical
+        FROM {temp_tab}
+        WHERE
+            {temp_tab}.ident = {tablename}.ident
+            AND {temp_tab}.revision = 1
+        """,
+        f"""
+        DROP TABLE IF EXISTS {temp_tab}
         """
-		UPDATE %(s)s SET
-            rating = %(t)s.rating,
-            critical = %(t)s.critical
-        FROM %(t)s
-        WHERE %(t)s.ident = %(s)s.ident AND %(t)s.revision = 1
-        """%{'t':temp_tab,'s':tablename},
-        """
-		DROP TABLE IF EXISTS %s
-		"""%(temp_tab)
-        #"""
-		#DROP TABLE IF EXISTS %s
-		#"""%(clust_tab)
+        # """
+        # DROP TABLE IF EXISTS {clust_tab}
+        # """
     )
     try:
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        log('Cost corrected.')
-    except psycopg2.Error as e:
-        log('Error correcting cost:%s'%e)
+        log("Cost corrected.")
+    except psycopg2.Error as err:
+        log(f"Error correcting cost: {err}")
+
 
 def check_tech_zones(conn, cursor, src_tab, tech_zones):
+    """Check if a points in technogen zone."""
     log("Checking tech-zones...")
-    sql_stat = """
-        UPDATE %(s)s
-		SET tech = %(o)s.name
-        FROM %(o)s
-        WHERE ST_Intersects(%(o)s.geog, %(s)s.geog)
-		"""%{'s':src_tab, 'o':tech_zones}
+    sql_stat = f"""
+        UPDATE {src_tab}
+        SET
+            tech = {tech_zones}.name
+        FROM {tech_zones}
+        WHERE
+            ST_Intersects({tech_zones}.geog, {src_tab}.geog)
+        """
     try:
         cursor.execute(sql_stat)
         conn.commit()
-        log('Tech zones checked.')
-    except psycopg2.Error as e:
-        log('Error intersecting points with tech-zones:%s'%e)
+        log("Tech zones checked.")
+    except psycopg2.Error as err:
+        log(f"'Error intersecting points with tech-zones: {err}")
+
 
 def check_vip_zones(conn, cursor, src_tab, vip_zones):
+    """Check if a points in vip-zone."""
     log("Checking vip-zones...")
-    sql_stat = """
-        UPDATE %(s)s
-		SET vip_zone = %(o)s.name
-        FROM %(o)s
-        WHERE ST_Intersects(%(o)s.geog, %(s)s.geog)
-		"""%{'s':src_tab, 'o':vip_zones}
+    sql_stat = f"""
+        UPDATE {src_tab}
+        SET
+            vip_zone = {vip_zones}.name
+        FROM {vip_zones}
+        WHERE
+            ST_Intersects(%(o)s.geog, {src_tab}.geog)
+        """
     try:
         cursor.execute(sql_stat)
         conn.commit()
-        log('Vip zones checked.')
-    except psycopg2.Error as e:
-        log('Error intersecting points with vip-zones:%s'%e)
+        log("Vip zones checked.")
+    except psycopg2.Error as err:
+        log(f"Error intersecting points with vip-zones: {err}")
+
 
 def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
+    """Check if a points in OOPT-zone."""
     log("Checking oopt-zones...")
-    sql_stat = """
-        UPDATE %(s)s
-        SET oopt_id = %(o)s.fid
-        FROM %(o)s
-        WHERE ST_Intersects(%(o)s.geog, %(s)s.geog)
-        """%{'s':src_tab, 'o':oopt_zones}
+    sql_stat = f"""
+        UPDATE {src_tab}
+        SET
+            oopt_id = {oopt_zones}.fid
+        FROM {oopt_zones}
+        WHERE
+            ST_Intersects(%(o)s.geog, {src_tab}.geog)
+        """
     try:
         cursor.execute(sql_stat)
         conn.commit()
-        log('OOPT zones checked.')
-    except psycopg2.Error as e:
-        log('Error intersecting points with oopt-zones:%s'%e)
+        log("OOPT zones checked.")
+    except psycopg2.Error as err:
+        log(f"Error intersecting points with oopt-zones: {err}")
+
 
 def check_oopt_buffers(conn, cursor, src_tab, oopt_buffers):
+    """Check if a points in a OOPT-buffers zone."""
     log("Checking oopt buffers...")
-    sql_stat = """
-        UPDATE %(s)s
-        SET oopt_buf_id = %(o)s.fid
-        FROM %(o)s
-        WHERE ST_Intersects(%(o)s.geog, %(s)s.geog)
-        """%{'s':src_tab, 'o':oopt_buffers}
+    sql_stat = f"""
+        UPDATE {src_tab}
+        SET
+            oopt_buf_id = %(o)s.fid
+        FROM {oopt_buffers}
+        WHERE
+            ST_Intersects({oopt_buffers}.geog, {src_tab}.geog)
+        """
     try:
         cursor.execute(sql_stat)
         conn.commit()
-        log('OOPT buffers checked.')
-    except psycopg2.Error as e:
-        log('Error intersecting points with oopt buffers:%s'%e)
+        log("OOPT buffers checked.")
+    except psycopg2.Error as err:
+        log(f"Error intersecting points with oopt buffers: {err}")
 
-#Копирование данных в общую годичную таблицу
-def copy_to_common_table(conn,cursor,today_tab, year_tab):
+
+def copy_to_common_table(conn, cursor, today_tab, year_tab):
+    """Copy temporary common table to year table."""
     log("Copying data into common table...")
-    ins_string = """
-        INSERT INTO %(y)s (name,acq_date,acq_time,daynight,latitude,longitude,satellite,conf_modis,conf_viirs,brightness,bright_t31,bright_ti4,bright_ti5,scan,track,version,frp,region,rating,critical,revision,peat_id,peat_district,peat_region,peat_area,peat_class,peat_fire,ident,date_time,geog,marker,tech,vip_zone,oopt_id,oopt_buf_id)
+    ins_string = f"""
+        INSERT INTO {year_tab} (name,
+                                acq_date,
+                                acq_time,
+                                daynight,
+                                latitude,
+                                longitude,
+                                satellite,
+                                conf_modis,
+                                conf_viirs,
+                                brightness,
+                                bright_t31,
+                                bright_ti4,
+                                bright_ti5,
+                                scan,
+                                track,
+                                version,
+                                frp,
+                                region,
+                                rating,
+                                critical,
+                                revision,
+                                peat_id,
+                                peat_district,
+                                peat_region,
+                                peat_area,
+                                peat_class,
+                                peat_fire,
+                                ident,
+                                date_time,
+                                geog,
+                                marker,
+                                tech,
+                                vip_zone,
+                                oopt_id,
+                                oopt_buf_id)
             SELECT
                 name,
                 acq_date,
@@ -683,124 +866,101 @@ def copy_to_common_table(conn,cursor,today_tab, year_tab):
                 vip_zone,
                 oopt_id,
                 oopt_buf_id
-            FROM %(t)s
-                WHERE NOT EXISTS(
-					SELECT ident FROM %(y)s
-						WHERE %(t)s.ident = %(y)s.ident)
-    """%{'y':year_tab, 't':today_tab}
+            FROM {today_tab}
+            WHERE NOT EXISTS(
+                SELECT ident FROM {year_tab}
+                WHERE
+                    {today_tab}.ident = {year_tab}.ident)
+    """
     try:
         cursor.execute(ins_string)
         conn.commit()
-        log('Data from %s added to common table %s'%(today_tab, year_tab))
-    except psycopg2.Error as e:
-        log('Error addin points to common table:%s'%e)
+        log(f"Data from {today_tab} added to common table {year_tab}")
+    except psycopg2.Error as err:
+        log(f"Error addin points to common table: {err}")
 
-def drop_today_table(conn,cursor,common_tab):
+
+def drop_today_table(conn, cursor, common_tab):
+    """Drop common today table."""
     log("Dropping today table...")
     try:
-        cursor.execute("DROP TABLE IF EXISTS %s"%(common_tab))
+        cursor.execute(f"DROP TABLE IF EXISTS {common_tab}")
         conn.commit()
         log("Today table dropped.")
-    except psycopg2.Error as e:
-        log('Error dropping today table:%s'%e)
+    except psycopg2.Error as err:
+        log(f"Error dropping today table: {err}")
 
 
-#Задачи
 def get_and_merge_points_job():
+    """Get and merge points main job."""
     currtime = time.localtime()
-    date=time.strftime('%Y-%m-%d',currtime)
+    date = time.strftime("%Y-%m-%d", currtime)
 
-    start_logging('get_and_merge_points.py')
+    start_logging("get_and_merge_points.py")
 
-    # extract db params from config
-    [year_tab,common_tab,tech_zones,vip_zones,oopt_zones,oopt_buffers] = get_config("tables", ["year_tab", "common_tab", "tech_zones", "vip_zones", "oopt_zones","oopt_buffers"])
-    [data_root,firms_folder] = get_config("path", ["data_root", "firms_folder"])
+    [year_tab,
+     common_tab,
+     tech_zones,
+     vip_zones,
+     oopt_zones,
+     oopt_buffers] = get_config("tables", ["year_tab",
+                                           "common_tab",
+                                           "tech_zones",
+                                           "vip_zones",
+                                           "oopt_zones",
+                                           "oopt_buffers"])
+    [data_root, firms_folder] = get_config("path", ["data_root",
+                                                    "firms_folder"])
     [clst_dist] = get_config("clusters", ["cluster_dist"])
     [num_of_src] = get_config("sources", ["num_of_src"])
     [pointsets] = get_config("sources", ["src"])
     [url, chat_id] = get_config("telegramm", ["url", "tst_chat_id"])
-    firms_path = get_path(data_root,firms_folder)
+    firms_path = get_path(data_root, firms_folder)
 
     loaded_set = []
 
-    #connecting to database
     conn, cursor = get_cursor()
 
     for pointset in pointsets:
-        #Получаем точки (скачиваем csv-файлы)
         errcode = GetPoints_with_retries(pointset, firms_path, date)
-        #Удаляем дневные таблицы
         if errcode == 0:
-            drop_today_tables(conn,cursor,pointset)
-            #Загружаем скачанные файлы в БД
-            count = upload_points_to_db(cursor, firms_path, pointset,date)
+            drop_today_tables(conn, cursor, pointset)
+            count = upload_points_to_db(cursor, firms_path, pointset, date)
             if count > 0:
-                #Добавляем поле с геоданными
-                add_geog_field(conn,cursor,pointset)
-                #Выбираем точки на территории России
-                make_tables_for_Russia(conn,cursor,pointset)
+                add_geog_field(conn, cursor, pointset)
+                make_tables_for_Russia(conn, cursor, pointset)
                 loaded_set.append(pointset)
             else:
-                msg = 'Zero-rows file: %s'%pointset
+                msg = f"Zero-rows file: {pointset}"
                 send_to_telegram(url, chat_id, msg)
 
-    #Собираем в единую таблицу
-    loaded = make_common_table(conn,cursor,common_tab,loaded_set)
+    loaded = make_common_table(conn, cursor, common_tab, loaded_set)
 
     if loaded < int(num_of_src):
-        msg = 'Загружены данные из %s таблиц'%loaded
-        #send_to_telegram(url, chat_id, msg)
+        msg = f"Загружены данные из {loaded} таблиц"
+        # send_to_telegram(url, chat_id, msg)
 
-    #Приводим время к виду "чч:мм"
-    correct_time_field(conn,cursor,common_tab)
-
-    #Устанавливаем значение поля date_time "acq_date acq_time"
-    set_datetime_field(conn,cursor,common_tab)
-
-    #Устанавливаем значение поля marker
-    marker = ''
-    set_marker_field(conn,cursor,common_tab,marker)
-
-    #Добавляем поле с уникальным идентификатором "acq_date:acq_time:latitude:longitude:satellite"
-    set_ident_field(conn,cursor,common_tab)
-
-    #Удаляем дубликаты строк
-    del_duplicates(conn,cursor,common_tab)
-
-    #Выделяем точки, попавшие в критичные буферы и пишем оценку
-    cost_point_in_buffers(conn,cursor,common_tab)
-
-    #Добавляем поле name вида [critical] : acq_date : gid
-    set_name_field(conn,cursor,common_tab)
-
-    #Повышаем оценку для групповых точек
-    rise_multipoint_cost(conn,cursor,common_tab,clst_dist)
-
-    #Проверка точек на попадание в слой техногена
+    correct_time_field(conn, cursor, common_tab)
+    set_datetime_field(conn, cursor, common_tab)
+    marker = ""
+    set_marker_field(conn, cursor, common_tab, marker)
+    set_ident_field(conn, cursor, common_tab)
+    del_duplicates(conn, cursor, common_tab)
+    cost_point_in_buffers(conn, cursor, common_tab)
+    set_name_field(conn, cursor, common_tab)
+    rise_multipoint_cost(conn, cursor, common_tab, clst_dist)
     check_tech_zones(conn, cursor, common_tab, tech_zones)
-
-    #Проверка точек на попадание в зоны особого контроля
     check_vip_zones(conn, cursor, common_tab, vip_zones)
-
-    #Проверка точек на попадание в ООПТ
     check_oopt_zones(conn, cursor, common_tab, oopt_zones)
-
-    #Проверка точек на попадание в буферные зоны ООПТ
     check_oopt_buffers(conn, cursor, common_tab, oopt_buffers)
-
-    #Копирование данных в общую годичную таблицу
-    copy_to_common_table(conn,cursor,common_tab, year_tab)
-
-    #Удаляем дневные таблицы
+    copy_to_common_table(conn, cursor, common_tab, year_tab)
     for pointset in pointsets:
-        drop_temp_tables(conn,cursor,pointset)
-
-    #Удаляем сводную таблицу за день
-    drop_today_table(conn,cursor,common_tab)
+        drop_temp_tables(conn, cursor, pointset)
+    drop_today_table(conn, cursor, common_tab)
 
     close_conn(conn, cursor)
-    stop_logging('get_and_merge_points.py')
+    stop_logging("get_and_merge_points.py")
 
-#main
+
 if __name__ == "__main__":
     get_and_merge_points_job()

@@ -1,10 +1,9 @@
 /data/
 /log/
 /bckup/
+/draft/
 /__pycache__/
 /.vscode/
 firealert.ini
 config.py
-test.py
 crontab-_list.txt
-test_ya.py

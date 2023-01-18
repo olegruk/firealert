@@ -1,4 +1,8 @@
 """
+Main firealert robot part.
+
+Started via crontab: '00 04 * * * create_backup.py'
+
 Create daily backup of firealert database.
 
 Created:     10.04.2019
@@ -12,7 +16,8 @@ Created:     10.04.2019
  *                                                                         *
  ***************************************************************************/
 
-Restoring: pg_restore -d newdb db.dump
+Restoring: 'pg_restore -d firealert db.dump' (if one file backup)
+or 'cat firealert.dump | psql -d firealert -U dbuser' (if many volumes)
 """
 
 import os
@@ -28,8 +33,8 @@ def create_today_backup(dbname, dbuser, dst_folder, dst_file):
         log(f"Owerwrite backup {dst_file}...")
     else:
         log(f"Create new backup {dst_file}...")
-    command = f"pg_dump -U {dbuser} -w {dbname} > {dst_file} | \
-                    split -b 250M --filter='gzip'"
+    command = f"pg_dump -U {dbuser} -w {dbname} "\
+              f"| split -b 250M --filter='gzip > ${dst_file}'"
     os.system(command)
     log('Done.')
 
