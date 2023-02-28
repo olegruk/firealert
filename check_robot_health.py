@@ -20,6 +20,7 @@ Created:     24.01.2020
 
 import os
 import time
+import socket
 from mylogger import init_logger
 from faservice import (
     get_config,
@@ -61,21 +62,25 @@ def check_robot_health_job():
 
     count, existlist = is_files_exist(filelist)
     currtime = time.localtime()
+    srv_name = socket.gethostname()
+    # srv_ip = socket.gethostbyname_ex(srv_name)[2]
 
     if count == 0 and currtime.tm_hour == 9:
-        msg = "В Багдаде все спокойно..."
+        msg = f"{srv_name}\nВ Багдаде все спокойно..."
         send_to_telegram(url, chat_id, msg)
     elif count == 1:
-        msg = "Здоровье подорвано! Ошибки в 1 журнале."
+        msg = f"{srv_name}\nЗдоровье подорвано! Ошибки в 1 журнале."
         send_to_telegram(url, chat_id, msg)
     elif count > 1:
-        msg = f"Держаться нету больше сил!.. Ошибки в {str(count)} журналах."
+        msg = f"{srv_name}\n"\
+              f"Держаться нету больше сил!.. Ошибки в {str(count)} журналах."
         send_to_telegram(url, chat_id, msg)
 
     if count > 0:
         subject = "Detected log files with errors"
-        body_text = "In the attachment log files with errors.\r\n"\
-                    "Check and correct current robot algorithms."
+        body_text = f"Host: {srv_name}\n"\
+                    f"In the attachment log files with errors.\r\n"\
+                    f"Check and correct current robot algorithms."
         send_email_with_attachment(mail_addr, subject, body_text, existlist)
         rm_files(existlist)
 

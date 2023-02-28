@@ -292,8 +292,8 @@ def write_to_yadisk(file, from_dir, to_dir, whom):
     try:
         y.upload(in_path, file_path, overwrite=True, timeout=(20.0, 25.0))
         logger.info(f"Written to yadisk {file_path}")
-    except yadisk.exceptions.PathExistsError:
-        logger.error(f"Path not exist {dir_path}.")
+    except yadisk.exceptions.YaDiskError as err:
+        logger.error(f"Error at file uploading: {err}.")
         pass
 
 

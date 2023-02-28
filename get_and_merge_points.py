@@ -261,7 +261,7 @@ def add_geog_field(conn, cursor, pointset):
             SET geog = ST_GeomFromText(
                         'POINT(' || longitude || ' ' || latitude || ')',4326)
         """,
-        """
+        f"""
         CREATE INDEX {src_tab}_idx ON {src_tab} USING GIST (geog)
         """
     )
@@ -745,7 +745,7 @@ def check_vip_zones(conn, cursor, src_tab, vip_zones):
             vip_zone = {vip_zones}.name
         FROM {vip_zones}
         WHERE
-            ST_Intersects(%(o)s.geog, {src_tab}.geog)
+            ST_Intersects({vip_zones}.geog, {src_tab}.geog)
         """
     try:
         cursor.execute(sql_stat)
@@ -764,7 +764,7 @@ def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
             oopt_id = {oopt_zones}.fid
         FROM {oopt_zones}
         WHERE
-            ST_Intersects(%(o)s.geog, {src_tab}.geog)
+            ST_Intersects({oopt_zones}.geog, {src_tab}.geog)
         """
     try:
         cursor.execute(sql_stat)
@@ -780,7 +780,7 @@ def check_oopt_buffers(conn, cursor, src_tab, oopt_buffers):
     sql_stat = f"""
         UPDATE {src_tab}
         SET
-            oopt_buf_id = %(o)s.fid
+            oopt_buf_id = {oopt_buffers}.fid
         FROM {oopt_buffers}
         WHERE
             ST_Intersects({oopt_buffers}.geog, {src_tab}.geog)
