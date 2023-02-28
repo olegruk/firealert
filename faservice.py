@@ -290,7 +290,8 @@ def write_to_yadisk(file, from_dir, to_dir, whom):
     in_path = os.path.join(from_dir, p_sys, file)
     logger.info(f"in_path: {in_path}.")
     try:
-        y.upload(in_path, file_path, overwrite=True, timeout=(20.0, 25.0))
+        y.upload(in_path, file_path, overwrite=True)
+        # y.upload(in_path, file_path, overwrite=True, timeout=(20.0, 25.0))
         logger.info(f"Written to yadisk {file_path}")
     except yadisk.exceptions.YaDiskError as err:
         logger.error(f"Error at file uploading: {err}.")
