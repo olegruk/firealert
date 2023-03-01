@@ -109,7 +109,7 @@ def add_new_email(telegram_id, email):
                             email IS NOT NULL
                             AND telegramm = '{telegram_id}'
                     """)
-    cursor.execute(f"""UPDATE{subs_table}
+    cursor.execute(f"""UPDATE {subs_table}
                        SET email = '{email}'
                        WHERE
                             email IS NULL
@@ -240,7 +240,7 @@ def list_reglist():
     msg = ""
     for elem in reglist[0:-1]:
         msg += f"{str(elem)[2:-3]}\n"
-    return msg
+    return msg, reglist
 
 
 def show_conf(telegram_id):

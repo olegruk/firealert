@@ -642,7 +642,7 @@ def del_email(update: Update, _):
     maillist = subsconf.remove_email(telegram_id, email)
     reply_markup = InlineKeyboardMarkup(em_keyboard)
     update.message.reply_text(
-        text="Список адресов обновлен:\n{maillist}",
+        text=f"Список адресов обновлен:\n{maillist}",
         reply_markup=reply_markup)
     return EMAIL_MENU
 
@@ -664,10 +664,11 @@ def rm_add(update: Update, _) -> None:
     """Add new region for subscriber."""
     query = update.callback_query
     query.answer()
-    reglist = subsconf.list_reglist()
+    msg, reglist = subsconf.list_reglist()
     msg = "0 Вся Россия\n"
     for num, elem in enumerate(reglist[0:-1]):
         msg += f"{str(num+1)} {str(elem)[2:-3]}\n"
+    logger.info(f"Попытка отправить сообщение:\n{msg}")
     query.edit_message_text(
         text=f"Список всех регионов:\n{msg}\n"
              "Укажите номер региона для добавления.\n"
@@ -682,7 +683,7 @@ def add_region1(update: Update, _):
     """
     telegram_id = update.message.from_user.id
     message = update.message.text
-    reglist = subsconf.list_reglist()
+    msg, reglist = subsconf.list_reglist()
     if message == "0":
         region = "Россия"
     else:
@@ -700,7 +701,7 @@ def add_region(update: Update, _):
     """Add a region into subscribers table."""
     telegram_id = update.message.from_user.id
     message = update.message.text
-    reglist = subsconf.list_reglist()
+    msg, reglist = subsconf.list_reglist()
     if message == "0":
         region = "Россия"
     else:
@@ -766,10 +767,10 @@ def rm_list(update: Update, _) -> None:
     """Show full region list."""
     query = update.callback_query
     query.answer()
-    reglist = subsconf.list_reglist()
+    msg, reglist = subsconf.list_reglist()
     reply_markup = InlineKeyboardMarkup(rm_keyboard)
     query.edit_message_text(
-        text=f"Список возможных регионов:\n{reglist}",
+        text=f"Список возможных регионов:\n{msg}",
         reply_markup=reply_markup)
     return REG_MENU
 
@@ -853,7 +854,7 @@ def get_r_period(update: Update, context: CallbackContext):
     """List all regions and ask for number selection."""
     message = update.message.text
     context.user_data["request"] = f" {message}h"
-    reglist = subsconf.list_reglist()
+    msg, reglist = subsconf.list_reglist()
     msg = "0 Вся Россия\n"
     for num, elem in enumerate(reglist[0:-1]):
         msg += f"{str(num+1)} {str(elem)[2:-3]}\n"
@@ -872,7 +873,7 @@ def get_r_reglist(update: Update, context: CallbackContext):
     result_dir = get_path(data_root, temp_folder)
     telegram_id = update.message.from_user.id
     message = update.message.text
-    reglist = subsconf.list_reglist()
+    msg, reglist = subsconf.list_reglist()
     if message == "0":
         final_reglist = "'Россия'"
     elif message == "ЦР":
@@ -1185,9 +1186,9 @@ def manual_show_regions(update: Update, _):
 
 def manual_list_regions(update: Update, _):
     """Show full region list when /list_regions is issued."""
-    reglist = subsconf.list_reglist()
+    msg, reglist = subsconf.list_reglist()
     update.message.reply_text(
-        text=f"Список возможных регионов:\n{reglist}")
+        text=f"Список возможных регионов:\n{msg}")
 
 
 def manual_show_conf(update: Update, _):
