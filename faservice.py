@@ -272,12 +272,12 @@ def write_to_yadisk(file, from_dir, to_dir, whom):
     # is_valid_token = y.check_token()
     # logger.info('Result of token validation: %s.'%(is_valid_token))
     to_dir = to_dir + whom
-    logger.info(f"to_dir: {to_dir}.")
-    logger.info(f"from_dir: {from_dir}.")
+    # logger.info(f"to_dir: {to_dir}.")
+    # logger.info(f"from_dir: {from_dir}.")
     p = from_dir.split(from_dir)[1].strip(os.path.sep)
-    logger.info(f"p: {p}.")
+    # logger.info(f"p: {p}.")
     dir_path = posixpath.join(to_dir, p)
-    logger.info(f"dir_path: {dir_path}.")
+    # logger.info(f"dir_path: {dir_path}.")
     if not y.exists(dir_path):
         try:
             y.mkdir(dir_path)
@@ -285,18 +285,33 @@ def write_to_yadisk(file, from_dir, to_dir, whom):
         except yadisk.exceptions.PathExistsError:
             logger.error(f"Path cannot be created {dir_path}.")
     file_path = posixpath.join(dir_path, file)
-    logger.info(f"file_path: {file_path}.")
+    # logger.info(f"file_path: {file_path}.")
     p_sys = p.replace("/", os.path.sep)
     in_path = os.path.join(from_dir, p_sys, file)
-    logger.info(f"in_path: {in_path}.")
+    # logger.info(f"in_path: {in_path}.")
     try:
-        y.upload(in_path, file_path, overwrite=True)
-        # y.upload(in_path, file_path, overwrite=True, timeout=(20.0, 25.0))
+        # y.upload(in_path, file_path, overwrite=True)
+        y.upload(in_path, file_path, overwrite=True, timeout=(20.0, 100.0))
         logger.info(f"Written to yadisk {file_path}")
     except yadisk.exceptions.YaDiskError as err:
         logger.error(f"Error at file uploading: {err}.")
         pass
 
+
+def remove_folder_from_yadisk(a_dir):
+    """Clear folder "a_dir" on Yandex disk from any files."""
+    logger.info(f"Removing Yandex disk folder {a_dir}...")
+    [yadisk_token] = get_config("yadisk", ["yadisk_token"])
+    y = yadisk.YaDisk(token=yadisk_token)
+    if y.exists(a_dir):
+        try:
+            y.remove(a_dir, permanently=True)
+            logger.info(f"Yandex disk directoy {a_dir} removed.")
+        except yadisk.exceptions.YaDiskError as err:
+            logger.error(f"Error at dir clearing: {err}.")
+            pass
+    else:
+        logger.info(f"Yandex disk directoy {a_dir} not exist.")
 
 def attach_file(msg, filepath):
     """Attach a file to email message."""
