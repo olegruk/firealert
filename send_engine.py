@@ -105,11 +105,12 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
                 {src_tab}.peat_fire,
                 {src_tab}.geog
             FROM {src_tab}
-            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                  AND date_time < TIMESTAMP 'now'
-                  AND {crit_or_peat} >= {limit}
-                  AND region in {reg_list}
-                  AND NOT(
+            WHERE
+                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                AND date_time < TIMESTAMP 'now'
+                AND {crit_or_peat} >= {limit}
+                AND region in {reg_list}
+                AND NOT(
                     (tech IS NOT NULL)
                     AND NOT (
                         {filter_tech}
@@ -122,21 +123,23 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
         UPDATE {src_tab}
             SET
                 whom = whom || '{marker}'
-            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                  AND date_time < TIMESTAMP 'now'
-                  AND {crit_or_peat} >= {limit}
-                  AND region in {reg_list}
-                  AND POSITION('{marker}' in whom) = 0
+            WHERE
+                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                AND date_time < TIMESTAMP 'now'
+                AND {crit_or_peat} >= {limit}
+                AND region in {reg_list}
+                AND POSITION('{marker}' in whom) = 0
         """,
         f"""
-        UPDATE {subs_tab}
+        UPDATE {src_tab}
             SET
                 whom = '{marker}'
-            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                  AND date_time < TIMESTAMP 'now'
-                  AND {crit_or_peat} >= {limit}
-                  AND region in {reg_list}
-                  AND whom is Null
+            WHERE
+                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                AND date_time < TIMESTAMP 'now'
+                AND {crit_or_peat} >= {limit}
+                AND region in {reg_list}
+                AND whom is Null
         """,
         f"""
         UPDATE {subs_tab}
@@ -212,9 +215,10 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
                 {src_tab}.region,
                 {src_tab}.geog
             FROM {src_tab}
-            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                  AND date_time < TIMESTAMP 'now'
-                  AND NOT(
+            WHERE
+                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                AND date_time < TIMESTAMP 'now'
+                AND NOT(
                     (tech IS NOT NULL)
                     AND NOT (
                         {filter_tech}
@@ -226,17 +230,19 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
         UPDATE {src_tab}
             SET
                 whom = whom || '{marker}'
-            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                  AND date_time < TIMESTAMP 'now'
-                  AND POSITION('{marker}' in whom) = 0
+            WHERE
+                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                AND date_time < TIMESTAMP 'now'
+                AND POSITION('{marker}' in whom) = 0
         """,
         f"""
         UPDATE {src_tab}
             SET
                 whom = '{marker}'
-            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                  AND date_time < TIMESTAMP 'now'
-                  AND whom is Null
+            WHERE
+                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                AND date_time < TIMESTAMP 'now'
+                AND whom is Null
         """,
         f"""
         UPDATE {subs_tab}
@@ -319,17 +325,18 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
                 {src_tab}.peat_fire,
                 {src_tab}.geog
             FROM {src_tab}
-            WHERE date_time > TIMESTAMP 'today'
-                  AND {crit_or_peat} >= {limit}
-                  AND region in {reg_list}
-                  AND (
-                      whom is Null
-                      OR POSITION('{marker}' in whom) = 0)
-                  AND NOT(
-                      (tech IS NOT NULL)
-                      AND NOT (
-                          {filter_tech}
-                          AND (tech IS NOT NULL)
+            WHERE
+                date_time > TIMESTAMP 'today'
+                AND {crit_or_peat} >= {limit}
+                AND region in {reg_list}
+                AND (
+                    whom is Null
+                    OR POSITION('{marker}' in whom) = 0)
+                AND NOT(
+                    (tech IS NOT NULL)
+                    AND NOT (
+                        {filter_tech}
+                        AND (tech IS NOT NULL)
                     )
                 )
             ORDER BY {src_tab}.peat_id
@@ -338,19 +345,21 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
         UPDATE {src_tab}
             SET
                 whom = whom || '{marker}'
-            WHERE date_time > TIMESTAMP 'today'
-                  AND {crit_or_peat} >= {limit}
-                  AND region in {reg_list}
-                  AND POSITION('{marker}' in whom) = 0
+            WHERE
+                date_time > TIMESTAMP 'today'
+                AND {crit_or_peat} >= {limit}
+                AND region in {reg_list}
+                AND POSITION('{marker}' in whom) = 0
         """,
         f"""
         UPDATE {src_tab}
             SET
                 whom = '{marker}'
-            WHERE date_time > TIMESTAMP 'today'
-                  AND {crit_or_peat} >= {limit}
-                  AND region in {reg_list}
-                  AND whom is Null
+            WHERE
+                date_time > TIMESTAMP 'today'
+                AND {crit_or_peat} >= {limit}
+                AND region in {reg_list}
+                AND whom is Null
         """,
         f"""
         UPDATE {subs_tab}
@@ -427,32 +436,35 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
                 {src_tab}.region,
                 {src_tab}.geog
             FROM {src_tab}
-            WHERE date_time > TIMESTAMP 'today'
-                  AND (
-                      whom is Null
-                      OR POSITION('{marker}' in whom) = 0
-                  )
-                  AND NOT(
-                      (tech IS NOT NULL)
-                      AND NOT (
-                          {filter_tech}
-                          AND (tech IS NOT NULL)
-                      )
-                  )
+            WHERE
+                date_time > TIMESTAMP 'today'
+                AND (
+                    whom is Null
+                    OR POSITION('{marker}' in whom) = 0
+                )
+                AND NOT(
+                    (tech IS NOT NULL)
+                    AND NOT (
+                        {filter_tech}
+                        AND (tech IS NOT NULL)
+                    )
+                )
         """,
         f"""
         UPDATE {src_tab}
             SET
                 whom = whom || '{marker}'
-            WHERE date_time > TIMESTAMP 'today'
-                  AND POSITION('{marker}' in whom) = 0
+            WHERE
+                date_time > TIMESTAMP 'today'
+                AND POSITION('{marker}' in whom) = 0
         """,
         f"""
         UPDATE {src_tab}
             SET
                 whom = '{marker}'
-            WHERE date_time > TIMESTAMP 'today'
-                  AND whom is Null
+            WHERE
+                date_time > TIMESTAMP 'today'
+                AND whom is Null
         """,
         f"""
         UPDATE {subs_tab}
@@ -531,41 +543,44 @@ def make_subs_oopt_table(conn, cursor, year_tab, oopt_tab, oopt_ids,
                 oopt_id,
                 geog
             FROM {year_tab}
-            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                  AND oopt_id IN ({oopt_ids})
-                  AND (
-                      whom is Null
-                      OR POSITION('{marker}' in whom) = 0
-                  )
-                  AND NOT (
-                      {filter_tech}
-                      AND (tech IS NOT NULL)
-                  )
+            WHERE
+                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                AND oopt_id IN ({oopt_ids})
+                AND (
+                    whom is Null
+                    OR POSITION('{marker}' in whom) = 0
+                )
+                AND NOT (
+                    {filter_tech}
+                    AND (tech IS NOT NULL)
+                )
             ORDER BY oopt_id
         """,
         f"""
         UPDATE {year_tab}
             SET
                 whom = whom || '%(m)s'
-            WHERE date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                  AND oopt_id IN ({oopt_ids})
-                  AND POSITION('{marker}' in whom) = 0
-                  AND NOT (
-                      {filter_tech}
-                      AND (tech IS NOT NULL)
-                  )
+            WHERE
+                date_time > TIMESTAMP 'now' - INTERVAL '{period}'
+                AND oopt_id IN ({oopt_ids})
+                AND POSITION('{marker}' in whom) = 0
+                AND NOT (
+                    {filter_tech}
+                    AND (tech IS NOT NULL)
+                )
         """,
         f"""
         UPDATE {year_tab}
             SET
                 whom = '{marker}'
-            WHERE date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                  AND oopt_id IN ({oopt_ids})
-                  AND whom is Null
-                  AND NOT (
-                      {filter_tech}
-                      AND (tech IS NOT NULL)
-                  )
+            WHERE
+                date_time > TIMESTAMP 'now' - INTERVAL '{period}'
+                AND oopt_id IN ({oopt_ids})
+                AND whom is Null
+                AND NOT (
+                    {filter_tech}
+                    AND (tech IS NOT NULL)
+                )
         """,
         f"""
         ALTER TABLE {subs_tab}

@@ -39,7 +39,7 @@ def create_today_backup(dbname, dbuser, dst_folder, dst_file):
     else:
         logger.info(f"Create new backup {dst_file}...")
     command = f"pg_dump -U {dbuser} -w {dbname} "\
-              f"| split -b 250M --filter='gzip > {dst_file}'"
+              f"| split -b 5M --filter='gzip > {dst_file}'"
     os.system(command)
     logger.info("Done.")
 
