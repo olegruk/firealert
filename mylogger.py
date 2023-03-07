@@ -40,14 +40,14 @@ class TgLoggerHandler(StreamHandler):
         """Send msg to telegram."""
         msg = self.format(record)
         params = {"chat_id": self.chat_id, "text": msg}
-        response = requests.post(self.url + "/sendMessage",
+        response = requests.post(self.url + "sendMessage",
                                  data=params,
                                  timeout=self.timeout)
         if response.status_code != 200:
             raise Exception(f"post_text error: {response.status_code}")
 
 
-def init_logger():
+def init_logger(loglevel="Info"):
     """Actions to prepare for logging."""
     base_path = os.path.dirname(os.path.abspath(__file__))
     result_path = os.path.join(base_path, "log")
@@ -66,7 +66,10 @@ def init_logger():
     logfile = f"{date}_{uname}.log"
     fulllog = os.path.join(result_path, logfile)
     a_logger = logging.getLogger(uname)
-    a_logger.setLevel(logging.INFO)
+    if loglevel == "Debug":
+        a_logger.setLevel(logging.DEBUG)
+    else:
+        a_logger.setLevel(logging.INFO)
     log_handler = logging.FileHandler(fulllog, mode="a")
     # log_formatter = logging.Formatter(
     #     "%(name)s %(asctime)s %(levelname)s %(message)s")

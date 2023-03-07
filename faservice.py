@@ -207,8 +207,8 @@ def send_to_telegram(url, chat, text):
     params = {"chat_id": chat, "text": text}
     response = requests.post(url + "sendMessage", data=params)
     if response.status_code != 200:
-        logger.warning(f"Post_text error: {response.status_code}")
-        logger.warning(f"Text:\n<<{text}>>")
+        logger.error(f"Post_text error: {response.status_code}")
+        logger.error(f"Text:\n<<{text}>>")
         # raise Exception(f"post_text error: {response.status_code}")
     return response
 
@@ -222,7 +222,7 @@ def send_doc_to_telegram(url, chat, file):
                              files=post_file)
     if response.status_code != 200:
         # raise Exception(f"post_text error: {response.status_code}")
-        logger.warning(f"post_text error: {response.status_code}")
+        logger.error(f"post_text error: {response.status_code}")
     return response
 
 
