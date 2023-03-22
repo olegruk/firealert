@@ -792,6 +792,53 @@ def check_oopt_buffers(conn, cursor, src_tab, oopt_buffers):
     except psycopg2.Error as err:
         logger.error(f"Error intersecting points with oopt buffers: {err}")
 
+def check_control_zones(conn, cursor, src_tab, control_zones):
+    """Check if a points in controled zones."""
+    logger.info("Checking control zones...")
+    ass_tab = "zones_assign"
+    statements = (
+        f"""
+        DROP TABLE IF EXISTS {ass_tab}
+        """,
+        f"""
+        CREATE TABLE {ass_tab} (
+                gid INTEGER,
+                zone_id BIGINT,
+                category VARCHAR(100),
+                peat_id VARCHAR(254),
+                tech_id VARCHAR(254),
+                vip_zone_id VARCHAR(254),
+                oopt_id INTEGER,
+                oopt_buf_id INTEGER
+                )
+        """,
+        f"""
+        UPDATE {ass_tab}
+            SET
+                gid = {src_tab}.gid,
+                zone_id = {control_zones}.fid,
+                category = {control_zones}.category
+            FROM {control_zones},{src_tab}
+            WHERE
+                ST_Intersects({control_zones}.geog, {src_tab}.geog)
+        """,
+        f"""
+        UPDATE {ass_tab}
+            SET 
+                peat_id = COALESCE(NULLIF('торфяник', category), zone_id) 
+                tech_id = COALESCE(NULLIF('техноген', category), zone_id) 
+                vip_zone_id = COALESCE(NULLIF('охранная зона', category), zone_id) 
+                oopt_id = COALESCE(NULLIF('ООПТ', category), zone_id)
+                oopt_buf_id = COALESCE(NULLIF('буфер', category), zone_id)
+        """
+    )
+    try:
+        for sql_stat in statements:
+            cursor.execute(sql_stat)
+            conn.commit()
+        logger.info("Control zones checked.")
+    except psycopg2.Error as err:
+        logger.error(f"Error checking control zones: {err}")
 
 def copy_to_common_table(conn, cursor, today_tab, year_tab):
     """Copy temporary common table to year table."""
