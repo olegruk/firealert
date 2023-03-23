@@ -444,7 +444,9 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
             elif pointset in ["as_viirs", "eu_viirs", "as_vnoaa", "eu_vnoaa"]:
                 cursor.execute(ins_from_viirs)
             conn.commit()
-            logger.info(f"The data added: {src_tab}")
+            cursor.execute(f"SELECT count(*) FROM {dst_tab}")
+            points_count = cursor.fetchone()[0]
+            logger.info(f"The {points_count} rows of data added: {src_tab}")
         except psycopg2.Error as err:
             logger.error(f"Error adding data: {err}")
 
@@ -808,8 +810,8 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
                 peat_id VARCHAR(254),
                 tech_id VARCHAR(254),
                 vip_zone_id VARCHAR(254),
-                oopt_id INTEGER,
-                oopt_buf_id INTEGER
+                oopt_id BIGINT,
+                oopt_buf_id BIGINT
                 )
         """,
         f"""
@@ -825,11 +827,23 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         f"""
         UPDATE {ass_tab}
             SET 
-                peat_id = COALESCE(NULLIF('торфяник', category), zone_id) 
-                tech_id = COALESCE(NULLIF('техноген', category), zone_id) 
-                vip_zone_id = COALESCE(NULLIF('охранная зона', category), zone_id) 
-                oopt_id = COALESCE(NULLIF('ООПТ', category), zone_id)
-                oopt_buf_id = COALESCE(NULLIF('буфер', category), zone_id)
+                peat_id = COALESCE(NULLIF('торфяник', category), to_char(zone_id, 'FM99999')),
+                tech_id = COALESCE(NULLIF('техноген', category), to_char(zone_id, 'FM99999')),
+                vip_zone_id = COALESCE(NULLIF('охранная зона', category), to_char(zone_id, 'FM99999')), 
+                oopt_id = to_number(COALESCE(NULLIF('ООПТ', category), to_char(zone_id, 'FM99999')), 'FM99999'),
+                oopt_buf_id = to_number(COALESCE(NULLIF('буфер', category), to_char(zone_id, 'FM99999')), 'FM99999')
+        """,
+        f"""
+        UPDATE {src_tab}
+            SET
+                peat_id = COALESCE(NULLIF({ass_tab}.peat_id, ''), to_char(zone_id, 'FM99999')),
+                tech_id = COALESCE(NULLIF('техноген', category), to_char(zone_id, 'FM99999')),
+                vip_zone_id = COALESCE(NULLIF('охранная зона', category), to_char(zone_id, 'FM99999')), 
+                oopt_id = to_number(COALESCE(NULLIF('ООПТ', category), to_char(zone_id, 'FM99999')), 'FM99999'),
+                oopt_buf_id = to_number(COALESCE(NULLIF('буфер', category), to_char(zone_id, 'FM99999')), 'FM99999')
+            FROM {ass_tab}
+            WHERE
+                {src_tab}.gid = {ass_tab.gid}
         """
     )
     try:
@@ -1002,6 +1016,7 @@ def get_and_merge_points_job():
     check_vip_zones(conn, cursor, common_tab, vip_zones)
     check_oopt_zones(conn, cursor, common_tab, oopt_zones)
     check_oopt_buffers(conn, cursor, common_tab, oopt_buffers)
+    check_control_zones(conn, cursor, common_tab, 'control_zones')
     copy_to_common_table(conn, cursor, common_tab, year_tab)
     for pointset in pointsets:
         drop_temp_tables(conn, cursor, pointset)
