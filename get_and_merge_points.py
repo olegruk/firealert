@@ -541,6 +541,7 @@ def set_name_field(conn, cursor, tablename):
         conn.commit()
         logger.info("A Name field setted.")
     except psycopg2.Error as err:
+        conn.rollback()
         logger.error(f"Error setting points name: {err}")
 
 
@@ -567,6 +568,7 @@ def set_ident_field(conn, cursor, tablename):
         conn.commit()
         logger.info("A Ident field setted.")
     except psycopg2.Error as err:
+        conn.rollback()
         logger.error(f"Error creating ident fields: {err}")
 
 
@@ -615,6 +617,7 @@ def set_marker_field(conn, cursor, tablename, marker):
         conn.commit()
         logger.info("Marker field setted.")
     except psycopg2.Error as err:
+        conn.rollback()
         logger.error(f"Error creating marker: {err}")
 
 
@@ -716,6 +719,7 @@ def rise_multipoint_cost(conn, cursor, tablename, distance):
             conn.commit()
         logger.info("Cost corrected.")
     except psycopg2.Error as err:
+        conn.rollback()
         logger.error(f"Error correcting cost: {err}")
 
 
@@ -735,6 +739,7 @@ def check_tech_zones(conn, cursor, src_tab, tech_zones):
         conn.commit()
         logger.info("Tech zones checked.")
     except psycopg2.Error as err:
+        conn.rollback()
         logger.error(f"'Error intersecting points with tech-zones: {err}")
 
 
@@ -754,6 +759,7 @@ def check_vip_zones(conn, cursor, src_tab, vip_zones):
         conn.commit()
         logger.info("Vip zones checked.")
     except psycopg2.Error as err:
+        conn.rollback()
         logger.error(f"Error intersecting points with vip-zones: {err}")
 
 
@@ -773,6 +779,7 @@ def check_oopt_zones(conn, cursor, src_tab, oopt_zones):
         conn.commit()
         logger.info("OOPT zones checked.")
     except psycopg2.Error as err:
+        conn.rollback()
         logger.error(f"Error intersecting points with oopt-zones: {err}")
 
 
@@ -792,6 +799,7 @@ def check_oopt_buffers(conn, cursor, src_tab, oopt_buffers):
         conn.commit()
         logger.info("OOPT buffers checked.")
     except psycopg2.Error as err:
+        conn.rollback()
         logger.error(f"Error intersecting points with oopt buffers: {err}")
 
 def check_control_zones(conn, cursor, src_tab, control_zones):
@@ -815,43 +823,70 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
                 )
         """,
         f"""
-        UPDATE {ass_tab}
-            SET
-                gid = {src_tab}.gid,
-                zone_id = {control_zones}.fid,
-                category = {control_zones}.category
+        INSERT INTO {ass_tab} (gid,
+                               zone_id,
+                               category)
+            SELECT
+                {src_tab}.gid AS gid,
+                {control_zones}.fid AS zone_id,
+                {control_zones}.category AS category
             FROM {control_zones},{src_tab}
             WHERE
                 ST_Intersects({control_zones}.geog, {src_tab}.geog)
         """,
         f"""
         UPDATE {ass_tab}
-            SET 
-                peat_id = COALESCE(NULLIF('торфяник', category), to_char(zone_id, 'FM99999')),
-                tech_id = COALESCE(NULLIF('техноген', category), to_char(zone_id, 'FM99999')),
-                vip_zone_id = COALESCE(NULLIF('охранная зона', category), to_char(zone_id, 'FM99999')), 
-                oopt_id = to_number(COALESCE(NULLIF('ООПТ', category), to_char(zone_id, 'FM99999')), 'FM99999'),
-                oopt_buf_id = to_number(COALESCE(NULLIF('буфер', category), to_char(zone_id, 'FM99999')), 'FM99999')
+	        SET peat_id = to_char(zone_id, 'FM99999')
+	        WHERE category = 'торфяник';
+        """,
+        f"""
+        UPDATE {ass_tab}
+        	SET tech_id = to_char(zone_id, 'FM99999')
+	        WHERE category = 'техноген';
+        """,
+        f"""
+        UPDATE {ass_tab}
+	        SET vip_zone_id = to_char(zone_id, 'FM99999')
+	        WHERE category = 'охранная зона';
+        """,
+        f"""
+        UPDATE {ass_tab}
+	        SET oopt_id = zone_id
+	        WHERE category = 'ООПТ';
+        """,
+        f"""
+        UPDATE {ass_tab}
+	        SET oopt_buf_id = zone_id
+	        WHERE category = 'буфер';
+        """,
+        f"""
+        UPDATE {ass_tab}
+	        SET vip_zone_id = to_char(zone_id, 'FM99999')
+	        WHERE category = 'зона мониторинга';
         """,
         f"""
         UPDATE {src_tab}
             SET
-                peat_id = COALESCE(NULLIF({ass_tab}.peat_id, ''), to_char(zone_id, 'FM99999')),
-                tech_id = COALESCE(NULLIF('техноген', category), to_char(zone_id, 'FM99999')),
-                vip_zone_id = COALESCE(NULLIF('охранная зона', category), to_char(zone_id, 'FM99999')), 
-                oopt_id = to_number(COALESCE(NULLIF('ООПТ', category), to_char(zone_id, 'FM99999')), 'FM99999'),
-                oopt_buf_id = to_number(COALESCE(NULLIF('буфер', category), to_char(zone_id, 'FM99999')), 'FM99999')
+                tech = COALESCE(NULLIF({src_tab}.tech, ''),
+                                {ass_tab}.tech_id),
+                vip_zone = COALESCE(NULLIF({src_tab}.vip_zone, ''),
+                                    {ass_tab}.vip_zone_id),
+                oopt_id = {ass_tab}.oopt_id,
+                oopt_buf_id = {ass_tab}.oopt_buf_id
             FROM {ass_tab}
             WHERE
-                {src_tab}.gid = {ass_tab.gid}
+                {src_tab}.gid = {ass_tab}.gid
         """
     )
     try:
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
-        logger.info("Control zones checked.")
+        cursor.execute(f"SELECT count(*) FROM {ass_tab}")
+        points_count = cursor.fetchone()[0]
+        logger.info("Control zones checked. {points_count} points detected.")
     except psycopg2.Error as err:
+        conn.rollback()
         logger.error(f"Error checking control zones: {err}")
 
 def copy_to_common_table(conn, cursor, today_tab, year_tab):
@@ -950,6 +985,7 @@ def drop_today_table(conn, cursor, common_tab):
         conn.commit()
         logger.info("Today table dropped.")
     except psycopg2.Error as err:
+        conn.rollback()
         logger.error(f"Error dropping today table: {err}")
 
 
@@ -1014,8 +1050,8 @@ def get_and_merge_points_job():
     rise_multipoint_cost(conn, cursor, common_tab, clst_dist)
     check_tech_zones(conn, cursor, common_tab, tech_zones)
     check_vip_zones(conn, cursor, common_tab, vip_zones)
-    check_oopt_zones(conn, cursor, common_tab, oopt_zones)
-    check_oopt_buffers(conn, cursor, common_tab, oopt_buffers)
+    # check_oopt_zones(conn, cursor, common_tab, oopt_zones)
+    # check_oopt_buffers(conn, cursor, common_tab, oopt_buffers)
     check_control_zones(conn, cursor, common_tab, 'control_zones')
     copy_to_common_table(conn, cursor, common_tab, year_tab)
     for pointset in pointsets:
