@@ -700,7 +700,7 @@ def get_oopt_for_ids(oopt_ids):
     logger.info("Making OOPT list for ids...")
     [oopt_zones] = get_config("tables", ["oopt_zones"])
     conn, cursor = get_cursor()
-    cursor.execute(f"""SELECT fid, region, name
+    cursor.execute(f"""SELECT id, region, name
                      FROM {oopt_zones}
                      WHERE fid IN ({oopt_ids})""")
     oopt_list = cursor.fetchall()
@@ -712,9 +712,24 @@ def get_oopt_ids_for_region(reglist):
     logger.info("Making OOPT ids list for regions...")
     [oopt_zones] = get_config("tables", ["oopt_zones"])
     conn, cursor = get_cursor()
-    cursor.execute(f"""SELECT fid
+    cursor.execute(f"""SELECT id
                        FROM {oopt_zones}
                        WHERE region IN ({reglist})""")
+    oopt_ids = cursor.fetchall()
+    oopt_lst = ""
+    for elem in oopt_ids:
+        oopt_lst += f"{str(elem[0])},"
+    oopt_lst = oopt_lst[0:-1]
+    return oopt_lst
+
+def get_oopt_ids_for_ecoregion(reglist):
+    """Generate a list of oopt ids for ecoregions in reglist."""
+    logger.info("Making OOPT ids list for ecoregions...")
+    [oopt_zones] = get_config("tables", ["oopt_zones"])
+    conn, cursor = get_cursor()
+    cursor.execute(f"""SELECT id
+                       FROM {oopt_zones}
+                       WHERE ecoregion IN ({reglist})""")
     oopt_ids = cursor.fetchall()
     oopt_lst = ""
     for elem in oopt_ids:

@@ -389,7 +389,15 @@ def echo(update: Update, _):
         telegram_id = chat.id
         logger.info(f"User with id {telegram_id} send message {text}")
     except AttributeError as err:
-        logger.warning(f"Cannot get chat.id. Error {err}")
+        logger.warning(f"Cannot get chat.id from message. Error {err}")
+    try:
+        #user = update.message.from_user
+        chat = update.edited_message.chat
+        text = update.edited_message.text
+        telegram_id = chat.id
+        logger.info(f"User with id {telegram_id} send message {text}")
+    except AttributeError as err:
+        logger.warning(f"Cannot get chat.id from ed-message. Error {err}")
     try:
         chat = update.message.forward_from_chat
         chat_id = chat.id
@@ -401,8 +409,9 @@ def echo(update: Update, _):
         if re.search(r'/init', cmd):
             update.message.reply_text(
                 text=f"Канал с Id {chat_id} включен в список подписчиков.")
+            logger.info(f"Echo: Канал {chat_id} включен в список подписчиков.")
     except AttributeError as err:
-        logger.info(f"Cannot get forwarded chat.id. Error {err}")
+        logger.info(f"Cannot get forwarded chat.id from message. Error {err}")
     # logger.info(f"Message returned: {update.message}")
 
 
@@ -425,17 +434,19 @@ def init(update: Update, _):
         logger.info(f"User with id {telegram_id} forward message "
                     f"from channel with id {chat_id}.")
     except AttributeError as err:
-        logger.error(f"Attribute error: {err}")
+        logger.warning(f"Attribute error: {err}")
     if chat_id != 0:
         subsconf.add_tlg_user(chat_id)
         update.message.reply_text(
             text=f"Канал с Id {chat_id} включен в список подписчиков.",
             reply_markup=reply_kb_markup)
+        logger.info(f"Init: Канал с Id {chat_id} включен в список подписчиков.")
     else:
         subsconf.add_tlg_user(telegram_id)
         update.message.reply_text(
             text=f"Чат с Id {telegram_id} включен в список подписчиков.",
             reply_markup=reply_kb_markup)
+        logger.info(f"Чат с Id {telegram_id} включен в список подписчиков.")
     update.message.reply_text(
         text="Если ничего не понятно, скажите '/help'.",
         reply_markup=reply_kb_markup)
@@ -751,6 +762,7 @@ def add_region(update: Update, _):
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     message = update.message.text
+    final_reglist = []
     msg, reglist = subsconf.list_reglist()
     if message == "0":
         region = "Россия"

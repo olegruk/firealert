@@ -40,6 +40,7 @@ from requester import (
     make_zone_stat_msg,
     make_smf_stat_msg,
     get_oopt_ids_for_region,
+    get_oopt_ids_for_ecoregion,
     new_alerts)
 from mylogger import init_logger
 
@@ -621,7 +622,12 @@ def make_subs_oopt_table(conn, cursor, year_tab, oopt_tab, oopt_ids,
                             count(*)
                      FROM {subs_tab}
                      GROUP BY oopt_id, region, oopt""")
-    return cursor.fetchall()
+    oopt_tab = cursor.fetchall()
+    cursor.execute(f"""SELECT
+                            ST_Extent(geog) AS table_extent 
+                     FROM {subs_tab}""")
+    oopt_extent = cursor.fetchone()
+    return oopt_tab, oopt_extent
 
 
 def drop_whom_table(conn, cursor, whom):
@@ -928,14 +934,17 @@ def send_to_subscribers_job():
                 and (now_hour in sendtimelist)
                 and ((subs.oopt_zones is not None)
                      or (subs.oopt_regions is not None)
+                     or (subs.oopt_ecoregions is not None)
                      )):
             logger.info(f"Checking oopt stat for {str(subs.subs_name)}...")
             if subs.oopt_zones is not None:
                 oopt_ids = subs.oopt_zones
             elif subs.oopt_regions is not None:
                 oopt_ids = get_oopt_ids_for_region(subs.oopt_regions)
+            elif subs.oopt_ecoregions is not None:
+                oopt_ids = get_oopt_ids_for_ecoregion(subs.oopt_ecoregions)
             logger.info("Sending OOPT points now!")
-            stat = make_subs_oopt_table(conn,
+            stat, extent = make_subs_oopt_table(conn,
                                         cursor,
                                         year_tab,
                                         oopt_tab,
@@ -953,6 +962,7 @@ def send_to_subscribers_job():
                     # Статистика без индексов ООПТ
                     msg += f"\r\n{st_str[1]} - {st_str[2]}: {st_str[3]}"
                     full_cnt += st_str[3]
+                msg += f"\nExtent: {extent}"
                 send_to_telegram(url, subs.telegramm, msg)
                 if ((subs.email_point and subs.email is not None)
                         or (subs.teleg_point and subs.telegramm is not None)):
