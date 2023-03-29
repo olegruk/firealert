@@ -20,6 +20,7 @@ Created:     13.05.2020
 
 import os
 import time
+import psycopg2
 from faservice import (
     get_config,
     get_tuple_cursor,
@@ -560,7 +561,7 @@ def make_subs_oopt_table(conn, cursor, year_tab, oopt_tab, oopt_ids,
         f"""
         UPDATE {year_tab}
             SET
-                whom = whom || '%(m)s'
+                whom = whom || '{marker}'
             WHERE
                 date_time > TIMESTAMP 'now' - INTERVAL '{period}'
                 AND oopt_id IN ({oopt_ids})
@@ -593,7 +594,7 @@ def make_subs_oopt_table(conn, cursor, year_tab, oopt_tab, oopt_ids,
                 oopt = {oopt_tab}.name
             FROM {oopt_tab}
             WHERE
-                {subs_tab}.oopt_id = {oopt_tab}.fid
+                {subs_tab}.oopt_id = {oopt_tab}.id
         """,
         f"""
         UPDATE {subs_tab}
@@ -624,8 +625,12 @@ def make_subs_oopt_table(conn, cursor, year_tab, oopt_tab, oopt_ids,
                      GROUP BY oopt_id, region, oopt""")
     oopt_tab = cursor.fetchall()
     cursor.execute(f"""SELECT
-                            ST_Extent(geog) AS table_extent 
-                     FROM {subs_tab}""")
+                            ST_XMax(ST_Extent(geog::geometry)) as x_max,
+                            ST_YMax(ST_Extent(geog::geometry)) as y_max,
+                            ST_XMin(ST_Extent(geog::geometry)) as x_min,
+                            ST_YMin(ST_Extent(geog::geometry)) as y_min,
+                            ST_Extent(geog::geometry) AS subs_extent
+                       FROM {subs_tab}""")
     oopt_extent = cursor.fetchone()
     return oopt_tab, oopt_extent
 
@@ -944,6 +949,7 @@ def send_to_subscribers_job():
             elif subs.oopt_ecoregions is not None:
                 oopt_ids = get_oopt_ids_for_ecoregion(subs.oopt_ecoregions)
             logger.info("Sending OOPT points now!")
+            # stat = make_subs_oopt_table(conn,
             stat, extent = make_subs_oopt_table(conn,
                                         cursor,
                                         year_tab,
@@ -962,6 +968,10 @@ def send_to_subscribers_job():
                     # Статистика без индексов ООПТ
                     msg += f"\r\n{st_str[1]} - {st_str[2]}: {st_str[3]}"
                     full_cnt += st_str[3]
+                msg += f"\nx_max: {extent[0]}"
+                msg += f"\ny_max: {extent[1]}"
+                msg += f"\nx_min: {extent[2]}"
+                msg += f"\ny_min: {extent[3]}"
                 msg += f"\nExtent: {extent}"
                 send_to_telegram(url, subs.telegramm, msg)
                 if ((subs.email_point and subs.email is not None)
