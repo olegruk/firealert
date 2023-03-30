@@ -218,7 +218,8 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
                 {src_tab}.geog
             FROM {src_tab}
             WHERE
-                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                country = 'Россия'
+                AND date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
                 AND date_time < TIMESTAMP 'now'
                 AND NOT(
                     (tech IS NOT NULL)
@@ -233,7 +234,8 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
             SET
                 whom = whom || '{marker}'
             WHERE
-                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                country = 'Россия'
+                AND date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
                 AND date_time < TIMESTAMP 'now'
                 AND POSITION('{marker}' in whom) = 0
         """,
@@ -242,7 +244,8 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
             SET
                 whom = '{marker}'
             WHERE
-                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                country = 'Россия'
+                AND date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
                 AND date_time < TIMESTAMP 'now'
                 AND whom is Null
         """,
@@ -439,7 +442,8 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
                 {src_tab}.geog
             FROM {src_tab}
             WHERE
-                date_time > TIMESTAMP 'today'
+                country = 'Россия'
+                AND date_time > TIMESTAMP 'today'
                 AND (
                     whom is Null
                     OR POSITION('{marker}' in whom) = 0
@@ -457,7 +461,8 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
             SET
                 whom = whom || '{marker}'
             WHERE
-                date_time > TIMESTAMP 'today'
+                country = 'Россия'
+                AND date_time > TIMESTAMP 'today'
                 AND POSITION('{marker}' in whom) = 0
         """,
         f"""
@@ -465,7 +470,8 @@ def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
             SET
                 whom = '{marker}'
             WHERE
-                date_time > TIMESTAMP 'today'
+                country = 'Россия'
+                AND date_time > TIMESTAMP 'today'
                 AND whom is Null
         """,
         f"""

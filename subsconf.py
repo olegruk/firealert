@@ -233,7 +233,7 @@ def list_reglist():
     """Return full list of regions."""
     conn, cursor = get_cursor()
     cursor.execute("""SELECT DISTINCT ON (region) region
-                      FROM reg_russia
+                      FROM monitored_area
                     """)
     reglist = cursor.fetchall()
     close_conn(conn, cursor)

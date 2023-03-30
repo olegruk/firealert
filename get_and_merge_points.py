@@ -274,19 +274,19 @@ def add_geog_field(conn, cursor, pointset):
         logger.error(f"Error adding geometry: {err}")
 
 
-def make_tables_for_Russia(conn, cursor, pointset):
-    """Make firepoints subset for Russia."""
-    logger.info(f"Making table for Russia for {pointset}...")
+def make_tables_for_mon_area(conn, cursor, pointset):
+    """Make firepoints subset for monitored area."""
+    logger.info(f"Making table for monitored area for {pointset}...")
     src_tab = f"{pointset}_today"
     dst_tab = f"{pointset}_today_ru"
-    [outline] = get_config("regions", ["reg_russia"])
+    [outline] = get_config("regions", ["monitored_area"])
     statements = (
         f"""
         DROP TABLE IF EXISTS {dst_tab}
         """,
         f"""
         CREATE TABLE {dst_tab} AS
-            SELECT {src_tab}.*, {outline}.region
+            SELECT {src_tab}.*, {outline}.region, {outline}.country
             FROM {src_tab}, {outline}
             WHERE
                 ST_Intersects({outline}.geog, {src_tab}.geog)
@@ -346,7 +346,8 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                 vip_zone VARCHAR(254),
                 oopt VARCHAR(254),
                 oopt_id INTEGER,
-                oopt_buf_id INTEGER
+                oopt_buf_id INTEGER,
+                country VARCHAR(50)
         )
         """
     )
@@ -383,6 +384,7 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                                    version,
                                    frp,
                                    region,
+                                   country,
                                    geog)
                 SELECT
                     {src_tab}.acq_date,
@@ -399,6 +401,7 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                     {src_tab}.version,
                     {src_tab}.frp,
                     {src_tab}.region,
+                    {src_tab}.country,
                     {src_tab}.geog
                 FROM {src_tab}
         """
@@ -418,6 +421,7 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                                version,
                                frp,
                                region,
+                               country,
                                geog)
                 SELECT
                     {src_tab}.acq_date,
@@ -434,6 +438,7 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                     {src_tab}.version,
                     {src_tab}.frp,
                     {src_tab}.region,
+                    {src_tab}.country,
                     {src_tab}.geog
                 FROM {src_tab}
         """
@@ -828,7 +833,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
                                category)
             SELECT
                 {src_tab}.gid AS gid,
-                {control_zones}.fid AS zone_id,
+                {control_zones}.id AS zone_id,
                 {control_zones}.category AS category
             FROM {control_zones},{src_tab}
             WHERE
@@ -927,7 +932,8 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                                 tech,
                                 vip_zone,
                                 oopt_id,
-                                oopt_buf_id)
+                                oopt_buf_id,
+                                country)
             SELECT
                 name,
                 acq_date,
@@ -962,7 +968,8 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                 tech,
                 vip_zone,
                 oopt_id,
-                oopt_buf_id
+                oopt_buf_id,
+                country
             FROM {today_tab}
             WHERE NOT EXISTS(
                 SELECT ident FROM {year_tab}
@@ -1027,7 +1034,7 @@ def get_and_merge_points_job():
             count = upload_points_to_db(cursor, firms_path, pointset, date)
             if count > 0:
                 add_geog_field(conn, cursor, pointset)
-                make_tables_for_Russia(conn, cursor, pointset)
+                make_tables_for_mon_area(conn, cursor, pointset)
                 loaded_set.append(pointset)
             else:
                 msg = f"Zero-rows file: {pointset}"

@@ -171,7 +171,8 @@ def make_reqst_table(conn, cursor, src_tab, crit_or_peat, limit,
             FROM
                 {src_tab}
             WHERE
-                date_time > TIMESTAMP '{from_time}' - INTERVAL '{period}'
+                country = 'Россия'
+                AND date_time > TIMESTAMP '{from_time}' - INTERVAL '{period}'
                 AND "date_time" <= TIMESTAMP '{from_time}'
         """,
         f"""
