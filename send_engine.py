@@ -968,11 +968,17 @@ def send_to_subscribers_job():
                     # Статистика без индексов ООПТ
                     msg += f"\r\n{st_str[1]} - {st_str[2]}: {st_str[3]}"
                     full_cnt += st_str[3]
-                msg += f"\nx_max: {extent[0]}"
-                msg += f"\ny_max: {extent[1]}"
-                msg += f"\nx_min: {extent[2]}"
-                msg += f"\ny_min: {extent[3]}"
-                msg += f"\nExtent: {extent}"
+                # msg += f"\nx_max: {extent[0]}"
+                # msg += f"\ny_max: {extent[1]}"
+                # msg += f"\nx_min: {extent[2]}"
+                # msg += f"\ny_min: {extent[3]}"
+                # msg += f"\nExtent: {extent}"
+                # msg += f"\n\nhttps://maps.wwf.ru/portal/home/webmap/viewer.html?webmap=8bf1c429e6d54f7a892a65173abb6427&extent={x_min},{y_min},{x_max},{y_max}"
+                x_max = extent[0]
+                y_max = extent[1]
+                x_min = extent[2]
+                y_min = extent[3]
+                msg += f"\n\n<a href='https://maps.wwf.ru/portal/apps/webappviewer/index.html?id=b1d52f160ac54c3faefd4592da4cf8ba&extent={x_min},{y_min},{x_max},{y_max}'>Пойду-ка, посмотрю-ка...</a>"
                 send_to_telegram(url, subs.telegramm, msg)
                 if ((subs.email_point and subs.email is not None)
                         or (subs.teleg_point and subs.telegramm is not None)):

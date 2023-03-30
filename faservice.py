@@ -204,7 +204,7 @@ def close_conn(conn, cursor):
 
 def send_to_telegram(url, chat, text):
     """Send a simple message to telegram."""
-    params = {"chat_id": chat, "text": text}
+    params = {"chat_id": chat, "text": text, "parse_mode": 'HTML'}
     response = requests.post(url + "sendMessage", data=params)
     if response.status_code != 200:
         logger.error(f"Post_text error: {response.status_code}")
