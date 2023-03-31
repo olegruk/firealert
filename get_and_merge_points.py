@@ -646,7 +646,10 @@ def del_duplicates(conn, cursor, tablename):
         for sql_stat in statements:
             cursor.execute(sql_stat)
             conn.commit()
+        cursor.execute(f"SELECT count(*) FROM {tablename}")
+        points_count = cursor.fetchone()[0]
         logger.info(f"The duplicates deleted in {tablename}")
+        logger.info(f"Final count of rows in {tablename}: {points_count}.")
     except psycopg2.Error as err:
         logger.error(f"Error deleting duplicates: {err}")
 

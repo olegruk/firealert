@@ -37,7 +37,7 @@ from faservice import (
     send_to_telegram,
     points_tail)
 from requester import (
-    make_tlg_stat_msg,
+    make_tlg_peat_stat_msg,
     make_zone_stat_msg,
     make_smf_stat_msg,
     get_oopt_ids_for_region,
@@ -827,10 +827,12 @@ def send_to_subscribers_job():
     result_dir = get_path(data_root, temp_folder)
 
     for subs in subscribers:
-        if subs.subs_name is None:
+        if (subs.subs_name is None
+                or subs.subs_name == ''):
             set_name(conn, cursor, subs_tab, subs.subs_id)
         logger.info(f"Processing for {subs.subs_name}...")
-        if subs.send_times is None:
+        if (subs.send_times is None
+                or subs.send_times == ''):
             sendtimelist = fill_send_times(conn,
                                            cursor,
                                            subs_tab,
@@ -844,11 +846,15 @@ def send_to_subscribers_job():
         if (now_hour in sendtimelist
                 and (
                     subs.regions is not None
-                    and subs.regions != ""
+                    and subs.regions != ''
                 )
                 and (
-                    (subs.email_point and subs.email is not None)
-                    or (subs.teleg_point and subs.telegramm is not None)
+                    (subs.email_point
+                        and subs.email is not None
+                        and subs.email != '')
+                    or (subs.teleg_point
+                            and subs.telegramm is not None
+                            and subs.telegramm != '')
                 )):
             logger.info("Sending points now!")
             iteration = sendtimelist.index(now_hour)
@@ -899,7 +905,9 @@ def send_to_subscribers_job():
 
                 logger.info("Creating kml file...")
                 write_to_kml(dst_file, subs.subs_id)
-                if subs.email_point and subs.email is not None:
+                if (subs.email_point
+                        and subs.email is not None
+                        and subs.email != ''):
                     logger.info("Creating maillist...")
                     maillist = subs.email.replace(" ", "").split(",")
                     subject, body_text = make_mail_attr(date,
@@ -943,16 +951,22 @@ def send_to_subscribers_job():
 
         if (subs.check_oopt
                 and (now_hour in sendtimelist)
-                and ((subs.oopt_zones is not None)
-                     or (subs.oopt_regions is not None)
-                     or (subs.oopt_ecoregions is not None)
+                and ((subs.oopt_zones is not None
+                        and subs.oopt_zones != '')
+                     or (subs.oopt_regions is not None
+                        and subs.oopt_regions != '')
+                     or (subs.oopt_ecoregions is not None
+                        and subs.oopt_ecoregions != '')
                      )):
             logger.info(f"Checking oopt stat for {str(subs.subs_name)}...")
-            if subs.oopt_zones is not None:
+            if (subs.oopt_zones is not None
+                    and subs.oopt_zones != ''):
                 oopt_ids = subs.oopt_zones
-            elif subs.oopt_regions is not None:
+            elif (subs.oopt_regions is not None
+                    and subs.oopt_regions != ''):
                 oopt_ids = get_oopt_ids_for_region(subs.oopt_regions)
-            elif subs.oopt_ecoregions is not None:
+            elif (subs.oopt_ecoregions is not None
+                    and subs.oopt_ecoregions != ''):
                 oopt_ids = get_oopt_ids_for_ecoregion(subs.oopt_ecoregions)
             logger.info("Sending OOPT points now!")
             # stat = make_subs_oopt_table(conn,
@@ -974,20 +988,23 @@ def send_to_subscribers_job():
                     # Статистика без индексов ООПТ
                     msg += f"\r\n{st_str[1]} - {st_str[2]}: {st_str[3]}"
                     full_cnt += st_str[3]
-                # msg += f"\nx_max: {extent[0]}"
-                # msg += f"\ny_max: {extent[1]}"
-                # msg += f"\nx_min: {extent[2]}"
-                # msg += f"\ny_min: {extent[3]}"
-                # msg += f"\nExtent: {extent}"
-                # msg += f"\n\nhttps://maps.wwf.ru/portal/home/webmap/viewer.html?webmap=8bf1c429e6d54f7a892a65173abb6427&extent={x_min},{y_min},{x_max},{y_max}"
                 x_max = extent[0]
                 y_max = extent[1]
                 x_min = extent[2]
                 y_min = extent[3]
-                msg += f"\n\n<a href='https://maps.wwf.ru/portal/apps/webappviewer/index.html?id=b1d52f160ac54c3faefd4592da4cf8ba&extent={x_min},{y_min},{x_max},{y_max}'>Пойду-ка, посмотрю-ка...</a>"
+                msg += (f"\n\n"
+                        f"<a href="
+                        f"'https://maps.wwf.ru/portal/apps/webappviewer/"
+                        f"index.html?id=b1d52f160ac54c3faefd4592da4cf8ba"
+                        f"&extent={x_min},{y_min},{x_max},{y_max}'"
+                        f">Посмотреть на карте...</a>")
                 send_to_telegram(url, subs.telegramm, msg)
-                if ((subs.email_point and subs.email is not None)
-                        or (subs.teleg_point and subs.telegramm is not None)):
+                if ((subs.email_point 
+                        and subs.email is not None
+                        and subs.email != '')
+                    or (subs.teleg_point
+                        and subs.telegramm is not None
+                        and subs.telegramm != '')):
                     logger.info("Creating kml file...")
                     dst_file_name = make_file_name(subs.point_period,
                                                    date,
@@ -996,7 +1013,9 @@ def send_to_subscribers_job():
                                                    int(now_hour))
                     dst_file = os.path.join(result_dir, dst_file_name)
                     write_to_kml(dst_file, subs.subs_id)
-                    if subs.email_point and subs.email is not None:
+                    if (subs.email_point 
+                            and subs.email is not None
+                            and subs.email != ''):
                         logger.info("Creating maillist...")
                         maillist = subs.email.replace(" ", "").split(",")
                         subject, body_text = make_mail_attr(date,
@@ -1010,7 +1029,9 @@ def send_to_subscribers_job():
                         except IOError as err:
                             logger.error(f"Error seneding e-mail. "
                                          f"Error: {err}")
-                    if subs.teleg_point and subs.telegramm is not None:
+                    if (subs.teleg_point
+                            and subs.telegramm is not None
+                            and subs.telegramm != ''):
                         doc = open(dst_file, "rb")
                         send_doc_to_telegram(url, subs.telegramm, doc)
                         tail = points_tail(full_cnt)
@@ -1025,9 +1046,11 @@ def send_to_subscribers_job():
             # drop_whom_table(conn,cursor,subs.subs_id)
 
         if (now_hour == sendtimelist[0]
-                and (subs.teleg_stat or subs.email_stat)):
+                and (subs.teleg_stat or subs.email_stat)
+                and (subs.regions is not None)
+                and (subs.regions != '')):
             reg_list = str_to_lst(subs.regions[2:-2])
-            msg = make_tlg_stat_msg(reg_list, period, subs.critical)
+            msg = make_tlg_peat_stat_msg(reg_list, period, subs.critical)
             if subs.teleg_stat:
                 logger.info("Sending stat to telegram...")
                 send_to_telegram(url, subs.telegramm, msg)

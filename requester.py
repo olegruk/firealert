@@ -456,8 +456,8 @@ def check_reg_stat(reg, period, critical):
     return critical_cnt, all_cnt
 
 
-def make_tlg_stat_msg(reg_list, period, limit):
-    """Generate a point statistic message for sending over telegramm."""
+def make_tlg_peat_stat_msg(reg_list, period, limit):
+    """Generate a peat-point statistic message for sending over telegramm."""
     if limit is None:
         limit = 0
     if period is None:
