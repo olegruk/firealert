@@ -498,6 +498,8 @@ def points_tail(nump):
     str_nump = str(nump)
     if str_nump[-1] == "1":
         tail = "точка"
+    elif str_nump[-1] in ["2", "3", "4"] and nump > 10 and nump < 20:
+        tail = "точек"
     elif str_nump[-1] in ["2", "3", "4"]:
         tail = "точки"
     else:

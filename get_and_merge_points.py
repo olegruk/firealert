@@ -346,7 +346,7 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                 vip_zone VARCHAR(254),
                 oopt VARCHAR(254),
                 oopt_id INTEGER,
-                oopt_buf_id INTEGER,
+                buffer_id INTEGER,
                 country VARCHAR(50)
         )
         """
@@ -797,7 +797,7 @@ def check_oopt_buffers(conn, cursor, src_tab, oopt_buffers):
     sql_stat = f"""
         UPDATE {src_tab}
         SET
-            oopt_buf_id = {oopt_buffers}.fid
+            buffer_id = {oopt_buffers}.fid
         FROM {oopt_buffers}
         WHERE
             ST_Intersects({oopt_buffers}.geog, {src_tab}.geog)
@@ -827,7 +827,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
                 tech_id VARCHAR(254),
                 vip_zone_id VARCHAR(254),
                 oopt_id BIGINT,
-                oopt_buf_id BIGINT
+                buffer_id BIGINT
                 )
         """,
         f"""
@@ -864,7 +864,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         """,
         f"""
         UPDATE {ass_tab}
-	        SET oopt_buf_id = zone_id
+	        SET buffer_id = zone_id
 	        WHERE category = 'буфер';
         """,
         f"""
@@ -880,7 +880,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
                 vip_zone = COALESCE(NULLIF({src_tab}.vip_zone, ''),
                                     {ass_tab}.vip_zone_id),
                 oopt_id = {ass_tab}.oopt_id,
-                oopt_buf_id = {ass_tab}.oopt_buf_id
+                buffer_id = {ass_tab}.buffer_id
             FROM {ass_tab}
             WHERE
                 {src_tab}.gid = {ass_tab}.gid
@@ -896,6 +896,27 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
     except psycopg2.Error as err:
         conn.rollback()
         logger.error(f"Error checking control zones: {err}")
+
+
+def check_control_buffers(conn, cursor, src_tab, buffers):
+    """Check if a points in a control zones buffers."""
+    logger.info("Checking control zones buffers...")
+    sql_stat = f"""
+        UPDATE {src_tab}
+        SET
+            buffer_id = {buffers}.id
+        FROM {buffers}
+        WHERE
+            ST_Intersects({buffers}.geog, {src_tab}.geog)
+        """
+    try:
+        cursor.execute(sql_stat)
+        conn.commit()
+        logger.info("Control zones buffers checked.")
+    except psycopg2.Error as err:
+        conn.rollback()
+        logger.error(f"Error intersecting points with buffers: {err}")
+
 
 def copy_to_common_table(conn, cursor, today_tab, year_tab):
     """Copy temporary common table to year table."""
@@ -935,7 +956,7 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                                 tech,
                                 vip_zone,
                                 oopt_id,
-                                oopt_buf_id,
+                                buffer_id,
                                 country)
             SELECT
                 name,
@@ -971,7 +992,7 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                 tech,
                 vip_zone,
                 oopt_id,
-                oopt_buf_id,
+                buffer_id,
                 country
             FROM {today_tab}
             WHERE NOT EXISTS(
@@ -1063,6 +1084,7 @@ def get_and_merge_points_job():
     # check_oopt_zones(conn, cursor, common_tab, oopt_zones)
     # check_oopt_buffers(conn, cursor, common_tab, oopt_buffers)
     check_control_zones(conn, cursor, common_tab, 'control_zones')
+    check_control_buffers(conn, cursor, common_tab, 'control_buffers')
     copy_to_common_table(conn, cursor, common_tab, year_tab)
     for pointset in pointsets:
         drop_temp_tables(conn, cursor, pointset)

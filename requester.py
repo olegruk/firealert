@@ -536,6 +536,56 @@ def make_zone_stat_msg(year_tab, zone_list, period):
     return msg
 
 
+def check_buf_stat(buf_id, period):
+    """Count statistic for buffers."""
+    # extract params from config
+    [year_tab] = get_config("tables", ["year_tab"])
+    #connecting to database
+    conn, cursor = get_cursor()
+    currtime = time.localtime()
+    oopt_time = time.strftime('%H',currtime)
+
+    statements = (
+        """
+        SELECT count(*) FROM
+            (SELECT name
+            FROM %(y)s
+            WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND buffer_id = '%(o)s' AND (oopt_time IS NULL OR oopt_time = '%(t)s')) as all_sel
+        """%{'y':year_tab,'p':period,'o':oopt_id,'t':oopt_time},
+        """
+        UPDATE %(y)s SET
+            oopt_time = '%(t)s'
+        WHERE date_time >= TIMESTAMP 'now' - INTERVAL '%(p)s' AND buffer_id = '%(o)s' AND oopt_time IS NULL
+        """%{'y':year_tab,'p':period,'o':oopt_id,'t':oopt_time}
+        )
+
+    try:
+        cursor.execute(statements[0])
+        all_cnt = cursor.fetchone()[0]
+        cursor.execute(statements[1])
+        log('Finished for:%(o)s. Points: %(p)s'%{'o':oopt_id, 'p':all_cnt})
+    except IOError as e:
+        log('Error getting statistic for oopt buffers:$s'%e)
+
+    close_conn(conn, cursor)
+
+    return all_cnt
+
+
+def make_buf_stat_msg(buf_list, period):
+    """Generate a statistic message for buffers to sending over telegram."""
+    full_cnt = 0
+    msg = 'Новые точки в буферных зонах:'
+    for buf in buf_list:
+        all_cnt = check_buf_stat(buf[0], period)
+        if all_cnt > 0:
+            msg = msg + f"\r\n{buf[1]} - {buf[2]}: {all_cnt}"
+        full_cnt = full_cnt + all_cnt
+    if full_cnt == 0:
+        msg = ''
+    return msg
+
+
 def make_smf_stat_msg(reg_list, period, limit):
     """Generate a point statistic message for sending to smf forum."""
     if limit is None:
@@ -708,7 +758,7 @@ def get_oopt_for_ids(oopt_ids):
     return oopt_list
 
 
-def get_oopt_ids_for_region(reglist):
+def get_zone_ids_for_region(reglist):
     """Generate a list of oopt ids for regions in reglist."""
     logger.info("Making OOPT ids list for regions...")
     [oopt_zones] = get_config("tables", ["oopt_zones"])
@@ -723,7 +773,7 @@ def get_oopt_ids_for_region(reglist):
     oopt_lst = oopt_lst[0:-1]
     return oopt_lst
 
-def get_oopt_ids_for_ecoregion(reglist):
+def get_zone_ids_for_ecoregion(reglist):
     """Generate a list of oopt ids for ecoregions in reglist."""
     logger.info("Making OOPT ids list for ecoregions...")
     [oopt_zones] = get_config("tables", ["oopt_zones"])

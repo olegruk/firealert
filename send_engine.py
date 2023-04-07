@@ -48,7 +48,7 @@ from mylogger import init_logger
 logger = init_logger()
 
 
-def make_subs_table(conn, cursor, src_tab, crit_or_peat, limit, period,
+def make_subs_table1(conn, cursor, src_tab, crit_or_peat, limit, period,
                     reg_list, whom, is_incremental, filter_tech):
     """Create a table with firepoints for subscriber."""
     logger.info(f"Creating table for subs_id: {whom}...")
@@ -641,6 +641,120 @@ def make_subs_oopt_table(conn, cursor, year_tab, oopt_tab, oopt_ids,
     return oopt_tab, oopt_extent
 
 
+def make_subs_table(conn, cursor, year_tab, zones_tab, id_list,
+                         period, whom, filter_tech, zone_type, zone_type_ru):
+    """Create OOPT-table fo subscriber with ID 'subs_id'."""
+    logger.info(f"Creating oopt table for subs_id: {whom}...")
+    subs_tab = f"for_s{str(whom)}"
+    marker = f"[s{str(whom)}]"
+    period = f"{period} hours"
+
+    statements = (
+        f"""
+        DROP TABLE IF EXISTS {subs_tab}
+        """,
+        f"""
+        CREATE TABLE {subs_tab} AS
+            SELECT
+                acq_date AS date,
+                acq_time AS time,
+                latitude,
+                longitude,
+                region,
+                {zone_type},
+                {zone_type}_id,
+                geog
+            FROM {year_tab}
+            WHERE
+                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                AND {zone_type}_id IN ({id_list})
+                AND (
+                    whom is Null
+                    OR POSITION('{marker}' in whom) = 0
+                )
+                AND NOT (
+                    {filter_tech}
+                    AND (tech IS NOT NULL)
+                )
+            ORDER BY {zone_type}_id
+        """,
+        f"""
+        UPDATE {year_tab}
+            SET
+                whom = whom || '{marker}'
+            WHERE
+                date_time > TIMESTAMP 'now' - INTERVAL '{period}'
+                AND {zone_type}_id IN ({id_list})
+                AND POSITION('{marker}' in whom) = 0
+                AND NOT (
+                    {filter_tech}
+                    AND (tech IS NOT NULL)
+                )
+        """,
+        f"""
+        UPDATE {year_tab}
+            SET
+                whom = '{marker}'
+            WHERE
+                date_time > TIMESTAMP 'now' - INTERVAL '{period}'
+                AND {zone_type}_id IN ({id_list})
+                AND whom is Null
+                AND NOT (
+                    {filter_tech}
+                    AND (tech IS NOT NULL)
+                )
+        """,
+        f"""
+        ALTER TABLE {subs_tab}
+            ADD COLUMN description VARCHAR(500)
+        """,
+        f"""
+        UPDATE {subs_tab}
+            SET
+                {zone_type} = {zones_tab}.name
+            FROM {zones_tab}
+            WHERE
+                {subs_tab}.{zone_type}_id = {zones_tab}.id
+        """,
+        f"""
+        UPDATE {subs_tab}
+            SET
+                description =
+                    'Дата: ' || date || '\n' ||
+                    'Время: ' || time || '\n' ||
+                    'Широта: ' || latitude || '\n' ||
+                    'Долгота (ID): ' || longitude || '\n' ||
+                    'Регион: ' || region || '\n' ||
+                    'Территория: ' || {zone_type}
+        """
+    )
+
+    try:
+        for sql_stat in statements:
+            cursor.execute(sql_stat)
+            conn.commit()
+        logger.info(f"The table created: subs_id: {whom}")
+    except psycopg2.OperationalError as err:
+        logger.error(f"Error creating subscribers tables: {err}")
+    cursor.execute(f"""SELECT
+                            {zone_type}_id,
+                            region,
+                            {zone_type},
+                            count(*)
+                     FROM {subs_tab}
+                     GROUP BY {zone_type}_id, region, {zone_type}""")
+    res_tab = cursor.fetchall()
+    cursor.execute(f"""SELECT
+                            ST_XMax(ST_Extent(geog::geometry)) as x_max,
+                            ST_YMax(ST_Extent(geog::geometry)) as y_max,
+                            ST_XMin(ST_Extent(geog::geometry)) as x_min,
+                            ST_YMin(ST_Extent(geog::geometry)) as y_min,
+                            ST_Extent(geog::geometry) AS subs_extent
+                       FROM {subs_tab}""")
+    points_extent = cursor.fetchone()
+    return res_tab, points_extent
+
+
 def drop_whom_table(conn, cursor, whom):
     """Delete temporary subscribers tablles."""
     subs_tab = f"for_s{str(whom)}"
@@ -758,6 +872,94 @@ def set_name(conn, cursor, subs_tab, subs_id):
     logger.info("Setting name done.")
 
 
+def make_zone_msg(stat, extent, zone_type):
+    """Generate a statistic message for zones to sending over telegram."""
+    if zone_type == "буфер ООПТ":
+        intro = "буферных зонах ООПТ"
+    elif zone_type == "ООПТ":
+        intro = "ООПТ"
+    else:
+        intro = "зонах контроля"
+    full_cnt = 0
+    msg = f"Новые точки в {intro}:"
+    for st_str in stat:
+        # Статистика с индексами ООПТ
+        # msg += f"\r\n{st_str[1]} "\
+        #        f"- {st_str[2]} ({st_str[0]}): {st_str[3]}"
+        # Статистика без индексов ООПТ
+        msg += f"\r\n{st_str[1]} - {st_str[2]}: {st_str[3]}"
+        full_cnt += st_str[3]
+    x_max = extent[0]
+    y_max = extent[1]
+    x_min = extent[2]
+    y_min = extent[3]
+    msg += (f"\n\n"
+            f"<a href="
+            f"'https://maps.wwf.ru/portal/apps/webappviewer/"
+            f"index.html?id=b1d52f160ac54c3faefd4592da4cf8ba"
+            f"&extent={x_min},{y_min},{x_max},{y_max}'"
+            f">Посмотреть на карте...</a>")
+    return msg
+
+
+def make_subs_kml(point_period,
+                    subs_name,
+                    subs_id,
+                    result_dir,
+                    date,
+                    int_now_hour):
+    """Writing kml-file for subscriber."""
+    logger.info("Creating kml file...")
+    dst_file_name = make_file_name(point_period,
+                                    date,
+                                    subs_name,
+                                    result_dir,
+                                    int_now_hour)
+    dst_file = os.path.join(result_dir, dst_file_name)
+    write_to_kml(dst_file, subs.subs_id)
+    return dst_file
+
+
+def send_email_to_subs(subs_email, subs_point_period, date, full_cnt, dst_file):
+    """Sending to subscriber a kml-file over email."""
+    if (subs.email is not None and subs.email != ''):
+        logger.info("Creating maillist...")
+        maillist = subs.email.replace(" ", "").split(",")
+        subject, body_text = make_mail_attr(date,
+                                            subs.point_period,
+                                            full_cnt)
+        try:
+            send_email_with_attachment(maillist,
+                                    subject,
+                                    body_text,
+                                    [dst_file])
+        except IOError as err:
+            logger.error(f"Error seneding e-mail. "
+                            f"Error: {err}")
+    else:
+        logger.warning("Unable to send email. Empty maillist.")
+
+
+def send_tlg_to_subs(subs_telegramm, dst_file, url, full_cnt):
+    if subs_telegramm is not None and subs_telegramm != '':
+        doc = open(dst_file, "rb")
+        send_doc_to_telegram(url, subs.telegramm, doc)
+        tail = points_tail(full_cnt)
+        send_to_telegram(url, subs.telegramm, f"В файле {full_cnt} {tail}.")
+    else:
+        logger.warning("Unable to send telegram message. Empty telegram_id..")
+
+
+def make_zones_list(zones, regions, ecoregions):
+    zone_list = []
+    if (zones is not None) and (zones != ''):
+        zone_list = zones
+    elif (regions is not None) and (regions != ''):
+        zone_list = get_zone_ids_for_region(regions)
+    elif (ecoregions is not None) and (ecoregions != ''):
+        zone_list = get_zone_ids_for_ecoregion(ecoregions)
+    return zone_list
+
 def send_to_subscribers_job():
     """Send to subscribers job main function."""
     logger.info("---------------------------------")
@@ -767,7 +969,7 @@ def send_to_subscribers_job():
     date = time.strftime("%Y-%m-%d", currtime)
     now_hour = time.strftime("%H", currtime)
 
-    [year_tab, subs_tab, oopt_tab] = get_config("tables", ["year_tab",
+    [year_tab, subs_tab, zones_tab] = get_config("tables", ["year_tab",
                                                            "subs_tab",
                                                            "oopt_zones"])
     [data_root, temp_folder] = get_config("path", ["data_root",
@@ -827,27 +1029,106 @@ def send_to_subscribers_job():
     result_dir = get_path(data_root, temp_folder)
 
     for subs in subscribers:
-        if (subs.subs_name is None
-                or subs.subs_name == ''):
+        if (subs.subs_name is None or subs.subs_name == ''):
             set_name(conn, cursor, subs_tab, subs.subs_id)
         logger.info(f"Processing for {subs.subs_name}...")
-        if (subs.send_times is None
-                or subs.send_times == ''):
-            sendtimelist = fill_send_times(conn,
-                                           cursor,
-                                           subs_tab,
-                                           subs.subs_id,
-                                           subs.send_first_time,
-                                           subs.send_period
-                                           ).split(",")
+        if (subs.send_times is None or subs.send_times == ''):
+            logger.warning(f"Empty send times list for {subs.subs_name}.")
+            continue
         else:
             sendtimelist = subs.send_times.split(",")
 
-        if (now_hour in sendtimelist
-                and (
-                    subs.regions is not None
-                    and subs.regions != ''
-                )
+        if now_hour in sendtimelist:
+            zone_list = make_zones_list(subs.zones,
+                                        subs.regions,
+                                        subs.ecoregions)
+            if zone_list == []:
+                logger.warning("Empty zones list for {subs.subs_name}.")
+                continue
+
+            zone_type_ru = "ООПТ"
+            zone_type = "oopt"
+            logger.info(f"Sending {zone_type_en} points now!")
+            stat, extent = make_subs_table(conn,
+                                        cursor,
+                                        year_tab,
+                                        zones_tab,
+                                        zone_list,
+                                        period,
+                                        subs.subs_id,
+                                        subs.filter_tech,
+                                        zone_type,
+                                        zone_type_ru)
+            if stat != []:
+                msg = make_zone_msg(stat, extent, zone_type_ru)
+                send_to_telegram(url, subs.telegramm, msg)
+                if (subs.email_point or subs.teleg_point):
+                    dst_file = make_subs_kml(subs.point_period,
+                                                subs.subs_name,
+                                                subs.subs_id,
+                                                result_dir,
+                                                date,
+                                                int(now_hour))
+                    if subs.email_point:
+                        send_email_to_subs(subs.email,
+                                            subs.point_period,
+                                            date,
+                                            full_cnt,
+                                            dst_file)
+                    if subs.teleg_point:
+                        send_tlg_to_subs(subs.telegramm,
+                                            dst_file,
+                                            url,
+                                            full_cnt)
+                    logger.info("Dropping temp files...")
+                    drop_temp_file(dst_file)
+            else:
+                logger.info(f"Don`t send zero-point {zone_type_en} file.")
+            logger.info("Dropping tables...")
+            drop_whom_table(conn,cursor,subs.subs_id)
+
+            zone_type_ru = "ООПТ"
+            zone_type = "oopt"
+            logger.info(f"Sending {zone_type_en} buffer points now!")
+            stat, extent = make_subs_table(conn,
+                                        cursor,
+                                        year_tab,
+                                        buffers_tab,
+                                        zone_list,
+                                        period,
+                                        subs.subs_id,
+                                        subs.filter_tech,
+                                        zone_type,
+                                        zone_type_ru)
+            if stat != []:
+                msg = make_zone_msg(stat, extent, zone_type_ru)
+                send_to_telegram(url, subs.telegramm, msg)
+                if (subs.email_point or subs.teleg_point):
+                    dst_file = make_subs_kml(subs.point_period,
+                                                subs.subs_name,
+                                                subs.subs_id,
+                                                result_dir,
+                                                date,
+                                                int(now_hour))
+                    if subs.email_point:
+                        send_email_to_subs(subs.email,
+                                            subs.point_period,
+                                            date,
+                                            full_cnt,
+                                            dst_file)
+                    if subs.teleg_point:
+                        send_tlg_to_subs(subs.telegramm,
+                                            dst_file,
+                                            url,
+                                            full_cnt)
+                    logger.info("Dropping temp files...")
+                    drop_temp_file(dst_file)
+            else:
+                logger.info(f"Don`t send zero {zone_type_en} buffer file.")
+            logger.info("Dropping tables...")
+            drop_whom_table(conn,cursor,subs.subs_id)
+
+
                 and (
                     (subs.email_point
                         and subs.email is not None
@@ -861,7 +1142,7 @@ def send_to_subscribers_job():
             is_increment = (iteration != 0)
             if subs.crit_or_fire == "crit":
                 logger.info("Making critical-limited table...")
-                num_points = make_subs_table(conn,
+                num_points = make_subs_table1(conn,
                                              cursor,
                                              year_tab,
                                              "critical",
@@ -873,7 +1154,7 @@ def send_to_subscribers_job():
                                              subs.filter_tech)
             elif subs.crit_or_fire == "fire":
                 logger.info("Making fire-limited table...")
-                num_points = make_subs_table(conn,
+                num_points = make_subs_table1(conn,
                                              cursor,
                                              year_tab,
                                              "peat_fire",
@@ -885,7 +1166,7 @@ def send_to_subscribers_job():
                                              subs.filter_tech)
             else:
                 logger.info("Making zero-critical table...")
-                num_points = make_subs_table(conn,
+                num_points = make_subs_table1(conn,
                                              cursor,
                                              year_tab,
                                              "critical",
@@ -949,101 +1230,6 @@ def send_to_subscribers_job():
                 logger.info("Sending zones stat to telegram...")
                 send_to_telegram(url, subs.telegramm, msg)
 
-        if (subs.check_oopt
-                and (now_hour in sendtimelist)
-                and ((subs.oopt_zones is not None
-                        and subs.oopt_zones != '')
-                     or (subs.oopt_regions is not None
-                        and subs.oopt_regions != '')
-                     or (subs.oopt_ecoregions is not None
-                        and subs.oopt_ecoregions != '')
-                     )):
-            logger.info(f"Checking oopt stat for {str(subs.subs_name)}...")
-            if (subs.oopt_zones is not None
-                    and subs.oopt_zones != ''):
-                oopt_ids = subs.oopt_zones
-            elif (subs.oopt_regions is not None
-                    and subs.oopt_regions != ''):
-                oopt_ids = get_oopt_ids_for_region(subs.oopt_regions)
-            elif (subs.oopt_ecoregions is not None
-                    and subs.oopt_ecoregions != ''):
-                oopt_ids = get_oopt_ids_for_ecoregion(subs.oopt_ecoregions)
-            logger.info("Sending OOPT points now!")
-            # stat = make_subs_oopt_table(conn,
-            stat, extent = make_subs_oopt_table(conn,
-                                        cursor,
-                                        year_tab,
-                                        oopt_tab,
-                                        oopt_ids,
-                                        period,
-                                        subs.subs_id,
-                                        subs.filter_tech)
-            if stat != []:
-                full_cnt = 0
-                msg = "Новые точки в ООПТ:"
-                for st_str in stat:
-                    # Статистика с индексами ООПТ
-                    # msg += f"\r\n{st_str[1]} "\
-                    #        f"- {st_str[2]} ({st_str[0]}): {st_str[3]}"
-                    # Статистика без индексов ООПТ
-                    msg += f"\r\n{st_str[1]} - {st_str[2]}: {st_str[3]}"
-                    full_cnt += st_str[3]
-                x_max = extent[0]
-                y_max = extent[1]
-                x_min = extent[2]
-                y_min = extent[3]
-                msg += (f"\n\n"
-                        f"<a href="
-                        f"'https://maps.wwf.ru/portal/apps/webappviewer/"
-                        f"index.html?id=b1d52f160ac54c3faefd4592da4cf8ba"
-                        f"&extent={x_min},{y_min},{x_max},{y_max}'"
-                        f">Посмотреть на карте...</a>")
-                send_to_telegram(url, subs.telegramm, msg)
-                if ((subs.email_point 
-                        and subs.email is not None
-                        and subs.email != '')
-                    or (subs.teleg_point
-                        and subs.telegramm is not None
-                        and subs.telegramm != '')):
-                    logger.info("Creating kml file...")
-                    dst_file_name = make_file_name(subs.point_period,
-                                                   date,
-                                                   subs.subs_name,
-                                                   result_dir,
-                                                   int(now_hour))
-                    dst_file = os.path.join(result_dir, dst_file_name)
-                    write_to_kml(dst_file, subs.subs_id)
-                    if (subs.email_point 
-                            and subs.email is not None
-                            and subs.email != ''):
-                        logger.info("Creating maillist...")
-                        maillist = subs.email.replace(" ", "").split(",")
-                        subject, body_text = make_mail_attr(date,
-                                                            subs.point_period,
-                                                            full_cnt)
-                        try:
-                            send_email_with_attachment(maillist,
-                                                       subject,
-                                                       body_text,
-                                                       [dst_file])
-                        except IOError as err:
-                            logger.error(f"Error seneding e-mail. "
-                                         f"Error: {err}")
-                    if (subs.teleg_point
-                            and subs.telegramm is not None
-                            and subs.telegramm != ''):
-                        doc = open(dst_file, "rb")
-                        send_doc_to_telegram(url, subs.telegramm, doc)
-                        tail = points_tail(full_cnt)
-                        send_to_telegram(url,
-                                         subs.telegramm,
-                                         f"В файле {full_cnt} {tail}.")
-                    logger.info("Dropping temp files...")
-                    drop_temp_file(dst_file)
-            else:
-                logger.info("Don`t send zero-point file.")
-            logger.info("Dropping tables...")
-            # drop_whom_table(conn,cursor,subs.subs_id)
 
         if (now_hour == sendtimelist[0]
                 and (subs.teleg_stat or subs.email_stat)
