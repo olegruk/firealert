@@ -243,7 +243,7 @@ def write_to_kml(dst_file, whom):
     """Save a table to kml-file."""
     [dbserver, dbport, dbname, dbuser, dbpass] = get_db_config()
 
-    subs_tab = f"for_s{str(whom)}"
+    subs_tab = f"for_s{whom}"
     logger.info(f"Writting data from {subs_tab} table "
                 f"to kml-file {dst_file}...")
     if os.path.isfile(dst_file):
