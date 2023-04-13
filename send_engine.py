@@ -48,601 +48,31 @@ from mylogger import init_logger
 logger = init_logger()
 
 
-def make_subs_table1(conn, cursor, src_tab, crit_or_peat, limit, period,
-                    reg_list, whom, is_incremental, filter_tech):
-    """Create a table with firepoints for subscriber."""
-    logger.info(f"Creating table for subs_id: {whom}...")
-    subs_tab = f"for_s{str(whom)}"
-    marker = f"[s{str(whom)}]"
-    period = f"{period} hours"
-
-    statements_regional_yesterday = (
+def count_crit_points(zones_tab, zone_id, limit):
+    """Check count of critical points for zonelist."""
+    # logger.info("Getting statistic for %s..."%(reg))
+    conn, cursor = get_cursor()
+    stat = (
         f"""
-        DROP TABLE IF EXISTS {subs_tab}
-        """,
-        f"""
-        CREATE TABLE {subs_tab} (
-                name VARCHAR(30),
-                description VARCHAR(500),
-                acq_date VARCHAR(10),
-                acq_time VARCHAR(5),
-                latitude NUMERIC,
-                longitude NUMERIC,
-                sat_sensor VARCHAR(5),
-                region  VARCHAR(100),
-                peat_district VARCHAR(254),
-                peat_id VARCHAR(256),
-                peat_class SMALLINT,
-                peat_fire SMALLINT,
-                critical SMALLINT,
-                geog GEOGRAPHY(POINT, 4326)
-        )
-        """,
-        f"""
-        INSERT INTO {subs_tab} (name,
-                                acq_date,
-                                acq_time,
-                                latitude,
-                                longitude,
-                                sat_sensor,
-                                region,
-                                critical,
-                                peat_id,
-                                peat_district,
-                                peat_class,
-                                peat_fire,
-                                geog)
-            SELECT
-                {src_tab}.name,
-                {src_tab}.acq_date,
-                {src_tab}.acq_time,
-                {src_tab}.latitude,
-                {src_tab}.longitude,
-                {src_tab}.satellite,
-                {src_tab}.region,
-                {src_tab}.critical,
-                {src_tab}.peat_id,
-                {src_tab}.peat_district,
-                {src_tab}.peat_class,
-                {src_tab}.peat_fire,
-                {src_tab}.geog
-            FROM {src_tab}
-            WHERE
-                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                AND date_time < TIMESTAMP 'now'
-                AND {crit_or_peat} >= {limit}
-                AND region in {reg_list}
-                AND NOT(
-                    (tech IS NOT NULL)
-                    AND NOT (
-                        {filter_tech}
-                        AND (tech IS NOT NULL)
-                        )
-                    )
-            ORDER BY {src_tab}.peat_id
-        """,
-        f"""
-        UPDATE {src_tab}
-            SET
-                whom = whom || '{marker}'
-            WHERE
-                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                AND date_time < TIMESTAMP 'now'
-                AND {crit_or_peat} >= {limit}
-                AND region in {reg_list}
-                AND POSITION('{marker}' in whom) = 0
-        """,
-        f"""
-        UPDATE {src_tab}
-            SET
-                whom = '{marker}'
-            WHERE
-                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                AND date_time < TIMESTAMP 'now'
-                AND {crit_or_peat} >= {limit}
-                AND region in {reg_list}
-                AND whom is Null
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                sat_sensor = 'VIIRS'
-            WHERE
-                sat_sensor = 'N'
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                sat_sensor = 'MODIS'
-            WHERE
-                sat_sensor <> 'VIIRS'
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                description =
-                    'Дата: ' || acq_date || '\n' ||
-                    'Время: ' || acq_time || '\n' ||
-                    'Сенсор: ' || sat_sensor || '\n' ||
-                    'Регион: ' || region || '\n' ||
-                    'Район: ' || peat_district || '\n' ||
-                    'Торфяник (ID): ' || peat_id || '\n' ||
-                    'Класс осушки: ' || peat_class || '\n' ||
-                    'Горимость торфяника: ' || peat_fire || '\n' ||
-                    'Критичность точки: ' || critical
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                description =
-                    'Дата: ' || acq_date || '\n' ||
-                    'Время: ' || acq_time || '\n' ||
-                    'Сенсор: ' || sat_sensor || '\n' ||
-                    'Регион: ' || region
-            WHERE
-                peat_id IS NULL
+        SELECT count(*) 
+        FROM {zones_tab}
+        WHERE id = {zone_id}
+              AND critical >= {limit}
         """
     )
-
-    statements_allrussia_yesterday = (
-        f"""
-        DROP TABLE IF EXISTS {subs_tab}
-        """,
-        f"""
-        CREATE TABLE {subs_tab} (
-                name VARCHAR(30),
-                description VARCHAR(256),
-                acq_date VARCHAR(10),
-                acq_time VARCHAR(5),
-                latitude NUMERIC,
-                longitude NUMERIC,
-                sat_sensor VARCHAR(5),
-                region  VARCHAR(100),
-                geog GEOGRAPHY(POINT, 4326)
-        )
-        """,
-        f"""
-        INSERT INTO {subs_tab} (acq_date,
-                                acq_time,
-                                latitude,
-                                longitude,
-                                sat_sensor,
-                                region,geog)
-            SELECT
-                {src_tab}.acq_date,
-                {src_tab}.acq_time,
-                {src_tab}.latitude,
-                {src_tab}.longitude,
-                {src_tab}.satellite,
-                {src_tab}.region,
-                {src_tab}.geog
-            FROM {src_tab}
-            WHERE
-                country = 'Россия'
-                AND date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                AND date_time < TIMESTAMP 'now'
-                AND NOT(
-                    (tech IS NOT NULL)
-                    AND NOT (
-                        {filter_tech}
-                        AND (tech IS NOT NULL)
-                    )
-                )
-        """,
-        f"""
-        UPDATE {src_tab}
-            SET
-                whom = whom || '{marker}'
-            WHERE
-                country = 'Россия'
-                AND date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                AND date_time < TIMESTAMP 'now'
-                AND POSITION('{marker}' in whom) = 0
-        """,
-        f"""
-        UPDATE {src_tab}
-            SET
-                whom = '{marker}'
-            WHERE
-                country = 'Россия'
-                AND date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                AND date_time < TIMESTAMP 'now'
-                AND whom is Null
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                sat_sensor = 'VIIRS'
-            WHERE
-                sat_sensor = 'N'
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                sat_sensor = 'MODIS'
-            WHERE
-                sat_sensor <> 'VIIRS'
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                name = ''
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                description =
-                    'Дата: ' || acq_date || '\n' ||
-                    'Время: ' || acq_time || '\n' ||
-                    'Сенсор: ' || sat_sensor || '\n' ||
-                    'Регион: ' || region
-        """
-    )
-
-    statements_regional_incremental = (
-        f"""
-        DROP TABLE IF EXISTS {subs_tab}
-        """,
-        f"""
-        CREATE TABLE {subs_tab} (
-                name VARCHAR(30),
-                description VARCHAR(500),
-                acq_date VARCHAR(10),
-                acq_time VARCHAR(5),
-                latitude NUMERIC,
-                longitude NUMERIC,
-                sat_sensor VARCHAR(5),
-                region  VARCHAR(100),
-                peat_district VARCHAR(254),
-                peat_id VARCHAR(256),
-                peat_class SMALLINT,
-                peat_fire SMALLINT,
-                critical SMALLINT,
-                geog GEOGRAPHY(POINT, 4326)
-        )
-        """,
-        f"""
-        INSERT INTO {subs_tab} (name,
-                                acq_date,
-                                acq_time,
-                                latitude,
-                                longitude,
-                                sat_sensor,
-                                region,
-                                critical,
-                                peat_id,
-                                peat_district,
-                                peat_class,
-                                peat_fire,
-                                geog)
-            SELECT
-                {src_tab}.name,
-                {src_tab}.acq_date,
-                {src_tab}.acq_time,
-                {src_tab}.latitude,
-                {src_tab}.longitude,
-                {src_tab}.satellite,
-                {src_tab}.region,
-                {src_tab}.critical,
-                {src_tab}.peat_id,
-                {src_tab}.peat_district,
-                {src_tab}.peat_class,
-                {src_tab}.peat_fire,
-                {src_tab}.geog
-            FROM {src_tab}
-            WHERE
-                date_time > TIMESTAMP 'today'
-                AND {crit_or_peat} >= {limit}
-                AND region in {reg_list}
-                AND (
-                    whom is Null
-                    OR POSITION('{marker}' in whom) = 0)
-                AND NOT(
-                    (tech IS NOT NULL)
-                    AND NOT (
-                        {filter_tech}
-                        AND (tech IS NOT NULL)
-                    )
-                )
-            ORDER BY {src_tab}.peat_id
-        """,
-        f"""
-        UPDATE {src_tab}
-            SET
-                whom = whom || '{marker}'
-            WHERE
-                date_time > TIMESTAMP 'today'
-                AND {crit_or_peat} >= {limit}
-                AND region in {reg_list}
-                AND POSITION('{marker}' in whom) = 0
-        """,
-        f"""
-        UPDATE {src_tab}
-            SET
-                whom = '{marker}'
-            WHERE
-                date_time > TIMESTAMP 'today'
-                AND {crit_or_peat} >= {limit}
-                AND region in {reg_list}
-                AND whom is Null
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                sat_sensor = 'VIIRS'
-            WHERE
-                sat_sensor = 'N'
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                sat_sensor = 'MODIS'
-            WHERE
-                sat_sensor <> 'VIIRS'
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                description =
-                    'Дата: ' || acq_date || '\n' ||
-                    'Время: ' || acq_time || '\n' ||
-                    'Сенсор: ' || sat_sensor || '\n' ||
-                    'Регион: ' || region || '\n' ||
-                    'Район: ' || peat_district || '\n' ||
-                    'Торфяник (ID): ' || peat_id || '\n' ||
-                    'Класс осушки: ' || peat_class || '\n' ||
-                    'Горимость торфяника: ' || peat_fire || '\n' ||
-                    'Критичность точки: ' || critical
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                description =
-                    'Дата: ' || acq_date || '\n' ||
-                    'Время: ' || acq_time || '\n' ||
-                    'Сенсор: ' || sat_sensor || '\n' ||
-                    'Регион: ' || region
-            WHERE
-                peat_id IS NULL
-        """
-    )
-
-    statements_allrussia_incremental = (
-        f"""
-        DROP TABLE IF EXISTS {subs_tab}
-        """,
-        f"""
-        CREATE TABLE {subs_tab} (
-                name VARCHAR(30),
-                description VARCHAR(256),
-                acq_date VARCHAR(10),
-                acq_time VARCHAR(5),
-                latitude NUMERIC,
-                longitude NUMERIC,
-                sat_sensor VARCHAR(5),
-                region  VARCHAR(100),
-                geog GEOGRAPHY(POINT, 4326)
-        )
-        """,
-        f"""
-        INSERT INTO {subs_tab} (acq_date,
-                                acq_time,
-                                latitude,
-                                longitude,
-                                sat_sensor,
-                                region,
-                                geog)
-            SELECT
-                {src_tab}.acq_date,
-                {src_tab}.acq_time,
-                {src_tab}.latitude,
-                {src_tab}.longitude,
-                {src_tab}.satellite,
-                {src_tab}.region,
-                {src_tab}.geog
-            FROM {src_tab}
-            WHERE
-                country = 'Россия'
-                AND date_time > TIMESTAMP 'today'
-                AND (
-                    whom is Null
-                    OR POSITION('{marker}' in whom) = 0
-                )
-                AND NOT(
-                    (tech IS NOT NULL)
-                    AND NOT (
-                        {filter_tech}
-                        AND (tech IS NOT NULL)
-                    )
-                )
-        """,
-        f"""
-        UPDATE {src_tab}
-            SET
-                whom = whom || '{marker}'
-            WHERE
-                country = 'Россия'
-                AND date_time > TIMESTAMP 'today'
-                AND POSITION('{marker}' in whom) = 0
-        """,
-        f"""
-        UPDATE {src_tab}
-            SET
-                whom = '{marker}'
-            WHERE
-                country = 'Россия'
-                AND date_time > TIMESTAMP 'today'
-                AND whom is Null
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                sat_sensor = 'VIIRS'
-            WHERE
-                sat_sensor = 'N'
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                sat_sensor = 'MODIS'
-            WHERE
-                sat_sensor <> 'VIIRS'
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                name = ''
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                description =
-                    'Дата: ' || acq_date || '\n' ||
-                    'Время: ' || acq_time || '\n' ||
-                    'Сенсор: ' || sat_sensor || '\n' ||
-                    'Регион: ' || region
-        """
-    )
-
-    if reg_list == "('Россия')":
-        if is_incremental:
-            statements = statements_allrussia_incremental
-        else:
-            statements = statements_allrussia_yesterday
-    else:
-        if is_incremental:
-            statements = statements_regional_incremental
-        else:
-            statements = statements_regional_yesterday
-
     try:
-        for sql_stat in statements:
-            cursor.execute(sql_stat)
-            conn.commit()
-        logger.info(f"The table created: subs_id: {whom}")
-    except psycopg2.OperationalError as err:
-        logger.error(f"Error creating subscribers tables: {err}")
-        return -1
-    cursor.execute(f"SELECT count(*) FROM {subs_tab}")
-    return cursor.fetchone()[0]
+        cursor.execute(stat)
+        critical_cnt = cursor.fetchone()[0]
+    except psycopg2.Error as err:
+        logger.error(f"Error getting critical statistic for zone: {err}")
 
+    close_conn(conn, cursor)
 
-def make_subs_oopt_table(conn, cursor, year_tab, oopt_tab, oopt_ids,
-                         period, whom, filter_tech):
-    """Create OOPT-table fo subscriber with ID 'subs_id'."""
-    logger.info(f"Creating oopt table for subs_id: {whom}...")
-    subs_tab = f"for_s{str(whom)}"
-    marker = f"[s{str(whom)}]"
-    period = f"{period} hours"
-
-    statements = (
-        f"""
-        DROP TABLE IF EXISTS {subs_tab}
-        """,
-        f"""
-        CREATE TABLE {subs_tab} AS
-            SELECT
-                acq_date AS date,
-                acq_time AS time,
-                latitude,
-                longitude,
-                region,
-                oopt,
-                oopt_id,
-                geog
-            FROM {year_tab}
-            WHERE
-                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                AND oopt_id IN ({oopt_ids})
-                AND (
-                    whom is Null
-                    OR POSITION('{marker}' in whom) = 0
-                )
-                AND NOT (
-                    {filter_tech}
-                    AND (tech IS NOT NULL)
-                )
-            ORDER BY oopt_id
-        """,
-        f"""
-        UPDATE {year_tab}
-            SET
-                whom = whom || '{marker}'
-            WHERE
-                date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                AND oopt_id IN ({oopt_ids})
-                AND POSITION('{marker}' in whom) = 0
-                AND NOT (
-                    {filter_tech}
-                    AND (tech IS NOT NULL)
-                )
-        """,
-        f"""
-        UPDATE {year_tab}
-            SET
-                whom = '{marker}'
-            WHERE
-                date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                AND oopt_id IN ({oopt_ids})
-                AND whom is Null
-                AND NOT (
-                    {filter_tech}
-                    AND (tech IS NOT NULL)
-                )
-        """,
-        f"""
-        ALTER TABLE {subs_tab}
-            ADD COLUMN description VARCHAR(500)
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                oopt = {oopt_tab}.name
-            FROM {oopt_tab}
-            WHERE
-                {subs_tab}.oopt_id = {oopt_tab}.id
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                description =
-                    'Дата: ' || date || '\n' ||
-                    'Время: ' || time || '\n' ||
-                    'Широта: ' || latitude || '\n' ||
-                    'Долгота (ID): ' || longitude || '\n' ||
-                    'Регион: ' || region || '\n' ||
-                    'ООПТ: ' || oopt
-        """
-    )
-
-    try:
-        for sql_stat in statements:
-            cursor.execute(sql_stat)
-            conn.commit()
-        logger.info(f"The table created: subs_id: {whom}")
-    except psycopg2.OperationalError as err:
-        logger.error(f"Error creating subscribers tables: {err}")
-    cursor.execute(f"""SELECT
-                            oopt_id,
-                            region,
-                            oopt,
-                            count(*)
-                     FROM {subs_tab}
-                     GROUP BY oopt_id, region, oopt""")
-    oopt_tab = cursor.fetchall()
-    cursor.execute(f"""SELECT
-                            ST_XMax(ST_Extent(geog::geometry)) as x_max,
-                            ST_YMax(ST_Extent(geog::geometry)) as y_max,
-                            ST_XMin(ST_Extent(geog::geometry)) as x_min,
-                            ST_YMin(ST_Extent(geog::geometry)) as y_min,
-                            ST_Extent(geog::geometry) AS subs_extent
-                       FROM {subs_tab}""")
-    oopt_extent = cursor.fetchone()
-    return oopt_tab, oopt_extent
+    return critical_cnt
 
 
 def make_subs_table(conn, cursor, year_tab, zones_tab, id_list,
-                         period, whom, filter_tech, zone_type):
+                         period, whom, filter_tech, zone_type, limit):
     """Create table with points for subscriber with ID 'subs_id'."""
     logger.info(f"Creating table for subs_id: {whom}...")
     subs_tab = f"for_s{whom}"
@@ -662,6 +92,7 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, id_list,
                 longitude,
                 region,
                 {zone_type}_id,
+                critical,
                 geog
             FROM {year_tab}
             WHERE
@@ -744,6 +175,9 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, id_list,
                      FROM {subs_tab}
                      GROUP BY {zone_type}_id, region, {zone_type}""")
     res_tab = cursor.fetchall()
+    for rec in res_tab:
+        crit_count = count_crit_points(zones_tab, rec[0], limit)
+        rec.append(crit_count)
     cursor.execute(f"""SELECT
                             ST_XMax(ST_Extent(geog::geometry)) as x_max,
                             ST_YMax(ST_Extent(geog::geometry)) as y_max,
@@ -767,37 +201,6 @@ def drop_whom_table(conn, cursor, whom):
         logger.error(f"Error dropping table: {err}")
 
 
-def fill_send_times(conn, cursor, subs_tab, subs_id, zero_time, period):
-    """Fill sending times field in subscribers table (if not filled)."""
-    logger.info(f"Creating send times for {subs_id}.")
-    if period is None:
-        period = 24
-    if zero_time is None:
-        zero_time = "00:15"
-    zero_hour = int(zero_time.split(":")[0])
-    send_hours = ""
-    if 24 % period == 0:
-        num_of_times = int(24//period)
-    else:
-        num_of_times = int(24//period) + 1
-    for i in range(num_of_times):
-        new_hour = (zero_hour + i*period) % 24
-        if new_hour < 10:
-            send_hours += f"0{str(new_hour)}"
-        else:
-            send_hours += str(new_hour)
-        if i < num_of_times - 1:
-            send_hours += ","
-    cursor.execute(f"""UPDATE {subs_tab}
-                       SET
-                            send_times = '{send_hours}'
-                       WHERE
-                            subs_id = {subs_id}
-                    """)
-    conn.commit()
-    return send_hours
-
-
 def make_file_name(period, date, whom, result_dir, iter):
     """Make full name of file wich will sended to subscriber."""
     if iter == 0:
@@ -814,18 +217,6 @@ def make_file_name(period, date, whom, result_dir, iter):
     if os.path.isfile(dst_file):
         drop_temp_file(dst_file)
     return dst_file_name
-
-
-def drop_temp_files(result_dir):
-    """Drop temporary files in 'result_dir'."""
-    for the_file in os.listdir(result_dir):
-        file_path = os.path.join(result_dir, the_file)
-        try:
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-            # elif os.path.isdir(file_path): shutil.rmtree(file_path)
-        except Exception as err:
-            logger.error(f"Cannot remove files: {err}")
 
 
 def drop_temp_file(the_file):
@@ -898,6 +289,9 @@ def make_zone_msg(stat, extent, zone_type):
         # Статистика без индексов ООПТ
         msg += f"\r\n{st_str[1]} - {st_str[2]}: {st_str[3]}"
         full_cnt += st_str[3]
+    msg += f"\nВсего точек: {full_cnt}"
+    if st_str[4] > 0:
+        msg+= f"\nВысокой опасности: {st_str[4]}"
     x_max = extent[0]
     y_max = extent[1]
     x_min = extent[2]
@@ -1070,11 +464,6 @@ def send_to_subscribers_job():
                 logger.warning("Empty zones list for {subs.subs_name}.")
                 continue
 
-#-------------------------------------------------------------------------------
-            msg = make_tlg_peat_stat_msg(reg_list, period, subs.critical)
-#-------------------------------------------------------------------------------
-
-
             for zone_type in subs.zone_types:
                 if zone_type == "peat":
                     zone_list = filter_zones(zonelist, subs.critical, zones_tab)
@@ -1087,7 +476,8 @@ def send_to_subscribers_job():
                                                 subs.period,
                                                 subs.subs_id,
                                                 subs.filter_tech,
-                                                zone_type)
+                                                zone_type,
+                                                subs.critical)
                 num_points = len(stat)
                 if (num_points > 0) and (subs.teleg_stat or subs.email_stat):
                     msg = make_zone_msg(stat, extent, zone_type)
@@ -1133,7 +523,8 @@ def send_to_subscribers_job():
                                                     subs.period,
                                                     subs.subs_id,
                                                     subs.filter_tech,
-                                                    zone_type)
+                                                    zone_type,
+                                                    subs.critical)
                     num_points = len(stat)
                     if num_points > 0:
                         msg = make_zone_msg(stat, extent, f"{zone_type}_buffer")
@@ -1176,10 +567,6 @@ def send_to_subscribers_job():
         [alerts_period] = get_config("alerts", ["period"])
         new_alerts(alerts_period, date)
 
-#-------------------------------------------------------------------------------
-
-
-#-------------------------------------------------------------------------------
     close_conn(conn, cursor)
     logger.info("Process [send_engine.py] stopped.")
 
