@@ -2,29 +2,31 @@
 peat_id
 oopt_id
 ctrl_id
+safe_id
 tech_id
 peat_buf_id
 oopt_buf_id
 ctrl_buf_id
+safe_buf_id
 
 Поля в subscribers:
-active
-subs_id
-subs_name
-tlg_id
-emails
-zones
-regions
-ecoregions
-zone_types [peat, oopt, ctrl]
-check_buffers
-email_stat
-teleg_stat
-email_point
-teleg_point
-period
-send_times
-filter_tech
-send_empty
-ya_disk
-critical
+++active
+++subs_id
+++subs_name
+++tlg_id
+++emails
+++zones
+++regions
+++ecoregions
+++zone_types [peat, oopt, ctrl, safe]
+++check_buffers
+++email_stat
+++teleg_stat
+++email_point
+++teleg_point
+++period
+++send_times
+++filter_tech
+++send_empty
+++ya_disk
+++critical

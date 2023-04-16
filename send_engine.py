@@ -272,12 +272,16 @@ def make_zone_msg(stat, extent, zone_type):
         intro = "торфяниках"
     elif zone_type == "ctrl":
         intro = "зонах особого контроля"
+    elif zone_type == "safe":
+        intro = "охранных зонах"
     elif zone_type == "oopt_buffer":
         intro = "буферных зонах ООПТ"
     elif zone_type == "peat_buffer":
         intro = "буферных зонах торфяников"
     elif zone_type == "ctrl_buffer":
         intro = "буферах зон особого контроля"
+    elif zone_type == "safe_buffer":
+        intro = "буферах охранных зон"
     else:
         intro = "непонятных зонах"
     full_cnt = 0
@@ -323,11 +327,11 @@ def make_subs_kml(point_period,
     return dst_file
 
 
-def send_email_to_subs(subs_email, subs_point_period, date, full_cnt, dst_file):
+def send_email_to_subs(subs_emails, subs_point_period, date, full_cnt, dst_file):
     """Sending to subscriber a kml-file over email."""
-    if (subs.email is not None and subs.email != ''):
+    if (subs_emails is not None and subs_emails != ''):
         logger.info("Creating maillist...")
-        maillist = subs.email.replace(" ", "").split(",")
+        maillist = subs_emails.replace(" ", "").split(",")
         subject, body_text = make_mail_attr(date,
                                             subs.point_period,
                                             full_cnt)
@@ -343,12 +347,12 @@ def send_email_to_subs(subs_email, subs_point_period, date, full_cnt, dst_file):
         logger.warning("Unable to send email. Empty maillist.")
 
 
-def send_tlg_to_subs(subs_telegramm, dst_file, url, full_cnt):
-    if subs_telegramm is not None and subs_telegramm != '':
+def send_tlg_to_subs(subs_tlg_id, dst_file, url, full_cnt):
+    if subs_tlg_id is not None and subs_tlg_id != '':
         doc = open(dst_file, "rb")
-        send_doc_to_telegram(url, subs.telegramm, doc)
+        send_doc_to_telegram(url, subs_tlg_id, doc)
         tail = points_tail(full_cnt)
-        send_to_telegram(url, subs.telegramm, f"В файле {full_cnt} {tail}.")
+        send_to_telegram(url, subs_tlg_id, f"В файле {full_cnt} {tail}.")
     else:
         logger.warning("Unable to send telegram message. Empty telegram_id..")
 
@@ -405,8 +409,8 @@ def send_to_subscribers_job():
     #                                       ориентирования в подписках
     # active            boolean         подписка активна?
     # regions           varchar()       список регионов на контроле подписчика
-    # email             varchar()       список e-mail адресов подписчика
-    # telegramm         varchar(20)     список телеграмм-чатов подписчика
+    # emails             varchar()       список e-mail адресов подписчика
+    # tlg_id         varchar(20)     список телеграмм-чатов подписчика
     # email_stat        boolean         слать статистику по почте?
     # teleg_stat        boolean         слать статистику в телеграмм?
     # email_point       boolean         слать точки по почте?
@@ -483,11 +487,11 @@ def send_to_subscribers_job():
                     msg = make_zone_msg(stat, extent, zone_type)
                     if subs.teleg_stat:
                         logger.info("Sending stat to telegram...")
-                        send_to_telegram(url, subs.telegramm, msg)
+                        send_to_telegram(url, subs.tlg_id, msg)
                     if subs.email_stat:
                         logger.info("Sending stat to email...")
                         subject = f"Statistic per last {subs.stat_period}"
-                        maillist = subs.email.replace(" ", "").split(",")
+                        maillist = subs.emails.replace(" ", "").split(",")
                         send_email_message(maillist, subject, msg)
                 if (subs.email_point or subs.teleg_point):
                     if (num_points > 0) or subs.send_empty:
@@ -498,13 +502,13 @@ def send_to_subscribers_job():
                                                     date,
                                                     int(now_hour))
                         if subs.email_point:
-                            send_email_to_subs(subs.email,
+                            send_email_to_subs(subs.emails,
                                                 subs.period,
                                                 date,
                                                 num_points,
                                                 dst_file)
                         if subs.teleg_point:
-                            send_tlg_to_subs(subs.telegramm,
+                            send_tlg_to_subs(subs.tlg_id,
                                                 dst_file,
                                                 url,
                                                 num_points)
@@ -528,7 +532,7 @@ def send_to_subscribers_job():
                     num_points = len(stat)
                     if num_points > 0:
                         msg = make_zone_msg(stat, extent, f"{zone_type}_buffer")
-                        send_to_telegram(url, subs.telegramm, msg)
+                        send_to_telegram(url, subs.tlg_id, msg)
                     if (subs.email_point or subs.teleg_point):
                         if (num_points > 0) or subs.send_empty:
                             dst_file = make_subs_kml(subs.period,
@@ -538,13 +542,13 @@ def send_to_subscribers_job():
                                                         date,
                                                         int(now_hour))
                             if subs.email_point:
-                                send_email_to_subs(subs.email,
+                                send_email_to_subs(subs.emails,
                                                     subs.period,
                                                     date,
                                                     num_points,
                                                     dst_file)
                             if subs.teleg_point:
-                                send_tlg_to_subs(subs.telegramm,
+                                send_tlg_to_subs(subs.tlg_id,
                                                     dst_file,
                                                     url,
                                                     num_points)

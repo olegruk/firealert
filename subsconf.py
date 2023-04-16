@@ -27,10 +27,10 @@ def add_tlg_user(telegram_id):
     conn, cursor = get_cursor()
     cursor.execute(f"""SELECT subs_id
                        FROM {subs_table}
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     if len(cursor.fetchall()) == 0:
-        cursor.execute(f"""INSERT INTO {subs_table} (telegramm)
+        cursor.execute(f"""INSERT INTO {subs_table} (tlg_id)
                                 VALUES ({telegram_id})
                         """)
         res = True
@@ -45,7 +45,7 @@ def set_teleg_stat(telegram_id):
     conn, cursor = get_cursor()
     cursor.execute(f"""UPDATE {subs_table}
                        SET teleg_stat = TRUE
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     close_conn(conn, cursor)
 
@@ -55,7 +55,7 @@ def unset_teleg_stat(telegram_id):
     conn, cursor = get_cursor()
     cursor.execute(f"""UPDATE {subs_table}
                        SET teleg_stat = FALSE
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     close_conn(conn, cursor)
 
@@ -65,7 +65,7 @@ def set_teleg_point(telegram_id):
     conn, cursor = get_cursor()
     cursor.execute(f"""UPDATE {subs_table}
                        SET teleg_point = TRUE
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     close_conn(conn, cursor)
 
@@ -75,7 +75,7 @@ def unset_teleg_point(telegram_id):
     conn, cursor = get_cursor()
     cursor.execute(f"""UPDATE {subs_table}
                        SET teleg_point = FALSE
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     close_conn(conn, cursor)
 
@@ -85,7 +85,7 @@ def set_active(telegram_id):
     conn, cursor = get_cursor()
     cursor.execute(f"""UPDATE {subs_table}
                        SET active = TRUE
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     close_conn(conn, cursor)
 
@@ -95,7 +95,7 @@ def unset_active(telegram_id):
     conn, cursor = get_cursor()
     cursor.execute(f"""UPDATE {subs_table}
                        SET active = FALSE
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     close_conn(conn, cursor)
 
@@ -104,20 +104,20 @@ def add_new_email(telegram_id, email):
     """Add new email for subscriber with telegram_id."""
     conn, cursor = get_cursor()
     cursor.execute(f"""UPDATE {subs_table}
-                       SET email = email || ', {email}'
+                       SET emails = emails || ', {email}'
                        WHERE
-                            email IS NOT NULL
-                            AND telegramm = '{telegram_id}'
+                            emails IS NOT NULL
+                            AND tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""UPDATE {subs_table}
-                       SET email = '{email}'
+                       SET emails = '{email}'
                        WHERE
-                            email IS NULL
-                            AND telegramm = '{telegram_id}'
+                            emails IS NULL
+                            AND tlg_id = '{telegram_id}'
                     """)
-    cursor.execute(f"""SELECT email
+    cursor.execute(f"""SELECT emails
                        FROM {subs_table}
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     maillist = cursor.fetchone()
     close_conn(conn, cursor)
@@ -128,26 +128,26 @@ def remove_email(telegram_id, email):
     """Remove email for subscriber with telegram_id."""
     conn, cursor = get_cursor()
     cursor.execute(f"""UPDATE {subs_table}
-                       SET email = replace(email, '{email}, ', '')
-                       WHERE telegramm = '{telegram_id}'
+                       SET emails = replace(emails, '{email}, ', '')
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""UPDATE {subs_table}
-                       SET email = replace(email, ', {email}', '')
-                       WHERE telegramm = '{telegram_id}'
+                       SET emails = replace(emails, ', {email}', '')
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""UPDATE {subs_table}
-                       SET email = replace(email, '{email}', '')
-                       WHERE telegramm = '{telegram_id}'
+                       SET emails = replace(emails, '{email}', '')
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""UPDATE {subs_table}
-                       SET email = NULL
+                       SET emails = NULL
                        WHERE
-                            email = ''
-                            AND telegramm = '{telegram_id}'
+                            emails = ''
+                            AND tlg_id = '{telegram_id}'
                     """)
-    cursor.execute(f"""SELECT email
+    cursor.execute(f"""SELECT emails
                        FROM {subs_table}
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     maillist = cursor.fetchone()
     close_conn(conn, cursor)
@@ -157,9 +157,9 @@ def remove_email(telegram_id, email):
 def show_maillist(telegram_id):
     """Return list of emails for subscriber with telegram_id."""
     conn, cursor = get_cursor()
-    cursor.execute(f"""SELECT email
+    cursor.execute(f"""SELECT emails
                        FROM {subs_table}
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     maillist = cursor.fetchone()
     close_conn(conn, cursor)
@@ -172,16 +172,16 @@ def add_new_region(telegram_id, region):
     cursor.execute(f"""UPDATE {subs_table}
                        SET regions = replace(regions, ')', ', ''{region}'')')
                        WHERE regions IS NOT NULL
-                       AND telegramm = '{telegram_id}'
+                       AND tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""UPDATE {subs_table}
                        SET regions = '(''{region}'')'
                        WHERE regions IS NULL
-                       AND telegramm = '{telegram_id}'
+                       AND tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""SELECT regions
                        FROM {subs_table}
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     reglist = cursor.fetchone()
     close_conn(conn, cursor)
@@ -193,24 +193,24 @@ def remove_region(telegram_id, region):
     conn, cursor = get_cursor()
     cursor.execute(f"""UPDATE {subs_table}
                        SET regions = replace(regions, '''{region}'', ', '')
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""UPDATE {subs_table}
                        SET regions = replace(regions, ', ''{region}''', '')
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""UPDATE {subs_table}
                        SET regions = replace(regions, '''{region}''', '')
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""UPDATE {subs_table}
                        SET regions = NULL
                        WHERE regions = '()'
-                       AND telegramm = '{telegram_id}'
+                       AND tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""SELECT regions
                        FROM {subs_table}
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     reglist = cursor.fetchone()
     close_conn(conn, cursor)
@@ -222,7 +222,7 @@ def show_reglist(telegram_id):
     conn, cursor = get_cursor()
     cursor.execute(f"""SELECT regions
                        FROM {subs_table}
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     reglist = cursor.fetchone()
     close_conn(conn, cursor)
@@ -248,7 +248,7 @@ def show_conf(telegram_id):
     conn, cursor = get_cursor()
     cursor.execute(f"""SELECT *
                        FROM {subs_table}
-                       WHERE telegramm = '{telegram_id}'
+                       WHERE tlg_id = '{telegram_id}'
                     """)
     conf = cursor.fetchone()
     close_conn(conn, cursor)
