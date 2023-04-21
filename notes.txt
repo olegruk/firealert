@@ -3,11 +3,13 @@ peat_id
 oopt_id
 ctrl_id
 safe_id
+attn_id
 tech_id
 peat_buf_id
 oopt_buf_id
 ctrl_buf_id
 safe_buf_id
+attn_buf_id
 
 Поля в subscribers:
 ++active
@@ -18,7 +20,7 @@ safe_buf_id
 ++zones
 ++regions
 ++ecoregions
-++zone_types [peat, oopt, ctrl, safe]
+++zone_types [peat, oopt, ctrl, safe, attn]
 ++check_buffers
 ++email_stat
 ++teleg_stat

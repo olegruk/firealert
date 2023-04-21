@@ -347,7 +347,17 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                 oopt VARCHAR(254),
                 oopt_id INTEGER,
                 buffer_id INTEGER,
-                country VARCHAR(50)
+                country VARCHAR(50),
+                peat_fid INTEGER,
+                ctrl_id INTEGER,
+                safe_id INTEGER,
+                attn_id INTEGER,
+                tech_id INTEGER,
+                peat_buf_id INTEGER,
+                oopt_buf_id INTEGER,
+                ctrl_buf_id INTEGER,
+                safe_buf_id INTEGER,
+                attn_buf_id INTEGER
         )
         """
     )
@@ -751,7 +761,7 @@ def check_tech_zones(conn, cursor, src_tab, tech_zones):
         logger.error(f"'Error intersecting points with tech-zones: {err}")
 
 
-def check_vip_zones(conn, cursor, src_tab, vip_zones):
+def check_vip_zones(conn, cursor, src_tab, vip_zones): 
     """Check if a points in vip-zone."""
     logger.info("Checking vip-zones...")
     sql_stat = f"""
@@ -822,12 +832,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         CREATE TABLE {ass_tab} (
                 gid INTEGER,
                 zone_id BIGINT,
-                category VARCHAR(100),
-                peat_id VARCHAR(254),
-                tech_id VARCHAR(254),
-                vip_zone_id VARCHAR(254),
-                oopt_id BIGINT,
-                buffer_id BIGINT
+                category VARCHAR(100)
                 )
         """,
         f"""
@@ -843,47 +848,52 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
                 ST_Intersects({control_zones}.geog, {src_tab}.geog)
         """,
         f"""
-        UPDATE {ass_tab}
-	        SET peat_id = to_char(zone_id, 'FM99999')
-	        WHERE category = 'торфяник';
-        """,
-        f"""
-        UPDATE {ass_tab}
-        	SET tech_id = to_char(zone_id, 'FM99999')
-	        WHERE category = 'техноген';
-        """,
-        f"""
-        UPDATE {ass_tab}
-	        SET vip_zone_id = to_char(zone_id, 'FM99999')
-	        WHERE category = 'охранная зона';
-        """,
-        f"""
-        UPDATE {ass_tab}
-	        SET oopt_id = zone_id
-	        WHERE category = 'ООПТ';
-        """,
-        f"""
-        UPDATE {ass_tab}
-	        SET buffer_id = zone_id
-	        WHERE category = 'буфер';
-        """,
-        f"""
-        UPDATE {ass_tab}
-	        SET vip_zone_id = to_char(zone_id, 'FM99999')
-	        WHERE category = 'зона мониторинга';
+        UPDATE {src_tab}
+	        SET {src_tab}.peat_fid = {ass_tab}.zone_id
+            FROM {ass_tab}
+	        WHERE 
+                {ass_tab}.gid = {src_tab}.gid
+                AND category = 'торфяник';
         """,
         f"""
         UPDATE {src_tab}
-            SET
-                tech = COALESCE(NULLIF({src_tab}.tech, ''),
-                                {ass_tab}.tech_id),
-                vip_zone = COALESCE(NULLIF({src_tab}.vip_zone, ''),
-                                    {ass_tab}.vip_zone_id),
-                oopt_id = {ass_tab}.oopt_id,
-                buffer_id = {ass_tab}.buffer_id
+	        SET {src_tab}.oopt_id = {ass_tab}.zone_id
             FROM {ass_tab}
-            WHERE
-                {src_tab}.gid = {ass_tab}.gid
+	        WHERE 
+                {ass_tab}.gid = {src_tab}.gid
+                AND category = 'ООПТ';
+        """,
+        f"""
+        UPDATE {src_tab}
+	        SET {src_tab}.ctrl_id = {ass_tab}.zone_id
+            FROM {ass_tab}
+	        WHERE 
+                {ass_tab}.gid = {src_tab}.gid
+                AND category = 'зона мониторинга';
+        """,
+        f"""
+        UPDATE {src_tab}
+	        SET {src_tab}.safe_id = {ass_tab}.zone_id
+            FROM {ass_tab}
+	        WHERE 
+                {ass_tab}.gid = {src_tab}.gid
+                AND category = 'охранная зона';
+        """,
+        f"""
+        UPDATE {src_tab}
+	        SET {src_tab}.attn_id = {ass_tab}.zone_id
+            FROM {ass_tab}
+	        WHERE 
+                {ass_tab}.gid = {src_tab}.gid
+                AND category = 'зона внимания';
+        """,
+        f"""
+        UPDATE {src_tab}
+	        SET {src_tab}.tech_id = {ass_tab}.zone_id
+            FROM {ass_tab}
+	        WHERE 
+                {ass_tab}.gid = {src_tab}.gid
+                AND category = 'техноген';
         """
     )
     try:
@@ -901,21 +911,81 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
 def check_control_buffers(conn, cursor, src_tab, buffers):
     """Check if a points in a control zones buffers."""
     logger.info("Checking control zones buffers...")
-    sql_stat = f"""
+    ass_tab = "buffers_assign"
+    statements = (
+        f"""
+        DROP TABLE IF EXISTS {ass_tab}
+        """,
+        f"""
+        CREATE TABLE {ass_tab} (
+                gid INTEGER,
+                zone_id BIGINT,
+                category VARCHAR(100)
+                )
+        """,
+        f"""
+        INSERT INTO {ass_tab} (gid,
+                               zone_id,
+                               category)
+            SELECT
+                {src_tab}.gid AS gid,
+                {buffers}.id AS zone_id,
+                {buffers}.category AS category
+            FROM {buffers},{src_tab}
+            WHERE
+                ST_Intersects({buffers}.geog, {src_tab}.geog)
+        """,
+        f"""
         UPDATE {src_tab}
-        SET
-            buffer_id = {buffers}.id
-        FROM {buffers}
-        WHERE
-            ST_Intersects({buffers}.geog, {src_tab}.geog)
+	        SET {src_tab}.peat_buf_id = {ass_tab}.zone_id
+            FROM {ass_tab}
+	        WHERE 
+                {ass_tab}.gid = {src_tab}.gid
+                AND category = 'торфяник';
+        """,
+        f"""
+        UPDATE {src_tab}
+	        SET {src_tab}.oopt_buf_id = {ass_tab}.zone_id
+            FROM {ass_tab}
+	        WHERE 
+                {ass_tab}.gid = {src_tab}.gid
+                AND category = 'ООПТ';
+        """,
+        f"""
+        UPDATE {src_tab}
+	        SET {src_tab}.ctrl_buf_id = {ass_tab}.zone_id
+            FROM {ass_tab}
+	        WHERE 
+                {ass_tab}.gid = {src_tab}.gid
+                AND category = 'зона мониторинга';
+        """,
+        f"""
+        UPDATE {src_tab}
+	        SET {src_tab}.safe_buf_id = {ass_tab}.zone_id
+            FROM {ass_tab}
+	        WHERE 
+                {ass_tab}.gid = {src_tab}.gid
+                AND category = 'охранная зона';
+        """,
+        f"""
+        UPDATE {src_tab}
+	        SET {src_tab}.attn_buf_id = {ass_tab}.zone_id
+            FROM {ass_tab}
+	        WHERE 
+                {ass_tab}.gid = {src_tab}.gid
+                AND category = 'зона внимания';
         """
+    )
     try:
-        cursor.execute(sql_stat)
-        conn.commit()
-        logger.info("Control zones buffers checked.")
+        for sql_stat in statements:
+            cursor.execute(sql_stat)
+            conn.commit()
+        cursor.execute(f"SELECT count(*) FROM {ass_tab}")
+        points_count = cursor.fetchone()[0]
+        logger.info("Control buffers checked. {points_count} points detected.")
     except psycopg2.Error as err:
         conn.rollback()
-        logger.error(f"Error intersecting points with buffers: {err}")
+        logger.error(f"Error checking control buffers: {err}")
 
 
 def copy_to_common_table(conn, cursor, today_tab, year_tab):
@@ -1079,8 +1149,8 @@ def get_and_merge_points_job():
     cost_point_in_buffers(conn, cursor, common_tab)
     set_name_field(conn, cursor, common_tab)
     rise_multipoint_cost(conn, cursor, common_tab, clst_dist)
-    check_tech_zones(conn, cursor, common_tab, tech_zones)
-    check_vip_zones(conn, cursor, common_tab, vip_zones)
+    # check_tech_zones(conn, cursor, common_tab, tech_zones)
+    # check_vip_zones(conn, cursor, common_tab, vip_zones)
     # check_oopt_zones(conn, cursor, common_tab, oopt_zones)
     # check_oopt_buffers(conn, cursor, common_tab, oopt_buffers)
     check_control_zones(conn, cursor, common_tab, 'control_zones')
