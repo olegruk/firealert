@@ -346,7 +346,6 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                 vip_zone VARCHAR(254),
                 oopt VARCHAR(254),
                 oopt_id INTEGER,
-                buffer_id INTEGER,
                 country VARCHAR(50),
                 peat_fid INTEGER,
                 ctrl_id INTEGER,
@@ -849,7 +848,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         """,
         f"""
         UPDATE {src_tab}
-	        SET {src_tab}.peat_fid = {ass_tab}.zone_id
+	        SET peat_fid = {ass_tab}.zone_id
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -857,7 +856,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         """,
         f"""
         UPDATE {src_tab}
-	        SET {src_tab}.oopt_id = {ass_tab}.zone_id
+	        SET oopt_id = {ass_tab}.zone_id
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -865,7 +864,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         """,
         f"""
         UPDATE {src_tab}
-	        SET {src_tab}.ctrl_id = {ass_tab}.zone_id
+	        SET ctrl_id = {ass_tab}.zone_id
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -873,7 +872,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         """,
         f"""
         UPDATE {src_tab}
-	        SET {src_tab}.safe_id = {ass_tab}.zone_id
+	        SET safe_id = {ass_tab}.zone_id
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -881,7 +880,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         """,
         f"""
         UPDATE {src_tab}
-	        SET {src_tab}.attn_id = {ass_tab}.zone_id
+	        SET attn_id = {ass_tab}.zone_id
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -889,7 +888,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         """,
         f"""
         UPDATE {src_tab}
-	        SET {src_tab}.tech_id = {ass_tab}.zone_id
+	        SET tech_id = {ass_tab}.zone_id
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -937,7 +936,7 @@ def check_control_buffers(conn, cursor, src_tab, buffers):
         """,
         f"""
         UPDATE {src_tab}
-	        SET {src_tab}.peat_buf_id = {ass_tab}.zone_id
+	        SET peat_buf_id = {ass_tab}.zone_id
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -945,7 +944,7 @@ def check_control_buffers(conn, cursor, src_tab, buffers):
         """,
         f"""
         UPDATE {src_tab}
-	        SET {src_tab}.oopt_buf_id = {ass_tab}.zone_id
+	        SET oopt_buf_id = {ass_tab}.zone_id
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -953,7 +952,7 @@ def check_control_buffers(conn, cursor, src_tab, buffers):
         """,
         f"""
         UPDATE {src_tab}
-	        SET {src_tab}.ctrl_buf_id = {ass_tab}.zone_id
+	        SET ctrl_buf_id = {ass_tab}.zone_id
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -961,7 +960,7 @@ def check_control_buffers(conn, cursor, src_tab, buffers):
         """,
         f"""
         UPDATE {src_tab}
-	        SET {src_tab}.safe_buf_id = {ass_tab}.zone_id
+	        SET safe_buf_id = {ass_tab}.zone_id
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -969,7 +968,7 @@ def check_control_buffers(conn, cursor, src_tab, buffers):
         """,
         f"""
         UPDATE {src_tab}
-	        SET {src_tab}.attn_buf_id = {ass_tab}.zone_id
+	        SET attn_buf_id = {ass_tab}.zone_id
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -1026,8 +1025,18 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                                 tech,
                                 vip_zone,
                                 oopt_id,
-                                buffer_id,
-                                country)
+                                country,
+                                oopt,
+                                peat_fid,
+                                ctrl_id,
+                                safe_id,
+                                attn_id,
+                                tech_id,
+                                peat_buf_id,
+                                oopt_buf_id,
+                                ctrl_buf_id,
+                                safe_buf_id,
+                                attn_buf_id)
             SELECT
                 name,
                 acq_date,
@@ -1042,7 +1051,8 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                 bright_t31,
                 bright_ti4,
                 bright_ti5,
-                scan,track,
+                scan,
+                track,
                 version,
                 frp,
                 region,
@@ -1062,8 +1072,18 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                 tech,
                 vip_zone,
                 oopt_id,
-                buffer_id,
-                country
+                country,
+                oopt,
+                peat_fid,
+                ctrl_id,
+                safe_id,
+                attn_id,
+                tech_id,
+                peat_buf_id,
+                oopt_buf_id,
+                ctrl_buf_id,
+                safe_buf_id,
+                attn_buf_id
             FROM {today_tab}
             WHERE NOT EXISTS(
                 SELECT ident FROM {year_tab}
