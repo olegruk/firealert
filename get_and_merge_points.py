@@ -907,7 +907,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         logger.error(f"Error checking control zones: {err}")
 
 
-def check_control_buffers(conn, cursor, src_tab, buffers):
+def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
     """Check if a points in a control zones buffers."""
     logger.info("Checking control zones buffers...")
     ass_tab = "buffers_assign"
@@ -919,7 +919,8 @@ def check_control_buffers(conn, cursor, src_tab, buffers):
         CREATE TABLE {ass_tab} (
                 gid INTEGER,
                 zone_id BIGINT,
-                category VARCHAR(100)
+                category VARCHAR(100),
+                distance INTEGER
                 )
         """,
         f"""
@@ -933,6 +934,13 @@ def check_control_buffers(conn, cursor, src_tab, buffers):
             FROM {buffers},{src_tab}
             WHERE
                 ST_Intersects({buffers}.geog, {src_tab}.geog)
+        """,
+        f"""
+        UPDATE {ass_tab}
+            SET distance = ST_Distance({src_tab}.geog, {control_zones}.geog)
+            FROM {src_tab}, {control_zones}
+            WHERE {src_tab}.gid = {ass_tab}.gid 
+                    AND {ass_tab}.zone_id = {control_zones}.id
         """,
         f"""
         UPDATE {src_tab}
@@ -1174,7 +1182,8 @@ def get_and_merge_points_job():
     # check_oopt_zones(conn, cursor, common_tab, oopt_zones)
     # check_oopt_buffers(conn, cursor, common_tab, oopt_buffers)
     check_control_zones(conn, cursor, common_tab, 'control_zones')
-    check_control_buffers(conn, cursor, common_tab, 'control_buffers')
+    check_control_buffers(conn, cursor, common_tab,
+                            'control_zones', 'control_buffers')
     copy_to_common_table(conn, cursor, common_tab, year_tab)
     for pointset in pointsets:
         drop_temp_tables(conn, cursor, pointset)
