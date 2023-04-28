@@ -356,7 +356,8 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                 oopt_buf_id INTEGER,
                 ctrl_buf_id INTEGER,
                 safe_buf_id INTEGER,
-                attn_buf_id INTEGER
+                attn_buf_id INTEGER,
+                distance INTEGER
         )
         """
     )
@@ -944,7 +945,9 @@ def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
         """,
         f"""
         UPDATE {src_tab}
-	        SET peat_buf_id = {ass_tab}.zone_id
+	        SET
+                peat_buf_id = {ass_tab}.zone_id,
+                distance = {ass_tab}.distance
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -952,7 +955,9 @@ def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
         """,
         f"""
         UPDATE {src_tab}
-	        SET oopt_buf_id = {ass_tab}.zone_id
+	        SET
+                oopt_buf_id = {ass_tab}.zone_id,
+                distance = {ass_tab}.distance
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -960,7 +965,9 @@ def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
         """,
         f"""
         UPDATE {src_tab}
-	        SET ctrl_buf_id = {ass_tab}.zone_id
+	        SET
+                ctrl_buf_id = {ass_tab}.zone_id,
+                distance = {ass_tab}.distance
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -968,7 +975,9 @@ def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
         """,
         f"""
         UPDATE {src_tab}
-	        SET safe_buf_id = {ass_tab}.zone_id
+	        SET
+                safe_buf_id = {ass_tab}.zone_id,
+                distance = {ass_tab}.distance
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -976,7 +985,9 @@ def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
         """,
         f"""
         UPDATE {src_tab}
-	        SET attn_buf_id = {ass_tab}.zone_id
+	        SET
+                attn_buf_id = {ass_tab}.zone_id,
+                distance = {ass_tab}.distance
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -1044,7 +1055,8 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                                 oopt_buf_id,
                                 ctrl_buf_id,
                                 safe_buf_id,
-                                attn_buf_id)
+                                attn_buf_id,
+                                distance)
             SELECT
                 name,
                 acq_date,
@@ -1091,7 +1103,8 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                 oopt_buf_id,
                 ctrl_buf_id,
                 safe_buf_id,
-                attn_buf_id
+                attn_buf_id,
+                distance
             FROM {today_tab}
             WHERE NOT EXISTS(
                 SELECT ident FROM {year_tab}
