@@ -90,7 +90,7 @@ def make_reqst_table(conn, cursor, src_tab, crit_or_peat, limit,
                 date_time > TIMESTAMP '{from_time}' - INTERVAL '{period}'
                 AND "date_time" <= TIMESTAMP '{from_time}'
                 AND {crit_or_peat} >= {limit}
-                AND region in {reg_list}
+                AND region IN ({reg_list})
             ORDER BY
                 {src_tab}.peat_id
         """,
@@ -205,7 +205,7 @@ def make_reqst_table(conn, cursor, src_tab, crit_or_peat, limit,
         """
     )
 
-    if reg_list == "('Россия')":
+    if reg_list == "'Россия'":
         statements = statements_allrussia_yesterday
     else:
         statements = statements_regional_yesterday

@@ -170,12 +170,12 @@ def add_new_region(telegram_id, region):
     """Add new monitored region for subscriber with telegram_id."""
     conn, cursor = get_cursor()
     cursor.execute(f"""UPDATE {subs_table}
-                       SET regions = replace(regions, ')', ', ''{region}'')')
+                       SET regions = regions || ",'{region}'")
                        WHERE regions IS NOT NULL
                        AND tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""UPDATE {subs_table}
-                       SET regions = '(''{region}'')'
+                       SET regions = "'{region}'"
                        WHERE regions IS NULL
                        AND tlg_id = '{telegram_id}'
                     """)
@@ -192,20 +192,20 @@ def remove_region(telegram_id, region):
     """Remove region from list of monitored for subscriber with telegram_id."""
     conn, cursor = get_cursor()
     cursor.execute(f"""UPDATE {subs_table}
-                       SET regions = replace(regions, '''{region}'', ', '')
+                       SET regions = replace(regions, "'{region}', ", "")
                        WHERE tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""UPDATE {subs_table}
-                       SET regions = replace(regions, ', ''{region}''', '')
+                       SET regions = replace(regions, ", '{region}'", "")
                        WHERE tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""UPDATE {subs_table}
-                       SET regions = replace(regions, '''{region}''', '')
+                       SET regions = replace(regions, "'{region}'", "")
                        WHERE tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""UPDATE {subs_table}
                        SET regions = NULL
-                       WHERE regions = '()'
+                       WHERE regions = "()"
                        AND tlg_id = '{telegram_id}'
                     """)
     cursor.execute(f"""SELECT regions

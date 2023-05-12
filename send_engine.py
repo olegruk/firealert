@@ -40,18 +40,17 @@ from requester import (
     make_tlg_peat_stat_msg,
     make_zone_stat_msg,
     make_smf_stat_msg,
-    get_oopt_ids_for_region,
-    get_oopt_ids_for_ecoregion,
+    get_zone_ids_for_region,
+    get_zone_ids_for_ecoregion,
     new_alerts)
 from mylogger import init_logger
 
-logger = init_logger()
+logger = init_logger(loglevel="Debug")
 
 
-def count_crit_points(zones_tab, zone_id, limit):
+def count_crit_points(cursor, zones_tab, zone_id, limit):
     """Check count of critical points for zonelist."""
     # logger.info("Getting statistic for %s..."%(reg))
-    conn, cursor = get_cursor()
     stat = (
         f"""
         SELECT count(*) 
@@ -65,8 +64,6 @@ def count_crit_points(zones_tab, zone_id, limit):
         critical_cnt = cursor.fetchone()[0]
     except psycopg2.Error as err:
         logger.error(f"Error getting critical statistic for zone: {err}")
-
-    close_conn(conn, cursor)
 
     return critical_cnt
 
@@ -136,7 +133,7 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, id_list,
         """,
         f"""
         ALTER TABLE {subs_tab}
-            ADD COLUMN description VARCHAR(500)
+            ADD COLUMN description VARCHAR(500),
             ADD COLUMN {zone_type} VARCHAR(100)
         """,
         f"""
@@ -161,7 +158,16 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, id_list,
     )
 
     try:
+        logger.debug(f"The period is: {period}")
+        n = 0
         for sql_stat in statements:
+            n += 1
+            logger.debug(f"Execute statement #: {n}")
+            logger.debug(f"Zone_type: {zone_type}")
+            logger.debug(f"Id_list: {id_list}")
+            logger.debug(f"Marker: {marker}")
+            logger.debug(f"Filter_tech: {filter_tech}")
+            logger.debug(f"Period: {period}")
             cursor.execute(sql_stat)
             conn.commit()
         logger.info(f"The table created for subs_id: {whom}")
@@ -176,7 +182,7 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, id_list,
                      GROUP BY {zone_type}_id, region, {zone_type}""")
     res_tab = cursor.fetchall()
     for rec in res_tab:
-        crit_count = count_crit_points(zones_tab, rec[0], limit)
+        crit_count = count_crit_points(cursor, zones_tab, rec[0], limit)
         rec.append(crit_count)
     cursor.execute(f"""SELECT
                             ST_XMax(ST_Extent(geog::geometry)) as x_max,
@@ -323,7 +329,7 @@ def make_subs_kml(point_period,
                                     result_dir,
                                     int_now_hour)
     dst_file = os.path.join(result_dir, dst_file_name)
-    write_to_kml(dst_file, subs.subs_id)
+    write_to_kml(dst_file, subs_id)
     return dst_file
 
 
@@ -333,7 +339,7 @@ def send_email_to_subs(subs_emails, subs_point_period, date, full_cnt, dst_file)
         logger.info("Creating maillist...")
         maillist = subs_emails.replace(" ", "").split(",")
         subject, body_text = make_mail_attr(date,
-                                            subs.point_period,
+                                            subs_point_period,
                                             full_cnt)
         try:
             send_email_with_attachment(maillist,
@@ -368,7 +374,7 @@ def make_zones_list(zones, regions, ecoregions):
     return zone_list
 
 
-def filter_zones(zonelist, peatfire, zones_tab):
+def filter_zones(cursor, zonelist, peatfire, zones_tab):
     cursor.execute(f"""SELECT id 
                        FROM {zones_tab}
                        WHERE 
@@ -465,18 +471,27 @@ def send_to_subscribers_job():
                                         subs.regions,
                                         subs.ecoregions)
             if zone_list == []:
-                logger.warning("Empty zones list for {subs.subs_name}.")
+                logger.warning(f"Empty zones list for {subs.subs_name}.")
                 continue
-
-            for zone_type in subs.zone_types:
+            zone_type_list = subs.zone_types.split(",")
+            logger.info(f"Checking zones for zone-types in: {zone_type_list}.")
+            for zone_type in zone_type_list:
                 if zone_type == "peat":
-                    zone_list = filter_zones(zonelist, subs.critical, zones_tab)
+                    filtered_zone_list = filter_zones(cursor,
+                                                        zone_list,
+                                                        subs.critical,
+                                                        zones_tab)
+                    if filtered_zone_list == []:
+                        logger.info(f"Empty peat zones for {subs.subs_name}.")
+                        continue
+                else:
+                    filtered_zone_list = zone_list              
                 logger.info(f"Check {zone_type} points now.")
                 stat, extent = make_subs_table(conn,
                                                 cursor,
                                                 year_tab,
                                                 zones_tab,
-                                                zone_list,
+                                                filtered_zone_list,
                                                 subs.period,
                                                 subs.subs_id,
                                                 subs.filter_tech,
@@ -523,7 +538,7 @@ def send_to_subscribers_job():
                                                     cursor,
                                                     year_tab,
                                                     buffers_tab,
-                                                    zone_list,
+                                                    filtered_zone_list,
                                                     subs.period,
                                                     subs.subs_id,
                                                     subs.filter_tech,
