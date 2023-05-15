@@ -164,7 +164,7 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, id_list,
             n += 1
             logger.debug(f"Execute statement #: {n}")
             logger.debug(f"Zone_type: {zone_type}")
-            logger.debug(f"Id_list: {id_list}")
+            # logger.debug(f"Id_list: {id_list}")
             logger.debug(f"Marker: {marker}")
             logger.debug(f"Filter_tech: {filter_tech}")
             logger.debug(f"Period: {period}")
@@ -181,9 +181,6 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, id_list,
                      FROM {subs_tab}
                      GROUP BY {zone_type}_id, region, {zone_type}""")
     res_tab = cursor.fetchall()
-    for rec in res_tab:
-        crit_count = count_crit_points(cursor, zones_tab, rec[0], limit)
-        rec.append(crit_count)
     cursor.execute(f"""SELECT
                             ST_XMax(ST_Extent(geog::geometry)) as x_max,
                             ST_YMax(ST_Extent(geog::geometry)) as y_max,
@@ -270,7 +267,7 @@ def set_name(conn, cursor, subs_tab, subs_id):
     logger.info("Setting name done.")
 
 
-def make_zone_msg(stat, extent, zone_type):
+def make_zone_msg(cursor, zones_tab, limit, stat, extent, zone_type):
     """Generate a statistic message for zones to sending over telegram."""
     if zone_type == "oopt":
         intro = "ООПТ"
@@ -300,8 +297,9 @@ def make_zone_msg(stat, extent, zone_type):
         msg += f"\r\n{st_str[1]} - {st_str[2]}: {st_str[3]}"
         full_cnt += st_str[3]
     msg += f"\nВсего точек: {full_cnt}"
-    if st_str[4] > 0:
-        msg+= f"\nВысокой опасности: {st_str[4]}"
+    crit_count = count_crit_points(cursor, zones_tab, st_str[0], limit)
+    if crit_count > 0:
+        msg+= f"\nВысокой опасности: {crit_count}"
     x_max = extent[0]
     y_max = extent[1]
     x_min = extent[2]
@@ -364,13 +362,13 @@ def send_tlg_to_subs(subs_tlg_id, dst_file, url, full_cnt):
 
 
 def make_zones_list(zones, regions, ecoregions):
-    zone_list = []
+    zone_list = ''
     if (zones is not None) and (zones != ''):
         zone_list = zones
     elif (regions is not None) and (regions != ''):
-        zone_list = get_zone_ids_for_region(regions)
+        zone_list = get_zone_ids_for_region(regions.split(","))
     elif (ecoregions is not None) and (ecoregions != ''):
-        zone_list = get_zone_ids_for_ecoregion(ecoregions)
+        zone_list = get_zone_ids_for_ecoregion(ecoregions.split(","))
     return zone_list
 
 
@@ -382,10 +380,17 @@ def filter_zones(cursor, zonelist, peatfire, zones_tab):
                             AND critical >= {peatfire}
                     """)
     relevant_zones = cursor.fetchall()
-    cutted_zonelist = []
-    for zone in zonelist:
-        if zone in relevant_zones:
-            cutted_zonelist.append(zone)
+    # logger.debug(f"Relevant zones: {relevant_zones}")
+    zone_list = zonelist.split(",")
+    logger.debug(f"Zonelist: {zone_list}")
+    cutted_zonelist = ""
+    for rec in relevant_zones:
+        # logger.debug(f"Rec: {rec}")
+        # logger.debug(f"Rec[0]: {str(rec[0])}")
+        if str(rec[0]) in zone_list:
+            cutted_zonelist += f"'{rec[0]}',"
+    cutted_zonelist = cutted_zonelist[0:-1]
+    logger.debug(f"Cutted zonelist: {cutted_zonelist}")
     return cutted_zonelist
 
 def send_to_subscribers_job():
@@ -397,9 +402,11 @@ def send_to_subscribers_job():
     date = time.strftime("%Y-%m-%d", currtime)
     now_hour = time.strftime("%H", currtime)
 
-    [year_tab, subs_tab, zones_tab] = get_config("tables", ["year_tab",
-                                                           "subs_tab",
-                                                           "oopt_zones"])
+    [year_tab, subs_tab, zones_tab, buffers_tab] = get_config("tables",
+                                                              ["year_tab",
+                                                              "subs_tab",
+                                                              "oopt_zones",
+                                                              "oopt_buffers"])
     [data_root, temp_folder] = get_config("path", ["data_root",
                                                    "temp_folder"])
     [to_dir] = get_config("yadisk", ["yadisk_out_path"])
@@ -470,7 +477,8 @@ def send_to_subscribers_job():
             zone_list = make_zones_list(subs.zones,
                                         subs.regions,
                                         subs.ecoregions)
-            if zone_list == []:
+            # logger.debug(f"Zones list: {zone_list}.")
+            if zone_list == '':
                 logger.warning(f"Empty zones list for {subs.subs_name}.")
                 continue
             zone_type_list = subs.zone_types.split(",")
@@ -481,7 +489,7 @@ def send_to_subscribers_job():
                                                         zone_list,
                                                         subs.critical,
                                                         zones_tab)
-                    if filtered_zone_list == []:
+                    if filtered_zone_list == "":
                         logger.info(f"Empty peat zones for {subs.subs_name}.")
                         continue
                 else:
@@ -499,7 +507,7 @@ def send_to_subscribers_job():
                                                 subs.critical)
                 num_points = len(stat)
                 if (num_points > 0) and (subs.teleg_stat or subs.email_stat):
-                    msg = make_zone_msg(stat, extent, zone_type)
+                    msg = make_zone_msg(cursor, zones_tab, subs.critical, stat, extent, zone_type)
                     if subs.teleg_stat:
                         logger.info("Sending stat to telegram...")
                         send_to_telegram(url, subs.tlg_id, msg)
@@ -546,7 +554,7 @@ def send_to_subscribers_job():
                                                     subs.critical)
                     num_points = len(stat)
                     if num_points > 0:
-                        msg = make_zone_msg(stat, extent, f"{zone_type}_buffer")
+                        msg = make_zone_msg(cursor, zones_tab, subs.critical, stat, extent, f"{zone_type}_buffer")
                         send_to_telegram(url, subs.tlg_id, msg)
                     if (subs.email_point or subs.teleg_point):
                         if (num_points > 0) or subs.send_empty:

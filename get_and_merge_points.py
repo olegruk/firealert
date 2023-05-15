@@ -332,7 +332,7 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                 rating SMALLINT,
                 critical SMALLINT,
                 revision SMALLINT,
-                peat_id VARCHAR(254),
+                peat_un_id VARCHAR(254),
                 peat_district VARCHAR(254),
                 peat_region VARCHAR(254),
                 peat_area SMALLINT,
@@ -347,7 +347,7 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                 oopt VARCHAR(254),
                 oopt_id INTEGER,
                 country VARCHAR(50),
-                peat_fid INTEGER,
+                peat_id INTEGER,
                 ctrl_id INTEGER,
                 safe_id INTEGER,
                 attn_id INTEGER,
@@ -493,7 +493,7 @@ def cost_point_in_buffers(conn, cursor, tablename):
                 SET
                     rating = {rate},
                     critical = {fire_cost}*{rate},
-                    peat_id = {peat_db}.unique_id,
+                    peat_un_id = {peat_db}.unique_id,
                     peat_district = {peat_db}.district,
                     peat_region = {peat_db}.region,
                     peat_class = {peat_db}.dry_indx,
@@ -677,7 +677,7 @@ def rise_multipoint_cost(conn, cursor, tablename, distance):
         CREATE TABLE {temp_tab}
             AS SELECT
                 ident,
-                peat_id,
+                peat_un_id,
                 peat_fire,
                 rating,
                 critical,
@@ -849,7 +849,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         """,
         f"""
         UPDATE {src_tab}
-	        SET peat_fid = {ass_tab}.zone_id
+	        SET peat_id = {ass_tab}.zone_id
             FROM {ass_tab}
 	        WHERE 
                 {ass_tab}.gid = {src_tab}.gid
@@ -1031,7 +1031,7 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                                 rating,
                                 critical,
                                 revision,
-                                peat_id,
+                                peat_un_id,
                                 peat_district,
                                 peat_region,
                                 peat_area,
@@ -1046,7 +1046,7 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                                 oopt_id,
                                 country,
                                 oopt,
-                                peat_fid,
+                                peat_id,
                                 ctrl_id,
                                 safe_id,
                                 attn_id,
@@ -1079,7 +1079,7 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                 rating,
                 critical,
                 revision,
-                peat_id,
+                peat_un_id,
                 peat_district,
                 peat_region,
                 peat_area,
@@ -1094,7 +1094,7 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                 oopt_id,
                 country,
                 oopt,
-                peat_fid,
+                peat_id,
                 ctrl_id,
                 safe_id,
                 attn_id,

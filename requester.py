@@ -50,7 +50,7 @@ def make_reqst_table(conn, cursor, src_tab, crit_or_peat, limit,
                 sat_sensor VARCHAR(5),
                 region  VARCHAR(100),
                 peat_district VARCHAR(254),
-                peat_id VARCHAR(256),
+                peat_un_id VARCHAR(256),
                 peat_class SMALLINT,
                 peat_fire SMALLINT,
                 critical SMALLINT,
@@ -66,7 +66,7 @@ def make_reqst_table(conn, cursor, src_tab, crit_or_peat, limit,
                                 sat_sensor,
                                 region,
                                 critical,
-                                peat_id,
+                                peat_un_id,
                                 peat_district,
                                 peat_class,
                                 peat_fire,
@@ -80,7 +80,7 @@ def make_reqst_table(conn, cursor, src_tab, crit_or_peat, limit,
                 {src_tab}.satellite,
                 {src_tab}.region,
                 {src_tab}.critical,
-                {src_tab}.peat_id,
+                {src_tab}.peat_un_id,
                 {src_tab}.peat_district,
                 {src_tab}.peat_class,
                 {src_tab}.peat_fire,
@@ -92,7 +92,7 @@ def make_reqst_table(conn, cursor, src_tab, crit_or_peat, limit,
                 AND {crit_or_peat} >= {limit}
                 AND region IN ({reg_list})
             ORDER BY
-                {src_tab}.peat_id
+                {src_tab}.peat_un_id
         """,
         f"""
         UPDATE {subs_tab}
@@ -117,7 +117,7 @@ def make_reqst_table(conn, cursor, src_tab, crit_or_peat, limit,
                     'Сенсор: ' || sat_sensor || '\n' ||
                     'Регион: ' || region || '\n' ||
                     'Район: ' || peat_district || '\n' ||
-                    'Торфяник (ID): ' || peat_id || '\n' ||
+                    'Торфяник (ID): ' || peat_un_id || '\n' ||
                     'Класс осушки: ' || peat_class || '\n' ||
                     'Горимость торфяника: ' || peat_fire || '\n' ||
                     'Критичность точки: ' || critical
@@ -131,7 +131,7 @@ def make_reqst_table(conn, cursor, src_tab, crit_or_peat, limit,
                     'Сенсор: ' || sat_sensor || '\n' ||
                     'Регион: ' || region
             WHERE
-                peat_id IS NULL
+                peat_un_id IS NULL
         """
     )
 
@@ -245,7 +245,7 @@ def make_reqst_for_circle(conn, cursor, src_tab, crit_or_peat,
                 sat_sensor VARCHAR(5),
                 region  VARCHAR(100),
                 peat_district VARCHAR(254),
-                peat_id VARCHAR(256),
+                peat_un_id VARCHAR(256),
                 peat_class SMALLINT,
                 peat_fire SMALLINT,
                 critical SMALLINT,
@@ -261,7 +261,7 @@ def make_reqst_for_circle(conn, cursor, src_tab, crit_or_peat,
                         sat_sensor,
                         region,
                         critical,
-                        peat_id,
+                        peat_un_id,
                         peat_district,
                         peat_class,
                         peat_fire,
@@ -275,7 +275,7 @@ def make_reqst_for_circle(conn, cursor, src_tab, crit_or_peat,
                 {src_tab}.satellite,
                 {src_tab}.region,
                 {src_tab}.critical,
-                {src_tab}.peat_id,
+                {src_tab}.peat_un_id,
                 {src_tab}.peat_district,
                 {src_tab}.peat_class,
                 {src_tab}.peat_fire,
@@ -313,7 +313,7 @@ def make_reqst_for_circle(conn, cursor, src_tab, crit_or_peat,
                     'Сенсор: ' || sat_sensor || '\n' ||
                     'Регион: ' || region || '\n' ||
                     'Район: ' || peat_district || '\n' ||
-                    'Торфяник (ID): ' || peat_id || '\n' ||
+                    'Торфяник (ID): ' || peat_un_id || '\n' ||
                     'Класс осушки: ' || peat_class || '\n' ||
                     'Горимость торфяника: ' || peat_fire || '\n' ||
                     'Критичность точки: ' || critical
@@ -327,7 +327,7 @@ def make_reqst_for_circle(conn, cursor, src_tab, crit_or_peat,
                 'Сенсор: ' || sat_sensor || '\n' ||
                 'Регион: ' || region
             WHERE
-                peat_id IS NULL
+                peat_un_id IS NULL
         """
     )
 
@@ -633,7 +633,7 @@ def new_alerts(period, cur_date):
                                  satellite_base,
                                  cluster)
             SELECT
-                peat_id,
+                peat_un_id,
                 date_time,
                 point_count,
                 'https://apps.sentinel-hub.com/eo-browser/?zoom=14&lat='
@@ -763,27 +763,35 @@ def get_zone_ids_for_region(reglist):
     logger.info("Making OOPT ids list for regions...")
     [oopt_zones] = get_config("tables", ["oopt_zones"])
     conn, cursor = get_cursor()
-    cursor.execute(f"""SELECT id
-                       FROM {oopt_zones}
-                       WHERE region IN ({reglist})""")
-    oopt_ids = cursor.fetchall()
-    oopt_lst = ""
-    for elem in oopt_ids:
-        oopt_lst += f"{str(elem[0])},"
-    oopt_lst = oopt_lst[0:-1]
-    return oopt_lst
+    full_oopt_lst = ""
+    for reg in reglist:
+        logger.debug(f"Region: --{reg}--.")
+        cursor.execute(f"""SELECT id
+                           FROM {oopt_zones}
+                           WHERE region LIKE '%{reg}%'""")
+        oopt_ids = cursor.fetchall()
+        oopt_lst = ""
+        for elem in oopt_ids:
+            oopt_lst += f"{str(elem[0])},"
+            # oopt_lst.append(elem[0])
+        full_oopt_lst += oopt_lst[0:-1]
+    # logger.debug(f"Zones list: {full_oopt_lst}.")
+    return full_oopt_lst
 
 def get_zone_ids_for_ecoregion(reglist):
     """Generate a list of oopt ids for ecoregions in reglist."""
     logger.info("Making OOPT ids list for ecoregions...")
     [oopt_zones] = get_config("tables", ["oopt_zones"])
     conn, cursor = get_cursor()
-    cursor.execute(f"""SELECT id
-                       FROM {oopt_zones}
-                       WHERE ecoregion IN ({reglist})""")
-    oopt_ids = cursor.fetchall()
-    oopt_lst = ""
-    for elem in oopt_ids:
-        oopt_lst += f"{str(elem[0])},"
-    oopt_lst = oopt_lst[0:-1]
-    return oopt_lst
+    full_oopt_lst = ""
+    for reg in reglist:
+        logger.debug(f"Region: --{reg}--.")
+        cursor.execute(f"""SELECT id
+                           FROM {oopt_zones}
+                           WHERE ecoregion IN ({reglist})""")
+        oopt_ids = cursor.fetchall()
+        oopt_lst = ""
+        for elem in oopt_ids:
+            oopt_lst += f"{str(elem[0])},"
+        full_oopt_lst += oopt_lst[0:-1]
+    return full_oopt_lst
