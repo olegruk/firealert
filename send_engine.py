@@ -25,9 +25,7 @@ from faservice import (
     get_config,
     get_tuple_cursor,
     close_conn,
-    get_path,
-    smf_new_topic,
-    str_to_lst)
+    get_path)
 from faservice import (
     write_to_kml,
     write_to_yadisk,
@@ -37,9 +35,6 @@ from faservice import (
     send_to_telegram,
     points_tail)
 from requester import (
-    make_tlg_peat_stat_msg,
-    make_zone_stat_msg,
-    make_smf_stat_msg,
     get_zone_ids_for_region,
     get_zone_ids_for_ecoregion,
     new_alerts)
@@ -331,7 +326,8 @@ def make_subs_kml(point_period,
     return dst_file
 
 
-def send_email_to_subs(subs_emails, subs_point_period, date, full_cnt, dst_file):
+def send_email_to_subs(subs_emails, subs_point_period,
+                       date, full_cnt, dst_file):
     """Sending to subscriber a kml-file over email."""
     if (subs_emails is not None and subs_emails != ''):
         logger.info("Creating maillist...")
@@ -417,46 +413,6 @@ def send_to_subscribers_job():
     conn, cursor = get_tuple_cursor()
 
     # Загружаем данные о подписчиках
-    # subs_id           serial          автоидентификатор
-    # subs_name         varchar(10)     имя подписчика, для удобства
-    #                                       ориентирования в подписках
-    # active            boolean         подписка активна?
-    # regions           varchar()       список регионов на контроле подписчика
-    # emails             varchar()       список e-mail адресов подписчика
-    # tlg_id         varchar(20)     список телеграмм-чатов подписчика
-    # email_stat        boolean         слать статистику по почте?
-    # teleg_stat        boolean         слать статистику в телеграмм?
-    # email_point       boolean         слать точки по почте?
-    # teleg_point       boolean         слать точки в телеграмм?
-    # stat_period       integer         период в часах, за который
-    #                                       выдается статистика
-    # point_period      integer         период в часах, за который
-    #                                       выбираются точки
-    # crit_or_fire      varchar(4)      критерий отбора точек,
-    #                                       критичность точки - 'crit'
-    #                                       или горимость торфа - 'fire'
-    # critical          integer         порог критичности точки
-    #                                       для отбора точек
-    # peatfire          integer         порог горимости торфяника
-    #                                       для отбора точек
-    # send_first_time   varchar(5)      время первой рассылки за сутки
-    # send_period       integer         периодичность рассылки в часах
-    # send_times        varchar()       список временных меток для рассылки
-    #                                       (в какие часы делается рассылка)
-    # vip_zones         boolean         рассылать ли информацию
-    #                                       по зонам особого внимания?
-    # send_empty        boolean         отправлять или нет пустой файл?
-    # ya_disk           boolean         писать или нет файл на яндекс-диск
-    # zones             varchar()       список зон особого внимания
-    #                                       на контроле подписчика
-    # filter_tech       boolean         фильтровать техноген?
-    # oopt_zones        varchar()       список ООПТ на контроле подписчика
-    # check_oopt        boolean         проверять попадание в ООПТ?
-    # oopt_regions      varchar()       список регионов для контроля ООПТ
-    #                                       (читается, если пуст явный список)
-    # check_oopt_buf    boolean         проверять попадание
-    #                                       в буферные зоны ООПТ?
-
     cursor.execute(f"SELECT * FROM {subs_tab} WHERE active")
     subscribers = cursor.fetchall()
 
@@ -507,7 +463,8 @@ def send_to_subscribers_job():
                                                 subs.critical)
                 num_points = len(stat)
                 if (num_points > 0) and (subs.teleg_stat or subs.email_stat):
-                    msg = make_zone_msg(cursor, zones_tab, subs.critical, stat, extent, zone_type)
+                    msg = make_zone_msg(cursor, zones_tab, subs.critical,
+                                        stat, extent, zone_type)
                     if subs.teleg_stat:
                         logger.info("Sending stat to telegram...")
                         send_to_telegram(url, subs.tlg_id, msg)
@@ -554,7 +511,8 @@ def send_to_subscribers_job():
                                                     subs.critical)
                     num_points = len(stat)
                     if num_points > 0:
-                        msg = make_zone_msg(cursor, zones_tab, subs.critical, stat, extent, f"{zone_type}_buffer")
+                        msg = make_zone_msg(cursor, zones_tab, subs.critical,
+                                            stat, extent, f"{zone_type}_buffer")
                         send_to_telegram(url, subs.tlg_id, msg)
                     if (subs.email_point or subs.teleg_point):
                         if (num_points > 0) or subs.send_empty:

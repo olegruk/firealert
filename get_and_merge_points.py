@@ -1155,7 +1155,7 @@ def get_and_merge_points_job():
     [clst_dist] = get_config("clusters", ["cluster_dist"])
     [num_of_src] = get_config("sources", ["num_of_src"])
     [pointsets] = get_config("sources", ["src"])
-    [url, chat_id] = get_config("telegramm", ["url", "tst_chat_id"])
+    [url, chat_id] = get_config("telegramm", ["url", "log_chat_id"])
     firms_path = get_path(data_root, firms_folder)
 
     loaded_set = []

@@ -57,7 +57,7 @@ def check_robot_health_job():
     logger.info("----------------------------------------")
     logger.info("Process [check_robot_health.py] started.")
 
-    [url, chat_id] = get_config("telegramm", ["url", "tst_chat_id"])
+    [url, chat_id] = get_config("telegramm", ["url", "log_chat_id"])
     [filelist, mail_addr] = get_config("health", ["filelist", "emails"])
 
     count, existlist = is_files_exist(filelist)
