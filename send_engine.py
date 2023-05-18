@@ -299,12 +299,20 @@ def make_zone_msg(cursor, zones_tab, limit, stat, extent, zone_type):
     y_max = extent[1]
     x_min = extent[2]
     y_min = extent[3]
-    msg += (f"\n\n"
-            f"<a href="
-            f"'https://maps.wwf.ru/portal/apps/webappviewer/"
-            f"index.html?id=b1d52f160ac54c3faefd4592da4cf8ba"
-            f"&extent={x_min},{y_min},{x_max},{y_max}'"
-            f">Посмотреть на карте...</a>")
+    if (x_max != x_min) and (y_max != y_min):
+        msg += (f"\n\n"
+                f"<a href="
+                f"'https://maps.wwf.ru/portal/apps/webappviewer/"
+                f"index.html?id=b1d52f160ac54c3faefd4592da4cf8ba"
+                f"&extent={x_min},{y_min},{x_max},{y_max}'"
+                f">Посмотреть на карте...</a>")
+    else:
+        msg += (f"\n\n"
+                f"<a href="
+                f"'https://maps.wwf.ru/portal/apps/webappviewer/"
+                f"index.html?id=b1d52f160ac54c3faefd4592da4cf8ba"
+                f"&extent={x_min},{y_min},{x_max},{y_max}&level=9'"
+                f">Посмотреть на карте...</a>")
     return msg
 
 
@@ -368,12 +376,12 @@ def make_zones_list(zones, regions, ecoregions):
     return zone_list
 
 
-def filter_zones(cursor, zonelist, peatfire, zones_tab):
+def filter_zones(cursor, zonelist, critical, zones_tab):
     cursor.execute(f"""SELECT id 
                        FROM {zones_tab}
                        WHERE 
                             category = 'торфяник'
-                            AND critical >= {peatfire}
+                            AND critical >= {critical}
                     """)
     relevant_zones = cursor.fetchall()
     # logger.debug(f"Relevant zones: {relevant_zones}")
@@ -470,7 +478,7 @@ def send_to_subscribers_job():
                         send_to_telegram(url, subs.tlg_id, msg)
                     if subs.email_stat:
                         logger.info("Sending stat to email...")
-                        subject = f"Statistic per last {subs.stat_period}"
+                        subject = f"Statistic per last {subs.period}"
                         maillist = subs.emails.replace(" ", "").split(",")
                         send_email_message(maillist, subject, msg)
                 if (subs.email_point or subs.teleg_point):
