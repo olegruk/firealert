@@ -505,7 +505,7 @@ def get_zone_ids_for_ecoregion(reglist):
         logger.debug(f"Region: --{reg}--.")
         cursor.execute(f"""SELECT id
                            FROM {oopt_zones}
-                           WHERE ecoregion IN ({reglist})""")
+                           WHERE ecoregion LIKE '%{reg}%'""")
         oopt_ids = cursor.fetchall()
         oopt_lst = ""
         for elem in oopt_ids:
