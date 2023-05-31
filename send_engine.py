@@ -46,32 +46,36 @@ logger = init_logger(loglevel="Debug")
 def count_crit_points(cursor, zones_tab, zone_id, limit):
     """Check count of critical points for zonelist."""
     # logger.info("Getting statistic for %s..."%(reg))
-    stat = (
-        f"""
-        SELECT count(*) 
-        FROM {zones_tab}
-        WHERE id = {zone_id}
-              AND critical >= {limit}
-        """
-    )
-    try:
-        cursor.execute(stat)
-        critical_cnt = cursor.fetchone()[0]
-    except psycopg2.Error as err:
-        logger.error(f"Error getting critical statistic for zone: {err}")
-
+    if limit is not None:
+        stat = (
+            f"""
+            SELECT count(*) 
+            FROM {zones_tab}
+            WHERE id = {zone_id}
+                AND critical >= {limit}
+            """
+        )
+        try:
+            cursor.execute(stat)
+            critical_cnt = cursor.fetchone()[0]
+        except psycopg2.Error as err:
+            logger.error(f"Error getting critical statistic for zone: {err}")
+            critical_cnt = 0
+    else:
+        logger.warning(f"Critical limit is Null. Count of points setted to 0.")
+        critical_cnt = 0
     return critical_cnt
 
 
-def make_subs_table(conn, cursor, year_tab, zones_tab, id_list,
-                         period, whom, filter_tech, zone_type, limit):
+def make_subs_table(conn, cursor, year_tab, zones_tab, buffers_tab, id_list,
+                         ch_buf, period, whom, filter_tech, zone_type, limit):
     """Create table with points for subscriber with ID 'subs_id'."""
     logger.info(f"Creating table for subs_id: {whom}...")
     subs_tab = f"for_s{whom}"
     marker = f"[s{whom}]"
     period = f"{period} hours"
 
-    statements = (
+    stat_non_buf = (
         f"""
         DROP TABLE IF EXISTS {subs_tab}
         """,
@@ -152,6 +156,96 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, id_list,
         """
     )
 
+    stat_buf = (
+        f"""
+        DROP TABLE IF EXISTS {subs_tab}
+        """,
+        f"""
+        CREATE TABLE {subs_tab} AS
+            SELECT
+                acq_date AS date,
+                acq_time AS time,
+                latitude,
+                longitude,
+                region,
+                COALESCE({zone_type}_id, {zone_type}_buf_id) AS {zone_type}_id,
+                critical,
+                distance,
+                geog
+            FROM {year_tab}
+            WHERE
+                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                AND ({zone_type}_id IN ({id_list})
+                     OR {zone_type}_buf_id IN ({id_list}))
+                AND (
+                    whom is Null
+                    OR POSITION('{marker}' in whom) = 0
+                )
+                AND NOT (
+                    {filter_tech}
+                    AND (tech_id IS NOT NULL)
+                )
+            ORDER BY {zone_type}_id
+        """,
+        f"""
+        UPDATE {year_tab}
+            SET
+                whom = whom || '{marker}'
+            WHERE
+                date_time > TIMESTAMP 'now' - INTERVAL '{period}'
+                AND ({zone_type}_id IN ({id_list})
+                     OR {zone_type}_buf_id IN ({id_list}))
+                AND POSITION('{marker}' in whom) = 0
+                AND NOT (
+                    {filter_tech}
+                    AND (tech_id IS NOT NULL)
+                )
+        """,
+        f"""
+        UPDATE {year_tab}
+            SET
+                whom = '{marker}'
+            WHERE
+                date_time > TIMESTAMP 'now' - INTERVAL '{period}'
+                AND ({zone_type}_id IN ({id_list})
+                     OR {zone_type}_buf_id IN ({id_list}))
+                AND whom is Null
+                AND NOT (
+                    {filter_tech}
+                    AND (tech_id IS NOT NULL)
+                )
+        """,
+        f"""
+        ALTER TABLE {subs_tab}
+            ADD COLUMN description VARCHAR(500),
+            ADD COLUMN {zone_type} VARCHAR(100)
+        """,
+        f"""
+        UPDATE {subs_tab}
+            SET
+                {zone_type} = {zones_tab}.name
+            FROM {zones_tab}
+            WHERE
+                {subs_tab}.{zone_type}_id = {zones_tab}.id
+        """,
+        f"""
+        UPDATE {subs_tab}
+            SET
+                description =
+                    'Дата: ' || date || '\n' ||
+                    'Время: ' || time || '\n' ||
+                    'Широта: ' || latitude || '\n' ||
+                    'Долгота (ID): ' || longitude || '\n' ||
+                    'Регион: ' || region || '\n' ||
+                    'Территория: ' || {zone_type}
+        """
+    )
+
+    if ch_buf:
+        statements = stat_buf
+    else:
+        statements = stat_non_buf
+
     try:
         logger.debug(f"The period is: {period}")
         n = 0
@@ -184,7 +278,10 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, id_list,
                             ST_Extent(geog::geometry) AS subs_extent
                        FROM {subs_tab}""")
     points_extent = cursor.fetchone()
-    return res_tab, points_extent
+    num = 0
+    for str in res_tab:
+        num += str[3]
+    return num, res_tab, points_extent
 
 
 def drop_whom_table(conn, cursor, whom):
@@ -235,7 +332,7 @@ def make_mail_attr(date, period, num_points):
         else:
             subject = f"Daily points per {date} (no any points)"
         body_text = "In the attachment firepoints for last day.\r\n"\
-                    "Email to dist_mon@firevolonter.ru if you find any "\
+                    "Email to firealert.robot@yandex.ru if you find any "\
                     "errors or inaccuracies."
     else:
         if num_points > 0:
@@ -243,7 +340,7 @@ def make_mail_attr(date, period, num_points):
         else:
             subject = f"Points per last {period} (no any points)"
         body_text = "In the attachment firepoints for last days.\r\n"\
-                    "Email to dist_mon@firevolonter.ru if you find any "\
+                    "Email to firealert.robot@yandex.ru if you find any "\
                     "errors or inaccuracies."
     return subject, body_text
 
@@ -377,24 +474,27 @@ def make_zones_list(zones, regions, ecoregions):
 
 
 def filter_zones(cursor, zonelist, critical, zones_tab):
-    cursor.execute(f"""SELECT id 
-                       FROM {zones_tab}
-                       WHERE 
-                            category = 'торфяник'
-                            AND critical >= {critical}
-                    """)
-    relevant_zones = cursor.fetchall()
-    # logger.debug(f"Relevant zones: {relevant_zones}")
-    zone_list = zonelist.split(",")
-    logger.debug(f"Zonelist: {zone_list}")
-    cutted_zonelist = ""
-    for rec in relevant_zones:
-        # logger.debug(f"Rec: {rec}")
-        # logger.debug(f"Rec[0]: {str(rec[0])}")
-        if str(rec[0]) in zone_list:
-            cutted_zonelist += f"'{rec[0]}',"
-    cutted_zonelist = cutted_zonelist[0:-1]
-    logger.debug(f"Cutted zonelist: {cutted_zonelist}")
+    if (critical is not None) and critical > 0:
+        cursor.execute(f"""SELECT id 
+                        FROM {zones_tab}
+                        WHERE 
+                                category = 'торфяник'
+                                AND critical >= {critical}
+                        """)
+        relevant_zones = cursor.fetchall()
+        # logger.debug(f"Relevant zones: {relevant_zones}")
+        zone_list = zonelist.split(",")
+        logger.debug(f"Zonelist: {zone_list}")
+        cutted_zonelist = ""
+        for rec in relevant_zones:
+            # logger.debug(f"Rec: {rec}")
+            # logger.debug(f"Rec[0]: {str(rec[0])}")
+            if str(rec[0]) in zone_list:
+                cutted_zonelist += f"'{rec[0]}',"
+        cutted_zonelist = cutted_zonelist[0:-1]
+        logger.debug(f"Cutted zonelist: {cutted_zonelist}")
+    else:
+        cutted_zonelist = zonelist
     return cutted_zonelist
 
 def send_to_subscribers_job():
@@ -445,7 +545,11 @@ def send_to_subscribers_job():
             if zone_list == '':
                 logger.warning(f"Empty zones list for {subs.subs_name}.")
                 continue
-            zone_type_list = subs.zone_types.split(",")
+            if subs.zone_types == '':
+                logger.warning(f"Empty zone types list for {subs.subs_name}.")
+                continue
+            else:
+                zone_type_list = subs.zone_types.split(",")
             logger.info(f"Checking zones for zone-types in: {zone_type_list}.")
             for zone_type in zone_type_list:
                 if zone_type == "peat":
@@ -459,20 +563,22 @@ def send_to_subscribers_job():
                 else:
                     filtered_zone_list = zone_list              
                 logger.info(f"Check {zone_type} points now.")
-                stat, extent = make_subs_table(conn,
+                num_points, stat, extent = make_subs_table(conn,
                                                 cursor,
                                                 year_tab,
                                                 zones_tab,
+                                                buffers_tab,
                                                 filtered_zone_list,
+                                                subs.check_buffers,
                                                 subs.period,
                                                 subs.subs_id,
                                                 subs.filter_tech,
                                                 zone_type,
                                                 subs.critical)
-                num_points = len(stat)
+                # num_points = len(stat)
                 if (num_points > 0) and (subs.teleg_stat or subs.email_stat):
-                    msg = make_zone_msg(cursor, zones_tab, subs.critical,
-                                        stat, extent, zone_type)
+                    msg = make_zone_msg(cursor, zones_tab, buffers_tab, 
+                                        subs.critical, stat, extent, zone_type)
                     if subs.teleg_stat:
                         logger.info("Sending stat to telegram...")
                         send_to_telegram(url, subs.tlg_id, msg)
@@ -505,54 +611,12 @@ def send_to_subscribers_job():
                         logger.info(f"Don`t send zero-point {zone_type} file.")
                 logger.info("Dropping tables...")
                 drop_whom_table(conn,cursor,subs.subs_id)
-                if subs.check_buffers:
-                    logger.info(f"Check {zone_type} buffers points now.")
-                    stat, extent = make_subs_table(conn,
-                                                    cursor,
-                                                    year_tab,
-                                                    buffers_tab,
-                                                    filtered_zone_list,
-                                                    subs.period,
-                                                    subs.subs_id,
-                                                    subs.filter_tech,
-                                                    zone_type,
-                                                    subs.critical)
-                    num_points = len(stat)
-                    if num_points > 0:
-                        msg = make_zone_msg(cursor, zones_tab, subs.critical,
-                                            stat, extent, f"{zone_type}_buffer")
-                        send_to_telegram(url, subs.tlg_id, msg)
-                    if (subs.email_point or subs.teleg_point):
-                        if (num_points > 0) or subs.send_empty:
-                            dst_file = make_subs_kml(subs.period,
-                                                        subs.subs_name,
-                                                        subs.subs_id,
-                                                        result_dir,
-                                                        date,
-                                                        int(now_hour))
-                            if subs.email_point:
-                                send_email_to_subs(subs.emails,
-                                                    subs.period,
-                                                    date,
-                                                    num_points,
-                                                    dst_file)
-                            if subs.teleg_point:
-                                send_tlg_to_subs(subs.tlg_id,
-                                                    dst_file,
-                                                    url,
-                                                    num_points)
-                            drop_temp_file(dst_file)
-                        else:
-                            logger.info(f"Don`t send zero-point "\
-                                        f"{zone_type} buffers file.")
-                    logger.info("Dropping tables...")
-                    drop_whom_table(conn,cursor,subs.subs_id)
             if now_hour == sendtimelist[0] and subs.ya_disk:
                 logger.info("Writing to yadisk...")
                 subs_folder = f"for_s{str(subs.subs_name)}"
                 write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
             logger.info("Dropping tables...")
-            drop_whom_table(conn, cursor, subs.subs_id)
+            # drop_whom_table(conn, cursor, subs.subs_id)
         else:
             logger.info("Do anything? It`s not time yet!")
 
