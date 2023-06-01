@@ -418,7 +418,8 @@ def make_subs_kml(point_period,
                     subs_id,
                     result_dir,
                     date,
-                    int_now_hour):
+                    int_now_hour,
+                    critical):
     """Writing kml-file for subscriber."""
     logger.info("Creating kml file...")
     dst_file_name = make_file_name(point_period,
@@ -427,7 +428,7 @@ def make_subs_kml(point_period,
                                     result_dir,
                                     int_now_hour)
     dst_file = os.path.join(result_dir, dst_file_name)
-    write_to_kml(dst_file, subs_id)
+    write_to_kml(dst_file, subs_id, critical)
     return dst_file
 
 
@@ -594,7 +595,8 @@ def send_to_subscribers_job():
                                                     subs.subs_id,
                                                     result_dir,
                                                     date,
-                                                    int(now_hour))
+                                                    int(now_hour),
+                                                    critical)
                         if subs.email_point:
                             send_email_to_subs(subs.emails,
                                                 subs.period,

@@ -215,7 +215,7 @@ def send_img_to_telegram(url, chat, file):
     return response
 
 
-def write_to_kml(dst_file, whom):
+def write_to_kml(dst_file, whom, crit=0):
     """Save a table to kml-file."""
     [dbserver, dbport, dbname, dbuser, dbpass] = get_db_config()
 
@@ -235,7 +235,8 @@ def write_to_kml(dst_file, whom):
                         dbname={dbname} \
                         password={dbpass} \
                         port={dbport}" \
-                    {subs_tab}"""
+                    {subs_tab}\
+                    -where "critical >= {crit}" """
     os.system(command)
     logger.info('Done.')
 
