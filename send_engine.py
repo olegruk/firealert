@@ -369,14 +369,14 @@ def make_zone_msg(cursor, zones_tab, limit, stat, extent, zone_type):
         intro = "зонах особого контроля"
     elif zone_type == "safe":
         intro = "охранных зонах"
-    elif zone_type == "oopt_buffer":
-        intro = "буферных зонах ООПТ"
-    elif zone_type == "peat_buffer":
-        intro = "буферных зонах торфяников"
-    elif zone_type == "ctrl_buffer":
-        intro = "буферах зон особого контроля"
-    elif zone_type == "safe_buffer":
-        intro = "буферах охранных зон"
+    # elif zone_type == "oopt_buffer":
+        # intro = "буферных зонах ООПТ"
+    # elif zone_type == "peat_buffer":
+        # intro = "буферных зонах торфяников"
+    # elif zone_type == "ctrl_buffer":
+        # intro = "буферах зон особого контроля"
+    # elif zone_type == "safe_buffer":
+        # intro = "буферах охранных зон"
     else:
         intro = "непонятных зонах"
     full_cnt = 0
@@ -553,7 +553,8 @@ def send_to_subscribers_job():
                 zone_type_list = subs.zone_types.split(",")
             logger.info(f"Checking zones for zone-types in: {zone_type_list}.")
             for zone_type in zone_type_list:
-                if zone_type == "peat":
+                # if zone_type == "peat":
+                if zone_type == "test":
                     filtered_zone_list = filter_zones(cursor,
                                                         zone_list,
                                                         subs.critical,
@@ -578,8 +579,8 @@ def send_to_subscribers_job():
                                                 subs.critical)
                 # num_points = len(stat)
                 if (num_points > 0) and (subs.teleg_stat or subs.email_stat):
-                    msg = make_zone_msg(cursor, zones_tab, buffers_tab, 
-                                        subs.critical, stat, extent, zone_type)
+                    msg = make_zone_msg(cursor, zones_tab, subs.critical,
+                                        stat, extent, zone_type)
                     if subs.teleg_stat:
                         logger.info("Sending stat to telegram...")
                         send_to_telegram(url, subs.tlg_id, msg)
@@ -588,6 +589,8 @@ def send_to_subscribers_job():
                         subject = f"Statistic per last {subs.period}"
                         maillist = subs.emails.replace(" ", "").split(",")
                         send_email_message(maillist, subject, msg)
+                else:
+                    logger.info("Zero-point stat. Don`t sending.")
                 if (subs.email_point or subs.teleg_point):
                     if (num_points > 0) or subs.send_empty:
                         dst_file = make_subs_kml(subs.period,
@@ -596,7 +599,7 @@ def send_to_subscribers_job():
                                                     result_dir,
                                                     date,
                                                     int(now_hour),
-                                                    critical)
+                                                    subs.critical)
                         if subs.email_point:
                             send_email_to_subs(subs.emails,
                                                 subs.period,
@@ -611,13 +614,11 @@ def send_to_subscribers_job():
                         drop_temp_file(dst_file)
                     else:
                         logger.info(f"Don`t send zero-point {zone_type} file.")
-                logger.info("Dropping tables...")
                 drop_whom_table(conn,cursor,subs.subs_id)
             if now_hour == sendtimelist[0] and subs.ya_disk:
                 logger.info("Writing to yadisk...")
                 subs_folder = f"for_s{str(subs.subs_name)}"
                 write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
-            logger.info("Dropping tables...")
             # drop_whom_table(conn, cursor, subs.subs_id)
         else:
             logger.info("Do anything? It`s not time yet!")
