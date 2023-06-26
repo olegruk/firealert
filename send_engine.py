@@ -49,7 +49,7 @@ def count_crit_points(cursor, zones_tab, zone_id, limit):
     if limit is not None:
         stat = (
             f"""
-            SELECT count(*) 
+            SELECT count(*)
             FROM {zones_tab}
             WHERE id = {zone_id}
                 AND critical >= {limit}
@@ -68,7 +68,7 @@ def count_crit_points(cursor, zones_tab, zone_id, limit):
 
 
 def make_subs_table(conn, cursor, year_tab, zones_tab, buffers_tab, id_list,
-                         ch_buf, period, whom, filter_tech, zone_type, limit):
+                    ch_buf, period, whom, filter_tech, zone_type, limit):
     """Create table with points for subscriber with ID 'subs_id'."""
     logger.info(f"Creating table for subs_id: {whom}...")
     subs_tab = f"for_s{whom}"
@@ -391,42 +391,44 @@ def make_zone_msg(cursor, zones_tab, limit, stat, extent, zone_type):
     msg += f"\nВсего точек: {full_cnt}"
     crit_count = count_crit_points(cursor, zones_tab, st_str[0], limit)
     if crit_count > 0:
-        msg+= f"\nВысокой опасности: {crit_count}"
+        msg += f"\nВысокой опасности: {crit_count}"
     x_max = extent[0]
     y_max = extent[1]
     x_min = extent[2]
     y_min = extent[3]
+    """
     if (x_max != x_min) and (y_max != y_min):
         msg += (f"\n\n"
                 f"<a href="
-                f"'https://maps.wwf.ru/portal/apps/webappviewer/"
+                f"'https://maps.rumap.ru/portal/apps/webappviewer/"
                 f"index.html?id=b1d52f160ac54c3faefd4592da4cf8ba"
                 f"&extent={x_min},{y_min},{x_max},{y_max}'"
                 f">Посмотреть на карте...</a>")
     else:
         msg += (f"\n\n"
                 f"<a href="
-                f"'https://maps.wwf.ru/portal/apps/webappviewer/"
+                f"'https://maps.rumap.ru/portal/apps/webappviewer/"
                 f"index.html?id=b1d52f160ac54c3faefd4592da4cf8ba"
                 f"&extent={x_min},{y_min},{x_max},{y_max}&level=9'"
                 f">Посмотреть на карте...</a>")
+    """
     return msg
 
 
 def make_subs_kml(point_period,
-                    subs_name,
-                    subs_id,
-                    result_dir,
-                    date,
-                    int_now_hour,
-                    critical):
-    """Writing kml-file for subscriber."""
+                  subs_name,
+                  subs_id,
+                  result_dir,
+                  date,
+                  int_now_hour,
+                  critical):
+    """Write kml-file for subscriber."""
     logger.info("Creating kml file...")
     dst_file_name = make_file_name(point_period,
-                                    date,
-                                    subs_name,
-                                    result_dir,
-                                    int_now_hour)
+                                   date,
+                                   subs_name,
+                                   result_dir,
+                                   int_now_hour)
     dst_file = os.path.join(result_dir, dst_file_name)
     write_to_kml(dst_file, subs_id, critical)
     return dst_file
@@ -434,7 +436,7 @@ def make_subs_kml(point_period,
 
 def send_email_to_subs(subs_emails, subs_point_period,
                        date, full_cnt, dst_file):
-    """Sending to subscriber a kml-file over email."""
+    """Send to subscriber a kml-file over email."""
     if (subs_emails is not None and subs_emails != ''):
         logger.info("Creating maillist...")
         maillist = subs_emails.replace(" ", "").split(",")
@@ -443,17 +445,18 @@ def send_email_to_subs(subs_emails, subs_point_period,
                                             full_cnt)
         try:
             send_email_with_attachment(maillist,
-                                    subject,
-                                    body_text,
-                                    [dst_file])
+                                       subject,
+                                       body_text,
+                                       [dst_file])
         except IOError as err:
             logger.error(f"Error seneding e-mail. "
-                            f"Error: {err}")
+                         f"Error: {err}")
     else:
         logger.warning("Unable to send email. Empty maillist.")
 
 
 def send_tlg_to_subs(subs_tlg_id, dst_file, url, full_cnt):
+    """Send file with hotspots to telegram."""
     if subs_tlg_id is not None and subs_tlg_id != '':
         doc = open(dst_file, "rb")
         send_doc_to_telegram(url, subs_tlg_id, doc)
@@ -464,6 +467,7 @@ def send_tlg_to_subs(subs_tlg_id, dst_file, url, full_cnt):
 
 
 def make_zones_list(zones, regions, ecoregions):
+    """Make list of zones as list from string."""
     zone_list = ''
     if (zones is not None) and (zones != ''):
         zone_list = zones
@@ -475,10 +479,11 @@ def make_zones_list(zones, regions, ecoregions):
 
 
 def filter_zones(cursor, zonelist, critical, zones_tab):
+    """Filter non-critical zones from list."""
     if (critical is not None) and critical > 0:
-        cursor.execute(f"""SELECT id 
+        cursor.execute(f"""SELECT id
                         FROM {zones_tab}
-                        WHERE 
+                        WHERE
                                 category = 'торфяник'
                                 AND critical >= {critical}
                         """)
@@ -498,6 +503,7 @@ def filter_zones(cursor, zonelist, critical, zones_tab):
         cutted_zonelist = zonelist
     return cutted_zonelist
 
+
 def send_to_subscribers_job():
     """Send to subscribers job main function."""
     logger.info("---------------------------------")
@@ -509,9 +515,9 @@ def send_to_subscribers_job():
 
     [year_tab, subs_tab, zones_tab, buffers_tab] = get_config("tables",
                                                               ["year_tab",
-                                                              "subs_tab",
-                                                              "oopt_zones",
-                                                              "oopt_buffers"])
+                                                               "subs_tab",
+                                                               "oopt_zones",
+                                                               "oopt_buffers"])
     [data_root, temp_folder] = get_config("path", ["data_root",
                                                    "temp_folder"])
     [to_dir] = get_config("yadisk", ["yadisk_out_path"])
@@ -556,27 +562,27 @@ def send_to_subscribers_job():
                 # if zone_type == "peat":
                 if zone_type == "test":
                     filtered_zone_list = filter_zones(cursor,
-                                                        zone_list,
-                                                        subs.critical,
-                                                        zones_tab)
+                                                      zone_list,
+                                                      subs.critical,
+                                                      zones_tab)
                     if filtered_zone_list == "":
                         logger.info(f"Empty peat zones for {subs.subs_name}.")
                         continue
                 else:
-                    filtered_zone_list = zone_list              
+                    filtered_zone_list = zone_list
                 logger.info(f"Check {zone_type} points now.")
                 num_points, stat, extent = make_subs_table(conn,
-                                                cursor,
-                                                year_tab,
-                                                zones_tab,
-                                                buffers_tab,
-                                                filtered_zone_list,
-                                                subs.check_buffers,
-                                                subs.period,
-                                                subs.subs_id,
-                                                subs.filter_tech,
-                                                zone_type,
-                                                subs.critical)
+                                                           cursor,
+                                                           year_tab,
+                                                           zones_tab,
+                                                           buffers_tab,
+                                                           filtered_zone_list,
+                                                           subs.check_buffers,
+                                                           subs.period,
+                                                           subs.subs_id,
+                                                           subs.filter_tech,
+                                                           zone_type,
+                                                           subs.critical)
                 # num_points = len(stat)
                 if (num_points > 0) and (subs.teleg_stat or subs.email_stat):
                     msg = make_zone_msg(cursor, zones_tab, subs.critical,
@@ -594,27 +600,27 @@ def send_to_subscribers_job():
                 if (subs.email_point or subs.teleg_point):
                     if (num_points > 0) or subs.send_empty:
                         dst_file = make_subs_kml(subs.period,
-                                                    subs.subs_name,
-                                                    subs.subs_id,
-                                                    result_dir,
-                                                    date,
-                                                    int(now_hour),
-                                                    subs.critical)
+                                                 subs.subs_name,
+                                                 subs.subs_id,
+                                                 result_dir,
+                                                 date,
+                                                 int(now_hour),
+                                                 subs.critical)
                         if subs.email_point:
                             send_email_to_subs(subs.emails,
-                                                subs.period,
-                                                date,
-                                                num_points,
-                                                dst_file)
+                                               subs.period,
+                                               date,
+                                               num_points,
+                                               dst_file)
                         if subs.teleg_point:
                             send_tlg_to_subs(subs.tlg_id,
-                                                dst_file,
-                                                url,
-                                                num_points)
+                                             dst_file,
+                                             url,
+                                             num_points)
                         drop_temp_file(dst_file)
                     else:
                         logger.info(f"Don`t send zero-point {zone_type} file.")
-                drop_whom_table(conn,cursor,subs.subs_id)
+                drop_whom_table(conn, cursor, subs.subs_id)
             if now_hour == sendtimelist[0] and subs.ya_disk:
                 logger.info("Writing to yadisk...")
                 subs_folder = f"for_s{str(subs.subs_name)}"

@@ -290,6 +290,7 @@ def remove_folder_from_yadisk(a_dir):
     else:
         logger.info(f"Yandex disk directoy {a_dir} not exist.")
 
+
 def attach_file(msg, filepath):
     """Attach a file to email message."""
     try:

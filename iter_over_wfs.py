@@ -1,8 +1,11 @@
+"""Test unit for try to communicate with wfs firepoints NASA servise."""
+
+
 import sys
 
 try:
     from osgeo import ogr, osr, gdal
-except:
+except Exception as err:
     sys.exit('ERROR: cannot find GDAL/OGR modules')
 
 # Set the driver (optional)
@@ -17,7 +20,8 @@ gdal.SetConfigOption('OGR_WFS_PAGING_ALLOWED', 'YES')
 gdal.SetConfigOption('OGR_WFS_PAGE_SIZE', '10000')
 
 # Open the webservice
-url = 'https://firms.modaps.eosdis.nasa.gov/mapserver/wfs/Russia_Asia/2dee5fba9c79a026daf0e4507e0423ee/'
+url = "https://firms.modaps.eosdis.nasa.gov/mapserver/wfs/Russia_Asia/"\
+      "2dee5fba9c79a026daf0e4507e0423ee/"
 wfs_ds = wfs_drv.Open('WFS:' + url)
 if not wfs_ds:
     sys.exit('ERROR: can not open WFS datasource')

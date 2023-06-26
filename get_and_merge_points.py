@@ -761,7 +761,7 @@ def check_tech_zones(conn, cursor, src_tab, tech_zones):
         logger.error(f"'Error intersecting points with tech-zones: {err}")
 
 
-def check_vip_zones(conn, cursor, src_tab, vip_zones): 
+def check_vip_zones(conn, cursor, src_tab, vip_zones):
     """Check if a points in vip-zone."""
     logger.info("Checking vip-zones...")
     sql_stat = f"""
@@ -820,6 +820,7 @@ def check_oopt_buffers(conn, cursor, src_tab, oopt_buffers):
         conn.rollback()
         logger.error(f"Error intersecting points with oopt buffers: {err}")
 
+
 def check_control_zones(conn, cursor, src_tab, control_zones):
     """Check if a points in controled zones."""
     logger.info("Checking control zones...")
@@ -849,49 +850,49 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         """,
         f"""
         UPDATE {src_tab}
-	        SET peat_id = {ass_tab}.zone_id
+            SET peat_id = {ass_tab}.zone_id
             FROM {ass_tab}
-	        WHERE 
+            WHERE
                 {ass_tab}.gid = {src_tab}.gid
                 AND category = 'торфяник';
         """,
         f"""
         UPDATE {src_tab}
-	        SET oopt_id = {ass_tab}.zone_id
+            SET oopt_id = {ass_tab}.zone_id
             FROM {ass_tab}
-	        WHERE 
+            WHERE
                 {ass_tab}.gid = {src_tab}.gid
                 AND category = 'ООПТ';
         """,
         f"""
         UPDATE {src_tab}
-	        SET ctrl_id = {ass_tab}.zone_id
+            SET ctrl_id = {ass_tab}.zone_id
             FROM {ass_tab}
-	        WHERE 
+            WHERE
                 {ass_tab}.gid = {src_tab}.gid
                 AND category = 'зона мониторинга';
         """,
         f"""
         UPDATE {src_tab}
-	        SET safe_id = {ass_tab}.zone_id
+            SET safe_id = {ass_tab}.zone_id
             FROM {ass_tab}
-	        WHERE 
+            WHERE
                 {ass_tab}.gid = {src_tab}.gid
                 AND category = 'охранная зона';
         """,
         f"""
         UPDATE {src_tab}
-	        SET attn_id = {ass_tab}.zone_id
+            SET attn_id = {ass_tab}.zone_id
             FROM {ass_tab}
-	        WHERE 
+            WHERE
                 {ass_tab}.gid = {src_tab}.gid
                 AND category = 'зона внимания';
         """,
         f"""
         UPDATE {src_tab}
-	        SET tech_id = {ass_tab}.zone_id
+            SET tech_id = {ass_tab}.zone_id
             FROM {ass_tab}
-	        WHERE 
+            WHERE
                 {ass_tab}.gid = {src_tab}.gid
                 AND category = 'техноген';
         """
@@ -940,56 +941,56 @@ def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
         UPDATE {ass_tab}
             SET distance = ST_Distance({src_tab}.geog, {control_zones}.geog)
             FROM {src_tab}, {control_zones}
-            WHERE {src_tab}.gid = {ass_tab}.gid 
+            WHERE {src_tab}.gid = {ass_tab}.gid
                     AND {ass_tab}.zone_id = {control_zones}.id
         """,
         f"""
         UPDATE {src_tab}
-	        SET
+            SET
                 peat_buf_id = {ass_tab}.zone_id,
                 distance = {ass_tab}.distance
             FROM {ass_tab}
-	        WHERE 
+            WHERE
                 {ass_tab}.gid = {src_tab}.gid
                 AND category = 'торфяник';
         """,
         f"""
         UPDATE {src_tab}
-	        SET
+            SET
                 oopt_buf_id = {ass_tab}.zone_id,
                 distance = {ass_tab}.distance
             FROM {ass_tab}
-	        WHERE 
+            WHERE
                 {ass_tab}.gid = {src_tab}.gid
                 AND category = 'ООПТ';
         """,
         f"""
         UPDATE {src_tab}
-	        SET
+            SET
                 ctrl_buf_id = {ass_tab}.zone_id,
                 distance = {ass_tab}.distance
             FROM {ass_tab}
-	        WHERE 
+            WHERE
                 {ass_tab}.gid = {src_tab}.gid
                 AND category = 'зона мониторинга';
         """,
         f"""
         UPDATE {src_tab}
-	        SET
+            SET
                 safe_buf_id = {ass_tab}.zone_id,
                 distance = {ass_tab}.distance
             FROM {ass_tab}
-	        WHERE 
+            WHERE
                 {ass_tab}.gid = {src_tab}.gid
                 AND category = 'охранная зона';
         """,
         f"""
         UPDATE {src_tab}
-	        SET
+            SET
                 attn_buf_id = {ass_tab}.zone_id,
                 distance = {ass_tab}.distance
             FROM {ass_tab}
-	        WHERE 
+            WHERE
                 {ass_tab}.gid = {src_tab}.gid
                 AND category = 'зона внимания';
         """
@@ -1196,7 +1197,7 @@ def get_and_merge_points_job():
     # check_oopt_buffers(conn, cursor, common_tab, oopt_buffers)
     check_control_zones(conn, cursor, common_tab, 'control_zones')
     check_control_buffers(conn, cursor, common_tab,
-                            'control_zones', 'control_buffers')
+                          'control_zones', 'control_buffers')
     copy_to_common_table(conn, cursor, common_tab, year_tab)
     for pointset in pointsets:
         drop_temp_tables(conn, cursor, pointset)

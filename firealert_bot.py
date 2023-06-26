@@ -287,7 +287,7 @@ command_list = ["",
 
 def parse_data_req(req):
     """Parse request string and return request params."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     central_region = "('Москва','Московская область','Тверская область',"\
                      "'Ярославская область','Ивановская область',"\
@@ -366,7 +366,7 @@ def parse_data_req(req):
 
 def drop_temp_files(result_dir):
     """Drop temporary files."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     for the_file in os.listdir(result_dir):
         file_path = os.path.join(result_dir, the_file)
@@ -380,10 +380,10 @@ def drop_temp_files(result_dir):
 
 def echo(update: Update, _):
     """Answer for 'other' user messages."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     try:
-        #user = update.message.from_user
+        # user = update.message.from_user
         chat = update.message.chat
         text = update.message.text
         telegram_id = chat.id
@@ -391,7 +391,7 @@ def echo(update: Update, _):
     except AttributeError as err:
         logger.warning(f"Cannot get chat.id from message. Error {err}")
     try:
-        #user = update.message.from_user
+        # user = update.message.from_user
         chat = update.edited_message.chat
         text = update.edited_message.text
         telegram_id = chat.id
@@ -417,7 +417,7 @@ def echo(update: Update, _):
 
 def init(update: Update, _):
     """Process the `/Init` command. Add user to subscribers."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     main_keyboard = [[KeyboardButton("/start"), KeyboardButton("/help")]]
     reply_kb_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True,
@@ -440,7 +440,7 @@ def init(update: Update, _):
         update.message.reply_text(
             text=f"Канал с Id {chat_id} включен в список подписчиков.",
             reply_markup=reply_kb_markup)
-        logger.info(f"Init: Канал с Id {chat_id} включен в список подписчиков.")
+        logger.info(f"Init: Канал Id {chat_id} включен в список подписчиков.")
     else:
         subsconf.add_tlg_user(telegram_id)
         update.message.reply_text(
@@ -454,7 +454,7 @@ def init(update: Update, _):
 
 def start(update: Update, _) -> None:
     """Process the `/Start` command. Add user to subscribers."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     # Get user that sent /start and log his name
     user = update.message.from_user
@@ -473,7 +473,7 @@ def start(update: Update, _) -> None:
 
 def start_over(update: Update, _) -> None:
     """Prompt same text & keyboard as `/start` does but not as new message."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     # Get CallbackQuery from Update
     query = update.callback_query
@@ -494,7 +494,7 @@ def start_over(update: Update, _) -> None:
 
 def mm_subscribe(update: Update, _) -> None:
     """Show `subscribe` menu buttons."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -507,7 +507,7 @@ def mm_subscribe(update: Update, _) -> None:
 
 def mm_get_points(update: Update, _) -> None:
     """Show `get` menu buttons."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -520,7 +520,7 @@ def mm_get_points(update: Update, _) -> None:
 
 def mm_config(update: Update, _) -> None:
     """Show `config` menu buttons."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -534,7 +534,7 @@ def mm_config(update: Update, _) -> None:
 
 def sm_subs_stat(update: Update, _) -> None:
     """Subscribe for statistic on telegram when /t_subs_stat is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -549,7 +549,7 @@ def sm_subs_stat(update: Update, _) -> None:
 
 def sm_uns_stat(update: Update, _) -> None:
     """Unsubscribe statistic on telegram when /t_unsubs_stat is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -564,7 +564,7 @@ def sm_uns_stat(update: Update, _) -> None:
 
 def sm_subs_point(update: Update, _) -> None:
     """Subscribe for firepoints on telegram when /t_subs_point is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -579,7 +579,7 @@ def sm_subs_point(update: Update, _) -> None:
 
 def sm_uns_point(update: Update, _) -> None:
     """Unsubscribe firepoints on telegram when /t_unsubs_point is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -594,7 +594,7 @@ def sm_uns_point(update: Update, _) -> None:
 
 def cm_emails(update: Update, _) -> None:
     """Show `email` menu buttons."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -608,7 +608,7 @@ def cm_emails(update: Update, _) -> None:
 
 def cm_regions(update: Update, _) -> None:
     """Show `region` menu buttons."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -622,7 +622,7 @@ def cm_regions(update: Update, _) -> None:
 
 def cm_show(update: Update, _) -> None:
     """Show current subscribers`s configuration."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -642,7 +642,7 @@ def cm_show(update: Update, _) -> None:
 
 def em_add(update: Update, _) -> None:
     """Add new subscribers email."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -653,7 +653,7 @@ def em_add(update: Update, _) -> None:
 
 def add_email(update: Update, _):
     """Add new email to subscribers table."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     email = update.message.text
@@ -668,7 +668,7 @@ def add_email(update: Update, _):
 
 def em_del(update: Update, _) -> None:
     """Delete email from subscribers email list."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -685,7 +685,7 @@ def em_del(update: Update, _) -> None:
 
 def del_email(update: Update, _):
     """Delete email from subscribers table."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     message = update.message.text
@@ -702,7 +702,7 @@ def del_email(update: Update, _):
 
 def em_show(update: Update, _) -> None:
     """Show subscribers email list."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -717,7 +717,7 @@ def em_show(update: Update, _) -> None:
 
 def rm_add(update: Update, _) -> None:
     """Add new region for subscriber."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -738,7 +738,7 @@ def add_region1(update: Update, _):
 
     Deprecated.
     """
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     message = update.message.text
@@ -758,7 +758,7 @@ def add_region1(update: Update, _):
 
 def add_region(update: Update, _):
     """Add a region into subscribers table."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     message = update.message.text
@@ -781,7 +781,7 @@ def add_region(update: Update, _):
 
 def rm_del(update: Update, _) -> None:
     """Delete region from subscriber."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -799,7 +799,7 @@ def rm_del(update: Update, _) -> None:
 
 def delete_region(update: Update, _):
     """Delete region from subscribers table."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     message = update.message.text
@@ -818,7 +818,7 @@ def delete_region(update: Update, _):
 
 def rm_show(update: Update, _) -> None:
     """Show subscribers region list."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -833,7 +833,7 @@ def rm_show(update: Update, _) -> None:
 
 def rm_list(update: Update, _) -> None:
     """Show full region list."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -847,7 +847,7 @@ def rm_list(update: Update, _) -> None:
 
 def gm_for_reglist(update: Update, _) -> None:
     """Ask for selection critery."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -861,7 +861,7 @@ def gm_for_reglist(update: Update, _) -> None:
 
 def get_r_cf_answ_c(update: Update, context: CallbackContext):
     """Get for critery answ and ask for critical limit."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -875,7 +875,7 @@ def get_r_cf_answ_c(update: Update, context: CallbackContext):
 
 def get_r_cf_answ_f(update: Update, context: CallbackContext):
     """Get for critery answ and ask for peatfire limit."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -889,7 +889,7 @@ def get_r_cf_answ_f(update: Update, context: CallbackContext):
 
 def get_r_cf_lim(update: Update, context: CallbackContext):
     """Ask for minimal date to get firepoints."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     message = update.message.text
     context.user_data["request"] += message
@@ -901,7 +901,7 @@ def get_r_cf_lim(update: Update, context: CallbackContext):
 
 def get_r_date(update: Update, context: CallbackContext):
     """Get date and ask for time."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     message = update.message.text
     context.user_data["request"] += f" {message}"
@@ -912,7 +912,7 @@ def get_r_date(update: Update, context: CallbackContext):
 
 def get_r_time(update: Update, context: CallbackContext):
     """Get time and ask for period."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     message = update.message.text
     context.user_data["request"] += f" {message}"
@@ -925,7 +925,7 @@ def get_r_time(update: Update, context: CallbackContext):
 
 def get_r_period1(update: Update, context: CallbackContext):
     """Get a period and ask for region."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     message = update.message.text
     context.user_data["request"] += f" {message}h"
@@ -936,7 +936,7 @@ def get_r_period1(update: Update, context: CallbackContext):
 
 def get_r_period(update: Update, context: CallbackContext):
     """List all regions and ask for number selection."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     message = update.message.text
     context.user_data["request"] = f" {message}h"
@@ -954,7 +954,7 @@ def get_r_period(update: Update, context: CallbackContext):
 
 def get_r_reglist(update: Update, context: CallbackContext):
     """Get firepoints into region and send its to subscriber."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     [data_root, temp_folder] = get_config("path", ["data_root", "temp_folder"])
     # Создаем каталог для записи временных файлов
@@ -1006,7 +1006,7 @@ def get_r_reglist(update: Update, context: CallbackContext):
 
 def gm_for_radius(update: Update, _) -> None:
     """Ask for selection critery."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -1020,7 +1020,7 @@ def gm_for_radius(update: Update, _) -> None:
 
 def get_c_cf_answ_c(update: Update, context: CallbackContext):
     """Get for critery answ and ask for critical limit."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -1034,7 +1034,7 @@ def get_c_cf_answ_c(update: Update, context: CallbackContext):
 
 def get_c_cf_answ_f(update: Update, context: CallbackContext):
     """Get for critery answ and ask for peatfire limit."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -1048,7 +1048,7 @@ def get_c_cf_answ_f(update: Update, context: CallbackContext):
 
 def get_c_cf_lim(update: Update, context: CallbackContext):
     """Ask for minimal date to get firepoints."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     message = update.message.text
     context.user_data["request"] += message
@@ -1060,7 +1060,7 @@ def get_c_cf_lim(update: Update, context: CallbackContext):
 
 def get_c_date(update: Update, context: CallbackContext):
     """Get date and ask for time."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     message = update.message.text
     context.user_data["request"] += f" {message}"
@@ -1071,7 +1071,7 @@ def get_c_date(update: Update, context: CallbackContext):
 
 def get_c_time(update: Update, context: CallbackContext):
     """Get time and ask for period."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     message = update.message.text
     context.user_data["request"] += f" {message}"
@@ -1084,7 +1084,7 @@ def get_c_time(update: Update, context: CallbackContext):
 
 def get_c_period(update: Update, context: CallbackContext):
     """Get a period and ask for point coordinates."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     message = update.message.text
     context.user_data["request"] += f" {message}h"
@@ -1096,7 +1096,7 @@ def get_c_period(update: Update, context: CallbackContext):
 
 def get_c_center(update: Update, context: CallbackContext):
     """Get a coordinates and ask for radius."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     message = update.message.text
     context.user_data["request"] += f" ({message}, "
@@ -1108,7 +1108,7 @@ def get_c_center(update: Update, context: CallbackContext):
 
 def get_c_radius(update: Update, context: CallbackContext):
     """Get firepoints into circle and send its to subscriber."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     [data_root, temp_folder] = get_config("path", ["data_root", "temp_folder"])
     # Создаем каталог для записи временных файлов
@@ -1153,7 +1153,7 @@ def get_c_radius(update: Update, context: CallbackContext):
 
 def mm_back(update: Update, _) -> None:
     """Go back to main menu."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -1166,7 +1166,7 @@ def mm_back(update: Update, _) -> None:
 
 def cm_back(update: Update, _) -> None:
     """Go back to configuration menu."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -1179,7 +1179,7 @@ def cm_back(update: Update, _) -> None:
 
 def mm_end(update: Update, _) -> None:
     """Return `END`, which tells the that the conversation is over."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     query = update.callback_query
     query.answer()
@@ -1190,7 +1190,7 @@ def mm_end(update: Update, _) -> None:
 
 def manual_t_subs_stat(update: Update, _):
     """Subscribe for stat on telegram when /t_subs_stat is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     subsconf.set_teleg_stat(telegram_id)
@@ -1200,7 +1200,7 @@ def manual_t_subs_stat(update: Update, _):
 
 def manual_t_unsubs_stat(update: Update, _):
     """Unsubscribe stat on telegram when /t_unsubs_stat is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     subsconf.unset_teleg_stat(telegram_id)
@@ -1210,7 +1210,7 @@ def manual_t_unsubs_stat(update: Update, _):
 
 def manual_t_subs_point(update: Update, _):
     """Subscribe for firepoints on telegram when /t_subs_point is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     subsconf.set_teleg_point(telegram_id)
@@ -1220,7 +1220,7 @@ def manual_t_subs_point(update: Update, _):
 
 def manual_t_unsubs_point(update: Update, _):
     """Unsubscribe firepoints on telegram when /t_unsubs_point is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     subsconf.unset_teleg_point(telegram_id)
@@ -1230,7 +1230,7 @@ def manual_t_unsubs_point(update: Update, _):
 
 def manual_activate(update: Update, _):
     """Activate subscribtion when the command /activate is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     subsconf.set_active(telegram_id)
@@ -1240,7 +1240,7 @@ def manual_activate(update: Update, _):
 
 def manual_deactivate(update: Update, _):
     """Deactivate subscribtion when the command /deactivate is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     subsconf.unset_active(telegram_id)
@@ -1250,7 +1250,7 @@ def manual_deactivate(update: Update, _):
 
 def manual_add_email(update: Update, _):
     """Add new subscribers email when the command /add_email is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     # telegram_id = update.message.from_user.id
     # message = update.message.text
@@ -1265,7 +1265,7 @@ def manual_add_email(update: Update, _):
 
 def manual_del_email(update: Update, _):
     """Delete subscribers email when the command /del_email is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     message = update.message.text
@@ -1277,7 +1277,7 @@ def manual_del_email(update: Update, _):
 
 def manual_show_emails(update: Update, _):
     """Show subscribers email list when the command /show_email is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     maillist = subsconf.show_maillist(telegram_id)
@@ -1287,7 +1287,7 @@ def manual_show_emails(update: Update, _):
 
 def manual_add_region(update: Update, _):
     """Add new region for subscriber when the command /add_region is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     message = update.message.text
@@ -1300,7 +1300,7 @@ def manual_add_region(update: Update, _):
 
 def manual_del_region(update: Update, _):
     """Delete region from subscriber when the command /del_region is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     message = update.message.text
@@ -1312,7 +1312,7 @@ def manual_del_region(update: Update, _):
 
 def manual_show_regions(update: Update, _):
     """Show subscribers region list when /show_regions is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     reglist = subsconf.show_reglist(telegram_id)
@@ -1322,7 +1322,7 @@ def manual_show_regions(update: Update, _):
 
 def manual_list_regions(update: Update, _):
     """Show full region list when /list_regions is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     msg, reglist = subsconf.list_reglist()
     update.message.reply_text(
@@ -1331,7 +1331,7 @@ def manual_list_regions(update: Update, _):
 
 def manual_show_conf(update: Update, _):
     """Show subscribers configuration when /show_conf is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     telegram_id = update.message.from_user.id
     conf = subsconf.show_conf(telegram_id)
@@ -1343,7 +1343,7 @@ def manual_show_conf(update: Update, _):
 
 def manual_get_data(update: Update, _):
     """Get firepoints for region when /get_data is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     [data_root, temp_folder] = get_config("path", ["data_root", "temp_folder"])
     # Создаем каталог для записи временных файлов
@@ -1370,7 +1370,7 @@ def manual_get_data(update: Update, _):
 
 def manual_get_around(update: Update, _):
     """Get firepoints around point when /get_around is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     [data_root, temp_folder] = get_config("path", ["data_root", "temp_folder"])
     # Создаем каталог для записи временных файлов
@@ -1408,7 +1408,7 @@ def manual_get_around(update: Update, _):
 
 def manual_help(update: Update, _):
     """Send a message when the command /help is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     update.message.reply_text(
         text="Тут можно плучить результат двумя путями - через диалог "
@@ -1449,7 +1449,7 @@ def manual_help(update: Update, _):
 
 def manual_help_get_data(update: Update, _):
     """Send a message when the command /help_get_data is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     update.message.reply_text(
         text="Строка запроса термоточек выглядит так: \n"
@@ -1478,7 +1478,7 @@ def manual_help_get_data(update: Update, _):
 
 def manual_help_get_around(update: Update, _):
     """Send a message when the command /help_get_around is issued."""
-    func_id = inspect.currentframe().f_code.co_name # inspect.stack()[1][3]
+    func_id = inspect.currentframe().f_code.co_name  # inspect.stack()[1][3]
     logger.debug(f"Trap: {func_id}()")
     update.message.reply_text(
         text="Строка запроса термоточек в радиусе от заданной выглядит так: \n"
