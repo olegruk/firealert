@@ -122,7 +122,12 @@ def read_csv_from_site_with_retries(url, sourcepath):
         with open(sourcepath, "wb") as receive:
             shutil.copyfileobj(filereq.raw, receive)
             del filereq
-        errcode = 0
+            csv_src_str = str(receive)[0:255]
+            if "<html>" in csv_src_str:
+                errcode = 5
+                logger.warning(f"Html in loaded csv: \n{csv_src_str}")
+            else:
+                errcode = 0
     return errcode
 
 
@@ -194,7 +199,7 @@ def write_to_db(engine, tablename, dataframe):
                          if_exists=u"append",
                          chunksize=1000)
         logger.info("Done inserted source into postgres")
-    except IOError as err:
+    except psycopg2.Error as err:
         logger.error(f"Error in inserting data into db: {err}")
 
 
@@ -208,11 +213,17 @@ def upload_points_to_db(cursor, src_folder, pointset, aDate):
     dst_table = f"{pointset}_today"
     try:
         csv_src = pandas.read_csv(src_file)
-        write_to_db(engine, dst_table, csv_src)
-        cursor.execute(f"SELECT count(*) FROM {dst_table}")
-        points_count = cursor.fetchone()[0]
-        logger.info(f"{points_count} rows added to db from {src_file}")
-    except IOError as err:
+        csv_src_str = str(csv_src)[0:255]
+        #logger.warning(f"Loaded text: \n>>>{ind}")
+        if "<html>" in csv_src_str:
+            points_count = 0
+            logger.warning(f"Html in loaded csv: \n{csv_src_str}")
+        else:
+            write_to_db(engine, dst_table, csv_src)
+            cursor.execute(f"SELECT count(*) FROM {dst_table}")
+            points_count = cursor.fetchone()[0]
+            logger.info(f"{points_count} rows added to db from {src_file}")
+    except psycopg2.Error as err:
         logger.error("Error download and add data {err}")
         points_count = 0
     return points_count
