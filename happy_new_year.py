@@ -30,18 +30,33 @@ logger = init_logger()
 
 def copy_table(conn, cursor, src_tab, now_year):
     """Copy last year table to table with name '<current_table>_YYYY'."""
-    dst_tab = f"{src_tab}_{str(now_year)}"
+    now_year_str = str(now_year)
+    dst_tab = f"{src_tab}_{now_year_str}_1"
     statements = (
         f"""
-        ALTER TABLE {src_tab}
-        RENAME TO {dst_tab}
+        CREATE TABLE {dst_tab} AS
+	        SELECT * FROM {src_tab}
+            WHERE date_time < TIMESTAMP '{now_year_str}-01-01'
         """,
         f"""
-        CREATE TABLE {src_tab} AS
-            SELECT * FROM {dst_tab}
-            WITH NO DATA
+        DELETE FROM {src_tab}
+            WHERE date_time < TIMESTAMP '{now_year_str}-01-01'
         """
+        #f"""
+        #TRUNCATE {src_tab} #Alternative method for deleting data from table
+        #"""
     )
+    #statements = (
+    #    f"""
+    #    ALTER TABLE {src_tab}
+    #    RENAME TO {dst_tab}
+    #    """,
+    #    f"""
+    #    CREATE TABLE {src_tab} AS
+    #        SELECT * FROM {dst_tab}
+    #        WITH NO DATA
+    #    """
+    #)
     try:
         for sql_stat in statements:
             cursor.execute(sql_stat)

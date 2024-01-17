@@ -257,6 +257,7 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, buffers_tab, id_list,
             logger.debug(f"Marker: {marker}")
             logger.debug(f"Filter_tech: {filter_tech}")
             logger.debug(f"Period: {period}")
+            logger.debug(f"Is buffer: {ch_buf}")
             cursor.execute(sql_stat)
             conn.commit()
         logger.info(f"The table created for subs_id: {whom}")
