@@ -73,7 +73,7 @@ def happy_new_year_job():
 
     [year_tab] = get_config("tables", ["year_tab"])
     currtime = time.localtime()
-    now_year = int(time.strftime("%Y", currtime)) - 1
+    now_year = int(time.strftime("%Y", currtime)) #- 1
     conn, cursor = get_cursor()
 
     copy_table(conn, cursor, year_tab, now_year)
