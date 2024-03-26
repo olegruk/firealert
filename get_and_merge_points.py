@@ -1206,9 +1206,9 @@ def get_and_merge_points_job():
     # check_vip_zones(conn, cursor, common_tab, vip_zones)
     # check_oopt_zones(conn, cursor, common_tab, oopt_zones)
     # check_oopt_buffers(conn, cursor, common_tab, oopt_buffers)
-    check_control_zones(conn, cursor, common_tab, 'control_zones')
+    check_control_zones(conn, cursor, common_tab, oopt_zones)
     check_control_buffers(conn, cursor, common_tab,
-                          'control_zones', 'control_buffers')
+                          oopt_zones, oopt_buffers)
     copy_to_common_table(conn, cursor, common_tab, year_tab)
     for pointset in pointsets:
         drop_temp_tables(conn, cursor, pointset)

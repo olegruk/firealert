@@ -35,6 +35,7 @@ from faservice import (
     send_to_telegram,
     points_tail)
 from requester import (
+    make_tlg_peat_stat_msg,
     get_zone_ids_for_region,
     get_zone_ids_for_ecoregion,
     new_alerts)
@@ -627,6 +628,20 @@ def send_to_subscribers_job():
                 subs_folder = f"for_s{str(subs.subs_name)}"
                 write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
             # drop_whom_table(conn, cursor, subs.subs_id)
+            if (now_hour == sendtimelist[0] 
+                    and (subs.teleg_digest or subs.email_digest)
+                    and (subs.regions is not None)
+                    and (subs.regions != '')):
+                reg_list = subs.regions.split(",")
+                msg = make_tlg_peat_stat_msg(reg_list, period, subs.critical)
+                if subs.teleg_digest:
+                    logger.info("Sending digest to telegram...")
+                    send_to_telegram(url, subs.telegramm, msg)
+                if subs.email_digest:
+                    logger.info("Sending digest to email...")
+                    subject = f"Digest per last {subs.stat_period}"
+                    maillist = subs.email.replace(" ", "").split(",")
+                    send_email_message(maillist, subject, msg)
         else:
             logger.info("Do anything? It`s not time yet!")
 
