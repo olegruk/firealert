@@ -512,3 +512,67 @@ def get_zone_ids_for_ecoregion(reglist):
             oopt_lst += f"{str(elem[0])},"
         full_oopt_lst += oopt_lst[0:-1]
     return full_oopt_lst
+
+
+def check_reg_stat(reg, period, critical):
+    """Check full points count and count of critical points for region."""
+    # logger.info("Getting statistic for %s..."%(reg))
+    [year_tab] = get_config("tables", ["year_tab"])
+    conn, cursor = get_cursor()
+
+    statements = (
+        f"""
+        SELECT count(*) FROM
+            (SELECT name
+             FROM {year_tab}
+             WHERE
+                date_time >= TIMESTAMP 'today' - INTERVAL '{period}'
+                AND date_time < TIMESTAMP 'today'
+                AND critical >= {critical}
+                AND region = '{reg}') as critical_sel
+        """,
+        f"""
+        SELECT count(*) FROM
+            (SELECT name
+             FROM {year_tab}
+             WHERE
+                date_time >= TIMESTAMP 'today' - INTERVAL '{period}'
+                AND date_time < TIMESTAMP 'today'
+                AND region = '{reg}') as all_sel
+        """
+    )
+    try:
+        cursor.execute(statements[0])
+        critical_cnt = cursor.fetchone()[0]
+        cursor.execute(statements[1])
+        all_cnt = cursor.fetchone()[0]
+        logger.info(f"Finished for:{reg}. All - {all_cnt}, "
+                    f"critical - {critical_cnt}")
+    except IOError as err:
+        logger.error(f"Error getting statistic for region: {err}")
+
+    close_conn(conn, cursor)
+
+    return critical_cnt, all_cnt
+
+
+def make_tlg_peat_stat_msg(reg_list, period, limit):
+    """Generate a peat-point statistic message for sending over telegramm."""
+    if limit is None:
+        limit = 0
+    if period is None:
+        period = 24
+    full_cnt = 0
+    full_cr_cnt = 0
+    msg = "Количество точек:"
+    for reg in reg_list:
+        critical_cnt, all_cnt = check_reg_stat(reg, period, limit)
+        if all_cnt > 0:
+            msg += f"\r\n{reg}: {all_cnt}"
+            if critical_cnt > 0:
+                msg += f"\r\nкритичных: {critical_cnt}"
+        full_cnt += all_cnt
+        full_cr_cnt += critical_cnt
+    if full_cnt == 0:
+        msg = "Нет новых точек."
+    return msg
