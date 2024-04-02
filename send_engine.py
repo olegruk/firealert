@@ -486,7 +486,7 @@ def filter_zones(cursor, zonelist, critical, zones_tab):
         cursor.execute(f"""SELECT id
                         FROM {zones_tab}
                         WHERE
-                                category = 'торфяник'
+                                l_code = 3000
                                 AND critical >= {critical}
                         """)
         relevant_zones = cursor.fetchall()
@@ -636,7 +636,7 @@ def send_to_subscribers_job():
                 msg = make_tlg_peat_stat_msg(reg_list, period, subs.critical)
                 if subs.teleg_digest:
                     logger.info("Sending digest to telegram...")
-                    send_to_telegram(url, subs.telegramm, msg)
+                    send_to_telegram(url, subs.tlg_id, msg)
                 if subs.email_digest:
                     logger.info("Sending digest to email...")
                     subject = f"Digest per last {subs.stat_period}"

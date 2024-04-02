@@ -53,7 +53,7 @@ def create_backup_job():
     logger.info("Process [create_backup.py] started.")
 
     # extract db params from config
-    [dbname, dbuser] = get_config("db", ["dbname", "dbuser"])
+    [dbname, bckup_user] = get_config("db", ["dbname", "bckup_user"])
     [backup_folder] = get_config("path", ["backup_folder"])
     [to_dir] = get_config("yadisk", ["yadisk_bckup_path"])
 
@@ -62,7 +62,7 @@ def create_backup_job():
 
     dst_path = get_path('', backup_folder)
     dst_file = f"{dbname}.dump.gz"
-    create_today_backup(dbname, dbuser, dst_path, dst_file)
+    create_today_backup(dbname, bckup_user, dst_path, dst_file)
     dir_list = os.listdir(dst_path)
     dir_list.remove(dst_file)
     for a_file in dir_list:

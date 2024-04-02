@@ -920,6 +920,37 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         logger.error(f"Error checking control zones: {err}")
 
 
+def check_monitored_zones(conn, cursor, src_tab, monitored_zones):
+    """Check if a points in monitored zones."""
+    logger.info("Checking monitored zones...")
+    sql_stat = f"""
+        UPDATE {src_tab}
+            SET 
+                zone_id = {control_zones}.id
+                l_code = {control_zones}.l_code
+            FROM {control_zones}
+            WHERE
+                ST_Intersects({control_zones}.geog, {src_tab}.geog);
+        """
+    count_stat = f"""
+        SELECT
+            count(*) 
+        FROM 
+            {src_tab}
+        WHERE
+            zone_id IS NOT NULL
+        """
+    try:
+        cursor.execute(sql_stat)
+        conn.commit()
+        cursor.execute(count_stat)
+        points_count = cursor.fetchone()[0]
+        logger.info("Control zones checked. {points_count} points detected.")
+    except psycopg2.Error as err:
+        conn.rollback()
+        logger.error(f"Error checking control zones: {err}")
+
+
 def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
     """Check if a points in a control zones buffers."""
     logger.info("Checking control zones buffers...")
@@ -1016,6 +1047,37 @@ def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
     except psycopg2.Error as err:
         conn.rollback()
         logger.error(f"Error checking control buffers: {err}")
+
+
+def check_monitored_buffers(conn, cursor, src_tab, monitored_zones, buffers):
+    """Check if a points in a monitored zones buffers."""
+    logger.info("Checking monitored zones buffers...")
+    sql_stat = f"""
+        UPDATE {src_tab}
+            SET 
+                buf_zone_id = {buffers}.id
+                l_code = {buffers}.l_code
+            FROM {buffers}
+            WHERE
+                ST_Intersects({buffers}.geog, {src_tab}.geog);
+        """
+    count_stat = f"""
+        SELECT
+            count(*) 
+        FROM 
+            {src_tab}
+        WHERE
+            buf_zone_id IS NOT NULL
+        """
+    try:
+        cursor.execute(sql_stat)
+        conn.commit()
+        cursor.execute(count_stat)
+        points_count = cursor.fetchone()[0]
+        logger.info("Monitored buff checked. {points_count} points detected.")
+    except psycopg2.Error as err:
+        conn.rollback()
+        logger.error(f"Error checking monitored buffers: {err}")
 
 
 def copy_to_common_table(conn, cursor, today_tab, year_tab):
@@ -1206,8 +1268,11 @@ def get_and_merge_points_job():
     # check_vip_zones(conn, cursor, common_tab, vip_zones)
     # check_oopt_zones(conn, cursor, common_tab, oopt_zones)
     # check_oopt_buffers(conn, cursor, common_tab, oopt_buffers)
-    check_control_zones(conn, cursor, common_tab, oopt_zones)
-    check_control_buffers(conn, cursor, common_tab,
+    #check_control_zones(conn, cursor, common_tab, oopt_zones)
+    #check_control_buffers(conn, cursor, common_tab,
+    #                      oopt_zones, oopt_buffers)
+    check_monitored_zones(conn, cursor, common_tab, oopt_zones)
+    check_monitored_buffers(conn, cursor, common_tab,
                           oopt_zones, oopt_buffers)
     copy_to_common_table(conn, cursor, common_tab, year_tab)
     for pointset in pointsets:
