@@ -484,10 +484,9 @@ def filter_zones(cursor, zonelist, critical, zones_tab):
     """Filter non-critical zones from list."""
     if (critical is not None) and critical > 0:
         cursor.execute(f"""SELECT id
-                        FROM {zones_tab}
-                        WHERE
-                                l_code = 3000
-                                AND critical >= {critical}
+                                FROM {zones_tab}
+                                WHERE
+                                    critical >= {critical}
                         """)
         relevant_zones = cursor.fetchall()
         # logger.debug(f"Relevant zones: {relevant_zones}")
@@ -547,13 +546,6 @@ def send_to_subscribers_job():
             sendtimelist = subs.send_times.split(",")
 
         if now_hour in sendtimelist:
-            zone_list = make_zones_list(subs.zones,
-                                        subs.regions,
-                                        subs.ecoregions)
-            # logger.debug(f"Zones list: {zone_list}.")
-            if zone_list == '':
-                logger.warning(f"Empty zones list for {subs.subs_name}.")
-                continue
             if subs.zone_types == '':
                 logger.warning(f"Empty zone types list for {subs.subs_name}.")
                 continue
@@ -561,8 +553,18 @@ def send_to_subscribers_job():
                 zone_type_list = subs.zone_types.split(",")
             logger.info(f"Checking zones for zone-types in: {zone_type_list}.")
             for zone_type in zone_type_list:
-                # if zone_type == "peat":
-                if zone_type == "test":
+                zones = zone_type + '_zones'
+                zones_tab = zone_type + "_zones"
+                buffers_tab = zone_type + "_zones_buf"
+                zone_list = make_zones_list(subs.zones,
+                                            subs.regions,
+                                            subs.ecoregions)
+                # logger.debug(f"Zones list: {zone_list}.")
+                if zone_list == '':
+                    logger.warning(f"Empty zones list for {subs.subs_name}.")
+                    continue
+                if ((zone_type == "peat") 
+                        and (subs.critical in [2,4,8,16,32,64])):
                     filtered_zone_list = filter_zones(cursor,
                                                       zone_list,
                                                       subs.critical,
@@ -585,7 +587,6 @@ def send_to_subscribers_job():
                                                            subs.filter_tech,
                                                            zone_type,
                                                            subs.critical)
-                # num_points = len(stat)
                 if (num_points > 0) and (subs.teleg_stat or subs.email_stat):
                     msg = make_zone_msg(cursor, zones_tab, subs.critical,
                                         stat, extent, zone_type)
@@ -628,10 +629,11 @@ def send_to_subscribers_job():
                 subs_folder = f"for_s{str(subs.subs_name)}"
                 write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
             # drop_whom_table(conn, cursor, subs.subs_id)
-            if (now_hour == sendtimelist[0] 
+            if (now_hour == sendtimelist[0]
                     and (subs.teleg_digest or subs.email_digest)
                     and (subs.regions is not None)
-                    and (subs.regions != '')):
+                    and (subs.regions != '')
+                    and ('peat' in zone_type_list)):
                 reg_list = subs.regions.split(",")
                 msg = make_tlg_peat_stat_msg(reg_list, period, subs.critical)
                 if subs.teleg_digest:

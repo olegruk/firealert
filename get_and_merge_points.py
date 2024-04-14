@@ -214,7 +214,7 @@ def upload_points_to_db(cursor, src_folder, pointset, aDate):
     try:
         csv_src = pandas.read_csv(src_file)
         csv_src_str = str(csv_src)[0:255]
-        #logger.warning(f"Loaded text: \n>>>{ind}")
+        # logger.warning(f"Loaded text: \n>>>{ind}")
         if "<html>" in csv_src_str:
             points_count = 0
             logger.warning(f"Html in loaded csv: \n{csv_src_str}")
@@ -368,7 +368,12 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                 ctrl_buf_id INTEGER,
                 safe_buf_id INTEGER,
                 attn_buf_id INTEGER,
-                distance INTEGER
+                distance INTEGER,
+                zone_id INTEGER,
+                l_code INTEGER,
+                peat_dist INTEGER,
+                attn_dist INTEGER,
+                oopt_dist INTEGER
         )
         """
     )
@@ -758,7 +763,8 @@ def check_tech_zones(conn, cursor, src_tab, tech_zones):
     sql_stat = f"""
         UPDATE {src_tab}
         SET
-            tech = {tech_zones}.name
+            tech = {tech_zones}.name,
+            tech_id = {tech_zones}.id
         FROM {tech_zones}
         WHERE
             ST_Intersects({tech_zones}.geog, {src_tab}.geog)
@@ -920,35 +926,36 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         logger.error(f"Error checking control zones: {err}")
 
 
-def check_monitored_zones(conn, cursor, src_tab, monitored_zones):
+def check_monitored_zones(conn, cursor, src_tab, zones_type):
     """Check if a points in monitored zones."""
-    logger.info("Checking monitored zones...")
+    monitored_zones = zones_type + '_zones'
+    logger.info(f"Checking {monitored_zones}...")
     sql_stat = f"""
         UPDATE {src_tab}
-            SET 
-                zone_id = {control_zones}.id
-                l_code = {control_zones}.l_code
-            FROM {control_zones}
+            SET
+                {zones_type}_id = {monitored_zones}.id,
+                l_code = {monitored_zones}.l_code
+            FROM {monitored_zones}
             WHERE
-                ST_Intersects({control_zones}.geog, {src_tab}.geog);
+                ST_Intersects({monitored_zones}.geog, {src_tab}.geog);
         """
     count_stat = f"""
         SELECT
-            count(*) 
-        FROM 
+            count(*)
+        FROM
             {src_tab}
         WHERE
-            zone_id IS NOT NULL
+            {zones_type}_id IS NOT NULL
         """
     try:
         cursor.execute(sql_stat)
         conn.commit()
         cursor.execute(count_stat)
         points_count = cursor.fetchone()[0]
-        logger.info("Control zones checked. {points_count} points detected.")
+        logger.info(f"Zones checked. {points_count} points detected.")
     except psycopg2.Error as err:
         conn.rollback()
-        logger.error(f"Error checking control zones: {err}")
+        logger.error(f"Error checking zones: {err}")
 
 
 def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
@@ -1049,35 +1056,52 @@ def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
         logger.error(f"Error checking control buffers: {err}")
 
 
-def check_monitored_buffers(conn, cursor, src_tab, monitored_zones, buffers):
+def check_monitored_buffers(conn, cursor, src_tab, zones_type):
     """Check if a points in a monitored zones buffers."""
-    logger.info("Checking monitored zones buffers...")
-    sql_stat = f"""
+    monitored_zones = zones_type + '_zones'
+    buffers = zones_type + '_zones_buf'
+    logger.info(f"Checking {monitored_zones} buffers...")
+    statements = (
+        f"""
         UPDATE {src_tab}
-            SET 
-                buf_zone_id = {buffers}.id
-                l_code = {buffers}.l_code
+            SET
+                {zones_type}_id = {buffers}.id,
+                l_code = {buffers}.l_code,
+                {zones_type}_dist = 1000000
             FROM {buffers}
             WHERE
                 ST_Intersects({buffers}.geog, {src_tab}.geog);
+        """,
+        f"""
+        UPDATE {src_tab}
+            SET
+                {zones_type}_dist = ST_Distance(src.geog, zones.geog)
+            FROM
+                {src_tab} AS src JOIN {monitored_zones} AS zones
+                ON src.{zones_type}_id = zones.id 
+                   AND src.{zones_type}_dist = 1000000
+            WHERE
+                {src_tab}.gid = src.gid 
         """
+    )
     count_stat = f"""
         SELECT
-            count(*) 
-        FROM 
+            count(*)
+        FROM
             {src_tab}
         WHERE
-            buf_zone_id IS NOT NULL
+            {zones_type}_dist IS NOT NULL
         """
     try:
-        cursor.execute(sql_stat)
-        conn.commit()
+        for sql_stat in statements:
+            cursor.execute(sql_stat)
+            conn.commit()
         cursor.execute(count_stat)
         points_count = cursor.fetchone()[0]
-        logger.info("Monitored buff checked. {points_count} points detected.")
+        logger.info(f"Buff checked. {points_count} points detected.")
     except psycopg2.Error as err:
         conn.rollback()
-        logger.error(f"Error checking monitored buffers: {err}")
+        logger.error(f"Error checking buffers: {err}")
 
 
 def copy_to_common_table(conn, cursor, today_tab, year_tab):
@@ -1130,7 +1154,12 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                                 ctrl_buf_id,
                                 safe_buf_id,
                                 attn_buf_id,
-                                distance)
+                                distance,
+                                zone_id,
+                                l_code,
+                                peat_dist,
+                                attn_dist,
+                                oopt_dist)
             SELECT
                 name,
                 acq_date,
@@ -1178,7 +1207,12 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                 ctrl_buf_id,
                 safe_buf_id,
                 attn_buf_id,
-                distance
+                distance,
+                zone_id,
+                l_code,
+                peat_dist,
+                attn_dist,
+                oopt_dist
             FROM {today_tab}
             WHERE NOT EXISTS(
                 SELECT ident FROM {year_tab}
@@ -1218,12 +1252,16 @@ def get_and_merge_points_job():
      tech_zones,
      vip_zones,
      oopt_zones,
-     oopt_buffers] = get_config("tables", ["year_tab",
-                                           "common_tab",
-                                           "tech_zones",
-                                           "vip_zones",
-                                           "oopt_zones",
-                                           "oopt_buffers"])
+     oopt_buffers,
+     zones_tabs,
+     zones_types] = get_config("tables", ["year_tab",
+                                         "common_tab",
+                                         "tech_zones",
+                                         "vip_zones",
+                                         "oopt_zones",
+                                         "oopt_buffers",
+                                         "zones_tabs",
+                                         "zones_types"])
     [data_root, firms_folder] = get_config("path", ["data_root",
                                                     "firms_folder"])
     [clst_dist] = get_config("clusters", ["cluster_dist"])
@@ -1264,16 +1302,19 @@ def get_and_merge_points_job():
     cost_point_in_buffers(conn, cursor, common_tab)
     set_name_field(conn, cursor, common_tab)
     rise_multipoint_cost(conn, cursor, common_tab, clst_dist)
-    # check_tech_zones(conn, cursor, common_tab, tech_zones)
+    check_tech_zones(conn, cursor, common_tab, tech_zones)
     # check_vip_zones(conn, cursor, common_tab, vip_zones)
     # check_oopt_zones(conn, cursor, common_tab, oopt_zones)
     # check_oopt_buffers(conn, cursor, common_tab, oopt_buffers)
-    #check_control_zones(conn, cursor, common_tab, oopt_zones)
-    #check_control_buffers(conn, cursor, common_tab,
+    # check_control_zones(conn, cursor, common_tab, oopt_zones)
+    # check_control_buffers(conn, cursor, common_tab,
     #                      oopt_zones, oopt_buffers)
-    check_monitored_zones(conn, cursor, common_tab, oopt_zones)
-    check_monitored_buffers(conn, cursor, common_tab,
-                          oopt_zones, oopt_buffers)
+    for zones_type in zones_types:
+        zones_tab = zones_type + '_zones'
+        zones_buf_tab = zones_tab + '_buf'
+        check_monitored_zones(conn, cursor, common_tab, zones_type)
+        check_monitored_buffers(conn, cursor, common_tab,
+                                zones_type)
     copy_to_common_table(conn, cursor, common_tab, year_tab)
     for pointset in pointsets:
         drop_temp_tables(conn, cursor, pointset)
