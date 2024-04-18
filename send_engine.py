@@ -169,15 +169,14 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, buffers_tab, id_list,
                 latitude,
                 longitude,
                 region,
-                COALESCE({zone_type}_id, {zone_type}_buf_id) AS {zone_type}_id,
+                {zone_type}_id,
                 critical,
-                distance,
+                {zone_type}_dist AS distance,
                 geog
             FROM {year_tab}
             WHERE
                 date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                AND ({zone_type}_id IN ({id_list})
-                     OR {zone_type}_buf_id IN ({id_list}))
+                AND {zone_type}_id IN ({id_list})
                 AND (
                     whom is Null
                     OR POSITION('{marker}' in whom) = 0
@@ -194,8 +193,7 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, buffers_tab, id_list,
                 whom = whom || '{marker}'
             WHERE
                 date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                AND ({zone_type}_id IN ({id_list})
-                     OR {zone_type}_buf_id IN ({id_list}))
+                AND {zone_type}_id IN ({id_list})
                 AND POSITION('{marker}' in whom) = 0
                 AND NOT (
                     {filter_tech}
@@ -208,8 +206,7 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, buffers_tab, id_list,
                 whom = '{marker}'
             WHERE
                 date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                AND ({zone_type}_id IN ({id_list})
-                     OR {zone_type}_buf_id IN ({id_list}))
+                AND {zone_type}_id IN ({id_list})
                 AND whom is Null
                 AND NOT (
                     {filter_tech}

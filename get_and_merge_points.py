@@ -359,16 +359,8 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                 oopt_id INTEGER,
                 country VARCHAR(50),
                 peat_id INTEGER,
-                ctrl_id INTEGER,
-                safe_id INTEGER,
                 attn_id INTEGER,
                 tech_id INTEGER,
-                peat_buf_id INTEGER,
-                oopt_buf_id INTEGER,
-                ctrl_buf_id INTEGER,
-                safe_buf_id INTEGER,
-                attn_buf_id INTEGER,
-                distance INTEGER,
                 zone_id INTEGER,
                 l_code INTEGER,
                 peat_dist INTEGER,
@@ -883,22 +875,6 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         """,
         f"""
         UPDATE {src_tab}
-            SET ctrl_id = {ass_tab}.zone_id
-            FROM {ass_tab}
-            WHERE
-                {ass_tab}.gid = {src_tab}.gid
-                AND category = 'зона мониторинга';
-        """,
-        f"""
-        UPDATE {src_tab}
-            SET safe_id = {ass_tab}.zone_id
-            FROM {ass_tab}
-            WHERE
-                {ass_tab}.gid = {src_tab}.gid
-                AND category = 'охранная зона';
-        """,
-        f"""
-        UPDATE {src_tab}
             SET attn_id = {ass_tab}.zone_id
             FROM {ass_tab}
             WHERE
@@ -1145,16 +1121,8 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                                 country,
                                 oopt,
                                 peat_id,
-                                ctrl_id,
-                                safe_id,
                                 attn_id,
                                 tech_id,
-                                peat_buf_id,
-                                oopt_buf_id,
-                                ctrl_buf_id,
-                                safe_buf_id,
-                                attn_buf_id,
-                                distance,
                                 zone_id,
                                 l_code,
                                 peat_dist,
@@ -1198,16 +1166,8 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                 country,
                 oopt,
                 peat_id,
-                ctrl_id,
-                safe_id,
                 attn_id,
                 tech_id,
-                peat_buf_id,
-                oopt_buf_id,
-                ctrl_buf_id,
-                safe_buf_id,
-                attn_buf_id,
-                distance,
                 zone_id,
                 l_code,
                 peat_dist,
@@ -1253,14 +1213,12 @@ def get_and_merge_points_job():
      vip_zones,
      oopt_zones,
      oopt_buffers,
-     zones_tabs,
      zones_types] = get_config("tables", ["year_tab",
                                          "common_tab",
                                          "tech_zones",
                                          "vip_zones",
                                          "oopt_zones",
                                          "oopt_buffers",
-                                         "zones_tabs",
                                          "zones_types"])
     [data_root, firms_folder] = get_config("path", ["data_root",
                                                     "firms_folder"])
