@@ -37,7 +37,7 @@ from faservice import (
 from requester import (
     make_tlg_peat_stat_msg,
     get_zone_ids_for_region,
-    get_zone_ids_for_ecoregion,
+    get_zone_ids_for_fed_distr,
     new_alerts)
 from mylogger import init_logger
 
@@ -465,15 +465,15 @@ def send_tlg_to_subs(subs_tlg_id, dst_file, url, full_cnt):
         logger.warning("Unable to send telegram message. Empty telegram_id..")
 
 
-def make_zones_list(zones, regions, ecoregions):
+def make_zones_list(zones_tab, zones, regions, fed_distr):
     """Make list of zones as list from string."""
     zone_list = ''
     if (zones is not None) and (zones != ''):
         zone_list = zones
     elif (regions is not None) and (regions != ''):
-        zone_list = get_zone_ids_for_region(regions.split(","))
-    elif (ecoregions is not None) and (ecoregions != ''):
-        zone_list = get_zone_ids_for_ecoregion(ecoregions.split(","))
+        zone_list = get_zone_ids_for_region(zones_tab, regions.split(","))
+    elif (fed_distr is not None) and (fed_distr != ''):
+        zone_list = get_zone_ids_for_fed_distr(zones_tab, fed_distr.split(","))
     return zone_list
 
 
@@ -511,13 +511,8 @@ def send_to_subscribers_job():
     date = time.strftime("%Y-%m-%d", currtime)
     now_hour = time.strftime("%H", currtime)
 
-    [year_tab, subs_tab, zones_tab, buffers_tab] = get_config("tables",
-                                                              ["year_tab",
-                                                               "subs_tab",
-                                                               "oopt_zones",
-                                                               "oopt_buffers"])
-    [data_root, temp_folder] = get_config("path", ["data_root",
-                                                   "temp_folder"])
+    [year_tab, subs_tab] = get_config("tables", ["year_tab", "subs_tab"])
+    [data_root, temp_folder] = get_config("path", ["data_root", "temp_folder"])
     [to_dir] = get_config("yadisk", ["yadisk_out_path"])
     [url] = get_config("telegramm", ["url"])
     [outline] = get_config("tables", ["vip_zones"])
@@ -553,9 +548,10 @@ def send_to_subscribers_job():
                 zones = zone_type + '_zones'
                 zones_tab = zone_type + "_zones"
                 buffers_tab = zone_type + "_zones_buf"
-                zone_list = make_zones_list(subs.zones,
+                zone_list = make_zones_list(zones_tab,
+                                            subs.zones,
                                             subs.regions,
-                                            subs.ecoregions)
+                                            subs.fed_reg)
                 # logger.debug(f"Zones list: {zone_list}.")
                 if zone_list == '':
                     logger.warning(f"Empty zones list for {subs.subs_name}.")

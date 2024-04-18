@@ -474,16 +474,16 @@ def new_alerts(period, cur_date):
     # return cursor.fetchone()[0]
 
 
-def get_zone_ids_for_region(reglist):
+def get_zone_ids_for_region(zones_tab, reglist):
     """Generate a list of oopt ids for regions in reglist."""
     logger.info("Making OOPT ids list for regions...")
-    [oopt_zones] = get_config("tables", ["oopt_zones"])
+    # [oopt_zones] = get_config("tables", ["oopt_zones"])
     conn, cursor = get_cursor()
     full_oopt_lst = ""
     for reg in reglist:
         logger.debug(f"Region: --{reg}--.")
         cursor.execute(f"""SELECT id
-                           FROM {oopt_zones}
+                           FROM {zones_tab}
                            WHERE region LIKE '%{reg}%'""")
         oopt_ids = cursor.fetchall()
         oopt_lst = ""
@@ -495,17 +495,17 @@ def get_zone_ids_for_region(reglist):
     return full_oopt_lst
 
 
-def get_zone_ids_for_ecoregion(reglist):
-    """Generate a list of oopt ids for ecoregions in reglist."""
-    logger.info("Making OOPT ids list for ecoregions...")
-    [oopt_zones] = get_config("tables", ["oopt_zones"])
+def get_zone_ids_for_fed_distr(zones_tab,fa_list):
+    """Generate a list of oopt ids for federal region in reglist."""
+    logger.info("Making OOPT ids list forfederal regions...")
+    # [oopt_zones] = get_config("tables", ["oopt_zones"])
     conn, cursor = get_cursor()
     full_oopt_lst = ""
-    for reg in reglist:
-        logger.debug(f"Region: --{reg}--.")
+    for fa in fa_list:
+        logger.debug(f"Region: --{fa}--.")
         cursor.execute(f"""SELECT id
-                           FROM {oopt_zones}
-                           WHERE ecoregion LIKE '%{reg}%'""")
+                           FROM {zones_tab}
+                           WHERE atd_fo = int4({fa})""")
         oopt_ids = cursor.fetchall()
         oopt_lst = ""
         for elem in oopt_ids:
