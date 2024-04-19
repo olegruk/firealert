@@ -628,7 +628,9 @@ def send_to_subscribers_job():
                     and (subs.regions != '')
                     and ('peat' in zone_type_list)):
                 reg_list = subs.regions.split(",")
-                msg = make_tlg_peat_stat_msg(reg_list, period, subs.critical)
+                msg = make_tlg_peat_stat_msg(reg_list,
+                                             subs.stat_period,
+                                             subs.critical)
                 if subs.teleg_digest:
                     logger.info("Sending digest to telegram...")
                     send_to_telegram(url, subs.tlg_id, msg)
