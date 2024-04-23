@@ -490,7 +490,8 @@ def get_zone_ids_for_region(zones_tab, reglist):
         for elem in oopt_ids:
             oopt_lst += f"{str(elem[0])},"
             # oopt_lst.append(elem[0])
-        full_oopt_lst += oopt_lst[0:-1]
+        full_oopt_lst += oopt_lst
+    full_oopt_lst = full_oopt_lst[0:-1]
     # logger.debug(f"Zones list: {full_oopt_lst}.")
     return full_oopt_lst
 
@@ -510,14 +511,16 @@ def get_zone_ids_for_fed_distr(zones_tab,fa_list):
         oopt_lst = ""
         for elem in oopt_ids:
             oopt_lst += f"{str(elem[0])},"
-        full_oopt_lst += oopt_lst[0:-1]
+        full_oopt_lst += oopt_lst
+    full_oopt_lst = full_oopt_lst[0:-1]
     return full_oopt_lst
 
 
 def check_reg_stat(reg, period, critical):
     """Check full points count and count of critical points for region."""
-    # logger.info("Getting statistic for %s..."%(reg))
+    logger.info(f"Getting statistic for region: {reg}, period: {period}...")
     [year_tab] = get_config("tables", ["year_tab"])
+    period = f"{period} hours"
     conn, cursor = get_cursor()
 
     statements = (
@@ -529,7 +532,7 @@ def check_reg_stat(reg, period, critical):
                 date_time >= TIMESTAMP 'today' - INTERVAL '{period}'
                 AND date_time < TIMESTAMP 'today'
                 AND critical >= {critical}
-                AND region = '{reg}') as critical_sel
+                AND region LIKE '%{reg}%') as critical_sel
         """,
         f"""
         SELECT count(*) FROM
@@ -538,7 +541,7 @@ def check_reg_stat(reg, period, critical):
              WHERE
                 date_time >= TIMESTAMP 'today' - INTERVAL '{period}'
                 AND date_time < TIMESTAMP 'today'
-                AND region = '{reg}') as all_sel
+                AND region LIKE '%{reg}%') as all_sel
         """
     )
     try:
