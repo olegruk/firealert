@@ -63,7 +63,7 @@ def count_crit_points(cursor, zones_tab, zone_id, limit):
             logger.error(f"Error getting critical statistic for zone: {err}")
             critical_cnt = 0
     else:
-        logger.warning(f"Critical limit is Null. Count of points setted to 0.")
+        logger.warning("Critical limit is Null. Count of points setted to 0.")
         critical_cnt = 0
     return critical_cnt
 
@@ -391,11 +391,11 @@ def make_zone_msg(cursor, zones_tab, limit, stat, extent, zone_type):
     crit_count = count_crit_points(cursor, zones_tab, st_str[0], limit)
     if crit_count > 0:
         msg += f"\nВысокой опасности: {crit_count}"
+    """
     x_max = extent[0]
     y_max = extent[1]
     x_min = extent[2]
     y_min = extent[3]
-    """
     if (x_max != x_min) and (y_max != y_min):
         msg += (f"\n\n"
                 f"<a href="
@@ -545,7 +545,7 @@ def send_to_subscribers_job():
                 zone_type_list = subs.zone_types.split(",")
             logger.info(f"Checking zones for zone-types in: {zone_type_list}.")
             for zone_type in zone_type_list:
-                zones = zone_type + '_zones'
+                # zones = zone_type + '_zones'
                 zones_tab = zone_type + "_zones"
                 buffers_tab = zone_type + "_zones_buf"
                 zone_list = make_zones_list(zones_tab,
@@ -620,6 +620,11 @@ def send_to_subscribers_job():
             if now_hour == sendtimelist[0] and subs.ya_disk:
                 logger.info("Writing to yadisk...")
                 subs_folder = f"for_s{str(subs.subs_name)}"
+                dst_file_name = make_file_name(subs.point_period,
+                                               date,
+                                               subs.subs_name,
+                                               result_dir,
+                                               0)
                 write_to_yadisk(dst_file_name, result_dir, to_dir, subs_folder)
             # drop_whom_table(conn, cursor, subs.subs_id)
             if (now_hour == sendtimelist[0]

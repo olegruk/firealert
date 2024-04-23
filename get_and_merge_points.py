@@ -28,7 +28,7 @@ from requests.exceptions import (
     ConnectionError,
     HTTPError,
     RequestException)
-import csv
+# import csv
 import pandas
 from sqlalchemy import create_engine
 from faservice import (
@@ -224,7 +224,7 @@ def upload_points_to_db(cursor, src_folder, pointset, aDate):
             points_count = cursor.fetchone()[0]
             logger.info(f"{points_count} rows added to db from {src_file}")
     except psycopg2.Error as err:
-        logger.error("Error download and add data {err}")
+        logger.error(f"Error download and add data {err}")
         points_count = 0
     return points_count
 
@@ -896,7 +896,7 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
             conn.commit()
         cursor.execute(f"SELECT count(*) FROM {ass_tab}")
         points_count = cursor.fetchone()[0]
-        logger.info("Control zones checked. {points_count} points detected.")
+        logger.info(f"Control zones checked. {points_count} points detected.")
     except psycopg2.Error as err:
         conn.rollback()
         logger.error(f"Error checking control zones: {err}")
@@ -1026,7 +1026,7 @@ def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
             conn.commit()
         cursor.execute(f"SELECT count(*) FROM {ass_tab}")
         points_count = cursor.fetchone()[0]
-        logger.info("Control buffers checked. {points_count} points detected.")
+        logger.info(f"Control buffers checked. {points_count} points detected.")
     except psycopg2.Error as err:
         conn.rollback()
         logger.error(f"Error checking control buffers: {err}")
@@ -1268,8 +1268,8 @@ def get_and_merge_points_job():
     # check_control_buffers(conn, cursor, common_tab,
     #                      oopt_zones, oopt_buffers)
     for zones_type in zones_types:
-        zones_tab = zones_type + '_zones'
-        zones_buf_tab = zones_tab + '_buf'
+        # zones_tab = zones_type + '_zones'
+        # zones_buf_tab = zones_tab + '_buf'
         check_monitored_zones(conn, cursor, common_tab, zones_type)
         check_monitored_buffers(conn, cursor, common_tab,
                                 zones_type)

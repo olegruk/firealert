@@ -25,7 +25,7 @@ import datetime
 import re
 import imaplib
 import email
-import base64
+#import base64
 from email.header import decode_header
 from mylogger import init_logger
 from faservice import (
@@ -212,8 +212,8 @@ def angel_mail_job():
     # currtime = time.localtime()
     # date = time.strftime('%Y-%m-%d',currtime)
     # now_hour = time.strftime('%H',currtime)
-    yesterday = (datetime.date.today()
-                 - datetime.timedelta(1)).strftime("%d-%b-%Y")
+    #  = (datetime.date.today()
+    #              - datetime.timedelta(1)).strftime("%d-%b-%Y")
     today = datetime.date.today().strftime("%Y-%m-%d")
     # Создаем каталог для записи временных файлов
     result_dir = get_path(data_root, angel_folder)

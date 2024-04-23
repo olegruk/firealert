@@ -4,9 +4,10 @@
 import sys
 
 try:
-    from osgeo import ogr, osr, gdal
+    from osgeo import ogr, gdal
+    # from osgeo import osr
 except Exception as err:
-    sys.exit('ERROR: cannot find GDAL/OGR modules')
+    sys.exit(f'ERROR: cannot find GDAL/OGR modules. {err}')
 
 # Set the driver (optional)
 wfs_drv = ogr.GetDriverByName('WFS')

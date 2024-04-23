@@ -73,7 +73,7 @@ def get_config(node, param_names):
                             password=dbpass)
     cursor = conn.cursor()
 
-    if type(param_names) is not list:
+    if isinstance(param_names, list):
         param_names = [param_names]
 
     val_list = [None]*len(param_names)
@@ -114,7 +114,7 @@ def get_config(node, param_names):
 
         i += 1
 
-        if type(param_names) is not list:
+        if isinstance(param_names, list):
             val_list = val_list[0]
 
     cursor.close
