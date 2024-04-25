@@ -464,7 +464,7 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
         try:
             if pointset in ["as_modis", "eu_modis"]:
                 cursor.execute(ins_from_modis)
-            elif pointset in ["as_viirs", "eu_viirs", "as_vnoaa", "eu_vnoaa"]:
+            else:
                 cursor.execute(ins_from_viirs)
             conn.commit()
             cursor.execute(f"SELECT count(*) FROM {dst_tab}")
@@ -1210,15 +1210,15 @@ def get_and_merge_points_job():
     [year_tab,
      common_tab,
      tech_zones,
-     vip_zones,
-     oopt_zones,
-     oopt_buffers,
+     # vip_zones,
+     # oopt_zones,
+     # oopt_buffers,
      zones_types] = get_config("tables", ["year_tab",
                                          "common_tab",
                                          "tech_zones",
-                                         "vip_zones",
-                                         "oopt_zones",
-                                         "oopt_buffers",
+                                         # "vip_zones",
+                                         # "oopt_zones",
+                                         # "oopt_buffers",
                                          "zones_types"])
     [data_root, firms_folder] = get_config("path", ["data_root",
                                                     "firms_folder"])

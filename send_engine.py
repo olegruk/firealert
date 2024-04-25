@@ -517,7 +517,7 @@ def send_to_subscribers_job():
     [url] = get_config("telegramm", ["url"])
     [outline] = get_config("tables", ["vip_zones"])
     [alerts_check_time] = get_config("alerts", ["check_time"])
-    [smf_check_time] = get_config("smf", ["check_time"])
+    # [smf_check_time] = get_config("smf", ["check_time"])
     conn, cursor = get_tuple_cursor()
 
     # Загружаем данные о подписчиках
