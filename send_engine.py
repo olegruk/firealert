@@ -335,24 +335,36 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, buffers_tab, id_list,
                                 {zone_type}_id,
                                 region,
                                 {zone_type}_name,
-                                count(*)
-                            FROM {subs_tab}
-                            GROUP BY {zone_type}_id, region, {zone_type}_name""")
+                                count(*),
+                                ST_XMin(ST_Extent({zones_tab}.geog::geometry))
+                                    AS x_min,
+                                ST_YMin(ST_Extent({zones_tab}.geog::geometry))
+                                    AS y_min,
+                                ST_XMax(ST_Extent({zones_tab}.geog::geometry))
+                                    AS x_max,
+                                ST_YMax(ST_Extent({zones_tab}.geog::geometry))
+                                    AS y_max
+                            FROM {subs_tab} 
+                                 LEFT JOIN {zones_tab} 
+                                 USING {zone_type}_id
+                            GROUP BY {zone_type}_id,
+                                     region,
+                                     {zone_type}_name""")
     else:
         cursor.execute(f"""SELECT 
-                                0 as full_id,
+                                0 AS full_id,
                                 region,
-                                '' as zone_name,
+                                '' AS zone_name,
                                 count(*)
                             FROM {subs_tab}
                             GROUP BY region""")
 
     res_tab = cursor.fetchall()
     cursor.execute(f"""SELECT
-                            ST_XMax(ST_Extent(geog::geometry)) as x_max,
-                            ST_YMax(ST_Extent(geog::geometry)) as y_max,
-                            ST_XMin(ST_Extent(geog::geometry)) as x_min,
-                            ST_YMin(ST_Extent(geog::geometry)) as y_min,
+                            ST_XMax(ST_Extent(geog::geometry)) AS x_max,
+                            ST_YMax(ST_Extent(geog::geometry)) AS y_max,
+                            ST_XMin(ST_Extent(geog::geometry)) AS x_min,
+                            ST_YMin(ST_Extent(geog::geometry)) AS y_min,
                             ST_Extent(geog::geometry) AS subs_extent
                        FROM {subs_tab}""")
     points_extent = cursor.fetchone()
@@ -464,13 +476,27 @@ def make_zone_msg(cursor, subs_tab, limit, stat, extent, zone_type):
         # msg += f"\r\n{st_str[1]} "\
         #        f"- {st_str[2]} ({st_str[0]}): {st_str[3]}"
         # Статистика без индексов ООПТ
-        msg += f"\r\n{st_str[1]} - {st_str[2]}: {st_str[3]}"
+        if (st_str[4] !=st_str[6]) and (st_str[5] != st_str[7]):
+            zone_link = (f"<a href="
+                         f"'https://maps.rumap.ru/portal/apps/webappviewer/"
+                         f"index.html?id=b1d52f160ac54c3faefd4592da4cf8ba"
+                         f"&extent="
+                         f"{st_str[4]},{st_str[5]},{st_str[6]},{st_str[7]}'"
+                         f">{st_str[2]}</a>")
+        else:
+            zone_link = (f"<a href="
+                         f"'https://maps.rumap.ru/portal/apps/webappviewer/"
+                         f"index.html?id=b1d52f160ac54c3faefd4592da4cf8ba"
+                         f"&extent="
+                         f"{st_str[4]},{st_str[5]},{st_str[6]},{st_str[7]}"
+                         f"&level=9'"
+                         f">{st_str[2]}</a>")
+        msg += f"\r\n{st_str[1]} - {zone_link}: {st_str[3]}"
         full_cnt += st_str[3]
     msg += f"\nВсего точек: {full_cnt}"
     crit_count = count_crit_points(cursor, subs_tab, st_str[0], limit)
     if crit_count > 0:
         msg += f"\nВысокой опасности: {crit_count}"
-    """
     x_max = extent[0]
     y_max = extent[1]
     x_min = extent[2]
@@ -489,7 +515,6 @@ def make_zone_msg(cursor, subs_tab, limit, stat, extent, zone_type):
                 f"index.html?id=b1d52f160ac54c3faefd4592da4cf8ba"
                 f"&extent={x_min},{y_min},{x_max},{y_max}&level=9'"
                 f">Посмотреть на карте...</a>")
-    """
     return msg
 
 
