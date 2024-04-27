@@ -19,7 +19,6 @@ Created:     15.10.2020
 from faservice import get_config, get_cursor, close_conn
 
 [subs_table] = get_config("tables", ["subs_tab"])
-[conf_list, conf_desc] = get_config("subs", ["conf_list", "conf_desc"])
 
 
 def add_tlg_user(telegram_id):

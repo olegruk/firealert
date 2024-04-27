@@ -44,16 +44,15 @@ from mylogger import init_logger
 logger = init_logger(loglevel="Debug")
 
 
-def count_crit_points(cursor, zones_tab, zone_id, limit):
+def count_crit_points(cursor, subs_tab, zone_id, limit):
     """Check count of critical points for zonelist."""
     # logger.info("Getting statistic for %s..."%(reg))
     if limit is not None:
         stat = (
             f"""
             SELECT count(*)
-            FROM {zones_tab}
-            WHERE id = {zone_id}
-                AND critical >= {limit}
+            FROM {subs_tab}
+            WHERE critical >= {limit}
             """
         )
         try:
@@ -69,175 +68,245 @@ def count_crit_points(cursor, zones_tab, zone_id, limit):
 
 
 def make_subs_table(conn, cursor, year_tab, zones_tab, buffers_tab, id_list,
-                    ch_buf, period, whom, filter_tech, zone_type, limit):
+                    ch_buf, period, whom, filter_tech, zone_type):
     """Create table with points for subscriber with ID 'subs_id'."""
     logger.info(f"Creating table for subs_id: {whom}...")
     subs_tab = f"for_s{whom}"
     marker = f"[s{whom}]"
     period = f"{period} hours"
 
-    stat_non_buf = (
-        f"""
-        DROP TABLE IF EXISTS {subs_tab}
-        """,
-        f"""
-        CREATE TABLE {subs_tab} AS
-            SELECT
-                acq_date AS date,
-                acq_time AS time,
-                latitude,
-                longitude,
-                region,
-                {zone_type}_id,
-                critical,
-                geog
-            FROM {year_tab}
-            WHERE
-                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                AND {zone_type}_id IN ({id_list})
-                AND (
-                    whom is Null
-                    OR POSITION('{marker}' in whom) = 0
-                )
-                AND NOT (
-                    {filter_tech}
-                    AND (tech_id IS NOT NULL)
-                )
-            ORDER BY {zone_type}_id
-        """,
-        f"""
-        UPDATE {year_tab}
-            SET
-                whom = whom || '{marker}'
-            WHERE
-                date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                AND {zone_type}_id IN ({id_list})
-                AND POSITION('{marker}' in whom) = 0
-                AND NOT (
-                    {filter_tech}
-                    AND (tech_id IS NOT NULL)
-                )
-        """,
-        f"""
-        UPDATE {year_tab}
-            SET
-                whom = '{marker}'
-            WHERE
-                date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                AND {zone_type}_id IN ({id_list})
-                AND whom is Null
-                AND NOT (
-                    {filter_tech}
-                    AND (tech_id IS NOT NULL)
-                )
-        """,
-        f"""
-        ALTER TABLE {subs_tab}
-            ADD COLUMN description VARCHAR(500),
-            ADD COLUMN {zone_type} VARCHAR(100)
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                {zone_type} = {zones_tab}.name
-            FROM {zones_tab}
-            WHERE
-                {subs_tab}.{zone_type}_id = {zones_tab}.id
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                description =
-                    'Дата: ' || date || '\n' ||
-                    'Время: ' || time || '\n' ||
-                    'Широта: ' || latitude || '\n' ||
-                    'Долгота (ID): ' || longitude || '\n' ||
-                    'Регион: ' || region || '\n' ||
-                    'Территория: ' || {zone_type}
-        """
-    )
+    if zone_type == 'full':
+        stat_non_buf = (
+            f"""
+            DROP TABLE IF EXISTS {subs_tab}
+            """,
+            f"""
+            CREATE TABLE {subs_tab} AS
+                SELECT
+                    acq_date AS date,
+                    acq_time AS time,
+                    latitude,
+                    longitude,
+                    region,
+                    critical,
+                    geog
+                FROM {year_tab}
+                WHERE
+                    date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                    AND (
+                        whom is Null
+                        OR POSITION('{marker}' in whom) = 0
+                    )
+                    AND NOT (
+                        {filter_tech}
+                        AND (tech_id IS NOT NULL)
+                    )
+            """,
+            f"""
+            UPDATE {year_tab}
+                SET
+                    whom = whom || '{marker}'
+                WHERE
+                    date_time > TIMESTAMP 'now' - INTERVAL '{period}'
+                    AND POSITION('{marker}' in whom) = 0
+                    AND NOT (
+                        {filter_tech}
+                        AND (tech_id IS NOT NULL)
+                    )
+            """,
+            f"""
+            UPDATE {year_tab}
+                SET
+                    whom = '{marker}'
+                WHERE
+                    date_time > TIMESTAMP 'now' - INTERVAL '{period}'
+                    AND whom is Null
+                    AND NOT (
+                        {filter_tech}
+                        AND (tech_id IS NOT NULL)
+                    )
+            """,
+            f"""
+            ALTER TABLE {subs_tab}
+                ADD COLUMN description VARCHAR(500),
+                ADD COLUMN name VARCHAR(100) DEFAULT ''
+            """,
+            f"""
+            UPDATE {subs_tab}
+                SET
+                    description =
+                        'Дата: ' || date || '\n' ||
+                        'Время: ' || time || '\n' ||
+                        'Широта: ' || latitude || '\n' ||
+                        'Долгота (ID): ' || longitude || '\n' ||
+                        'Регион: ' || region
+            """
+        )
 
-    stat_buf = (
-        f"""
-        DROP TABLE IF EXISTS {subs_tab}
-        """,
-        f"""
-        CREATE TABLE {subs_tab} AS
-            SELECT
-                acq_date AS date,
-                acq_time AS time,
-                latitude,
-                longitude,
-                region,
-                {zone_type}_id,
-                critical,
-                {zone_type}_dist AS distance,
-                geog
-            FROM {year_tab}
-            WHERE
-                date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
-                AND {zone_type}_id IN ({id_list})
-                AND (
-                    whom is Null
-                    OR POSITION('{marker}' in whom) = 0
-                )
-                AND NOT (
-                    {filter_tech}
-                    AND (tech_id IS NOT NULL)
-                )
-            ORDER BY {zone_type}_id
-        """,
-        f"""
-        UPDATE {year_tab}
-            SET
-                whom = whom || '{marker}'
-            WHERE
-                date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                AND {zone_type}_id IN ({id_list})
-                AND POSITION('{marker}' in whom) = 0
-                AND NOT (
-                    {filter_tech}
-                    AND (tech_id IS NOT NULL)
-                )
-        """,
-        f"""
-        UPDATE {year_tab}
-            SET
-                whom = '{marker}'
-            WHERE
-                date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                AND {zone_type}_id IN ({id_list})
-                AND whom is Null
-                AND NOT (
-                    {filter_tech}
-                    AND (tech_id IS NOT NULL)
-                )
-        """,
-        f"""
-        ALTER TABLE {subs_tab}
-            ADD COLUMN description VARCHAR(500),
-            ADD COLUMN {zone_type} VARCHAR(100)
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                {zone_type} = {zones_tab}.name
-            FROM {zones_tab}
-            WHERE
-                {subs_tab}.{zone_type}_id = {zones_tab}.id
-        """,
-        f"""
-        UPDATE {subs_tab}
-            SET
-                description =
-                    'Дата: ' || date || '\n' ||
-                    'Время: ' || time || '\n' ||
-                    'Широта: ' || latitude || '\n' ||
-                    'Долгота (ID): ' || longitude || '\n' ||
-                    'Регион: ' || region || '\n' ||
-                    'Территория: ' || {zone_type}
-        """
-    )
+        stat_buf = stat_non_buf
+    else:
+        stat_non_buf = (
+            f"""
+            DROP TABLE IF EXISTS {subs_tab}
+            """,
+            f"""
+            CREATE TABLE {subs_tab} AS
+                SELECT
+                    acq_date AS date,
+                    acq_time AS time,
+                    latitude,
+                    longitude,
+                    region,
+                    {zone_type}_id,
+                    critical,
+                    geog
+                FROM {year_tab}
+                WHERE
+                    date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                    AND {zone_type}_id IN ({id_list})
+                    AND (
+                        whom is Null
+                        OR POSITION('{marker}' in whom) = 0
+                    )
+                    AND NOT (
+                        {filter_tech}
+                        AND (tech_id IS NOT NULL)
+                    )
+                ORDER BY {zone_type}_id
+            """,
+            f"""
+            UPDATE {year_tab}
+                SET
+                    whom = whom || '{marker}'
+                WHERE
+                    date_time > TIMESTAMP 'now' - INTERVAL '{period}'
+                    AND {zone_type}_id IN ({id_list})
+                    AND POSITION('{marker}' in whom) = 0
+                    AND NOT (
+                        {filter_tech}
+                        AND (tech_id IS NOT NULL)
+                    )
+            """,
+            f"""
+            UPDATE {year_tab}
+                SET
+                    whom = '{marker}'
+                WHERE
+                    date_time > TIMESTAMP 'now' - INTERVAL '{period}'
+                    AND {zone_type}_id IN ({id_list})
+                    AND whom is Null
+                    AND NOT (
+                        {filter_tech}
+                        AND (tech_id IS NOT NULL)
+                    )
+            """,
+            f"""
+            ALTER TABLE {subs_tab}
+                ADD COLUMN description VARCHAR(500),
+                ADD COLUMN {zone_type}_name VARCHAR(100)
+            """,
+            f"""
+            UPDATE {subs_tab}
+                SET
+                    {zone_type}_name = {zones_tab}.name
+                FROM {zones_tab}
+                WHERE
+                    {subs_tab}.{zone_type}_id = {zones_tab}.id
+            """,
+            f"""
+            UPDATE {subs_tab}
+                SET
+                    description =
+                        'Дата: ' || date || '\n' ||
+                        'Время: ' || time || '\n' ||
+                        'Широта: ' || latitude || '\n' ||
+                        'Долгота (ID): ' || longitude || '\n' ||
+                        'Регион: ' || region || '\n' ||
+                        'Территория: ' || {zone_type}_name
+            """
+        )
+
+        stat_buf = (
+            f"""
+            DROP TABLE IF EXISTS {subs_tab}
+            """,
+            f"""
+            CREATE TABLE {subs_tab} AS
+                SELECT
+                    acq_date AS date,
+                    acq_time AS time,
+                    latitude,
+                    longitude,
+                    region,
+                    {zone_type}_id,
+                    critical,
+                    {zone_type}_dist AS distance,
+                    geog
+                FROM {year_tab}
+                WHERE
+                    date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
+                    AND {zone_type}_id IN ({id_list})
+                    AND (
+                        whom is Null
+                        OR POSITION('{marker}' in whom) = 0
+                    )
+                    AND NOT (
+                        {filter_tech}
+                        AND (tech_id IS NOT NULL)
+                    )
+                ORDER BY {zone_type}_id
+            """,
+            f"""
+            UPDATE {year_tab}
+                SET
+                    whom = whom || '{marker}'
+                WHERE
+                    date_time > TIMESTAMP 'now' - INTERVAL '{period}'
+                    AND {zone_type}_id IN ({id_list})
+                    AND POSITION('{marker}' in whom) = 0
+                    AND NOT (
+                        {filter_tech}
+                        AND (tech_id IS NOT NULL)
+                    )
+            """,
+            f"""
+            UPDATE {year_tab}
+                SET
+                    whom = '{marker}'
+                WHERE
+                    date_time > TIMESTAMP 'now' - INTERVAL '{period}'
+                    AND {zone_type}_id IN ({id_list})
+                    AND whom is Null
+                    AND NOT (
+                        {filter_tech}
+                        AND (tech_id IS NOT NULL)
+                    )
+            """,
+            f"""
+            ALTER TABLE {subs_tab}
+                ADD COLUMN description VARCHAR(500),
+                ADD COLUMN {zone_type}_name VARCHAR(100)
+            """,
+            f"""
+            UPDATE {subs_tab}
+                SET
+                    {zone_type}_name = {zones_tab}.name
+                FROM {zones_tab}
+                WHERE
+                    {subs_tab}.{zone_type}_id = {zones_tab}.id
+            """,
+            f"""
+            UPDATE {subs_tab}
+                SET
+                    description =
+                        'Дата: ' || date || '\n' ||
+                        'Время: ' || time || '\n' ||
+                        'Широта: ' || latitude || '\n' ||
+                        'Долгота (ID): ' || longitude || '\n' ||
+                        'Регион: ' || region || '\n' ||
+                        'Территория: ' || {zone_type}_name
+            """
+        )
 
     if ch_buf:
         statements = stat_buf
@@ -261,13 +330,23 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, buffers_tab, id_list,
         logger.info(f"The table created for subs_id: {whom}")
     except psycopg2.OperationalError as err:
         logger.error(f"Error creating subscribers tables: {err}")
-    cursor.execute(f"""SELECT
-                            {zone_type}_id,
-                            region,
-                            {zone_type},
-                            count(*)
-                     FROM {subs_tab}
-                     GROUP BY {zone_type}_id, region, {zone_type}""")
+    if zone_type != "full":
+        cursor.execute(f"""SELECT
+                                {zone_type}_id,
+                                region,
+                                {zone_type}_name,
+                                count(*)
+                            FROM {subs_tab}
+                            GROUP BY {zone_type}_id, region, {zone_type}_name""")
+    else:
+        cursor.execute(f"""SELECT 
+                                0 as full_id,
+                                region,
+                                '' as zone_name,
+                                count(*)
+                            FROM {subs_tab}
+                            GROUP BY region""")
+
     res_tab = cursor.fetchall()
     cursor.execute(f"""SELECT
                             ST_XMax(ST_Extent(geog::geometry)) as x_max,
@@ -280,7 +359,7 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, buffers_tab, id_list,
     num = 0
     for str in res_tab:
         num += str[3]
-    return num, res_tab, points_extent
+    return num, res_tab, points_extent, subs_tab
 
 
 def drop_whom_table(conn, cursor, whom):
@@ -358,7 +437,7 @@ def set_name(conn, cursor, subs_tab, subs_id):
     logger.info("Setting name done.")
 
 
-def make_zone_msg(cursor, zones_tab, limit, stat, extent, zone_type):
+def make_zone_msg(cursor, subs_tab, limit, stat, extent, zone_type):
     """Generate a statistic message for zones to sending over telegram."""
     if zone_type == "oopt":
         intro = "ООПТ"
@@ -366,8 +445,8 @@ def make_zone_msg(cursor, zones_tab, limit, stat, extent, zone_type):
         intro = "торфяниках"
     elif zone_type == "ctrl":
         intro = "зонах особого контроля"
-    elif zone_type == "safe":
-        intro = "охранных зонах"
+    elif zone_type == "full":
+        intro = "регионе мониторинга"
     # elif zone_type == "oopt_buffer":
         # intro = "буферных зонах ООПТ"
     # elif zone_type == "peat_buffer":
@@ -388,7 +467,7 @@ def make_zone_msg(cursor, zones_tab, limit, stat, extent, zone_type):
         msg += f"\r\n{st_str[1]} - {st_str[2]}: {st_str[3]}"
         full_cnt += st_str[3]
     msg += f"\nВсего точек: {full_cnt}"
-    crit_count = count_crit_points(cursor, zones_tab, st_str[0], limit)
+    crit_count = count_crit_points(cursor, subs_tab, st_str[0], limit)
     if crit_count > 0:
         msg += f"\nВысокой опасности: {crit_count}"
     """
@@ -420,7 +499,7 @@ def make_subs_kml(point_period,
                   result_dir,
                   date,
                   int_now_hour,
-                  critical):
+                  limit):
     """Write kml-file for subscriber."""
     logger.info("Creating kml file...")
     dst_file_name = make_file_name(point_period,
@@ -429,7 +508,7 @@ def make_subs_kml(point_period,
                                    result_dir,
                                    int_now_hour)
     dst_file = os.path.join(result_dir, dst_file_name)
-    write_to_kml(dst_file, subs_id, critical)
+    write_to_kml(dst_file, subs_id, limit)
     return dst_file
 
 
@@ -477,13 +556,13 @@ def make_zones_list(zones_tab, zones, regions, fed_distr):
     return zone_list
 
 
-def filter_zones(cursor, zonelist, critical, zones_tab):
+def filter_zones(cursor, zonelist, limit, zones_tab):
     """Filter non-critical zones from list."""
-    if (critical is not None) and critical > 0:
+    if (limit is not None) and limit > 0:
         cursor.execute(f"""SELECT id
                                 FROM {zones_tab}
                                 WHERE
-                                    critical >= {critical}
+                                    critical >= {limit}
                         """)
         relevant_zones = cursor.fetchall()
         # logger.debug(f"Relevant zones: {relevant_zones}")
@@ -538,29 +617,39 @@ def send_to_subscribers_job():
             sendtimelist = subs.send_times.split(",")
 
         if now_hour in sendtimelist:
-            if subs.zone_types == '':
+            if subs.zone_types == '' or subs.zone_types is None:
                 logger.warning(f"Empty zone types list for {subs.subs_name}.")
                 continue
             else:
                 zone_type_list = subs.zone_types.split(",")
             logger.info(f"Checking zones for zone-types in: {zone_type_list}.")
             for zone_type in zone_type_list:
-                # zones = zone_type + '_zones'
+                if zone_type == 'peat':
+                     zones = subs.peat_zones
+                elif zone_type == 'oopt':
+                    zones = subs.oopt_zones
+                elif zone_type == 'attn':
+                    zones = subs.attn_zones
+                else:
+                    zones = ''
                 zones_tab = zone_type + "_zones"
                 buffers_tab = zone_type + "_zones_buf"
-                zone_list = make_zones_list(zones_tab,
-                                            subs.zones,
-                                            subs.regions,
-                                            subs.fed_reg)
-                # logger.debug(f"Zones list: {zone_list}.")
-                if zone_list == '':
+                if zone_type == 'full':
+                    zone_list = ''
+                else:
+                    zone_list = make_zones_list(zones_tab,
+                                                zones,
+                                                subs.regions,
+                                                subs.fed_reg)
+                logger.debug(f"Zones list: {zone_list}.")
+                if zone_list == '' and zone_type != 'full':
                     logger.warning(f"Empty zones list for {subs.subs_name}.")
                     continue
-                if ((zone_type == "peat") 
-                        and (subs.critical in [2,4,8,16,32,64])):
+                if ((zone_type == "test") 
+                        and (subs.dnld_lim in [2,4,8,16,32,64])):
                     filtered_zone_list = filter_zones(cursor,
                                                       zone_list,
-                                                      subs.critical,
+                                                      subs.dnld_lim,
                                                       zones_tab)
                     if filtered_zone_list == "":
                         logger.info(f"Empty peat zones for {subs.subs_name}.")
@@ -568,20 +657,19 @@ def send_to_subscribers_job():
                 else:
                     filtered_zone_list = zone_list
                 logger.info(f"Check {zone_type} points now.")
-                num_points, stat, extent = make_subs_table(conn,
-                                                           cursor,
-                                                           year_tab,
-                                                           zones_tab,
-                                                           buffers_tab,
-                                                           filtered_zone_list,
-                                                           subs.check_buffers,
-                                                           subs.period,
-                                                           subs.subs_id,
-                                                           subs.filter_tech,
-                                                           zone_type,
-                                                           subs.critical)
+                num_points, stat, extent, s_tab = make_subs_table(conn,
+                                                        cursor,
+                                                        year_tab,
+                                                        zones_tab,
+                                                        buffers_tab,
+                                                        filtered_zone_list,
+                                                        subs.check_buffers,
+                                                        subs.period,
+                                                        subs.subs_id,
+                                                        subs.filter_tech,
+                                                        zone_type)
                 if (num_points > 0) and (subs.teleg_stat or subs.email_stat):
-                    msg = make_zone_msg(cursor, zones_tab, subs.critical,
+                    msg = make_zone_msg(cursor, s_tab, subs.stat_lim,
                                         stat, extent, zone_type)
                     if subs.teleg_stat:
                         logger.info("Sending stat to telegram...")
@@ -601,7 +689,7 @@ def send_to_subscribers_job():
                                                  result_dir,
                                                  date,
                                                  int(now_hour),
-                                                 subs.critical)
+                                                 subs.dnld_lim)
                         if subs.email_point:
                             send_email_to_subs(subs.emails,
                                                subs.period,
@@ -635,7 +723,7 @@ def send_to_subscribers_job():
                 reg_list = subs.regions.split(",")
                 msg = make_tlg_peat_stat_msg(reg_list,
                                              subs.stat_period,
-                                             subs.critical)
+                                             subs.stat_lim)
                 if subs.teleg_digest:
                     logger.info("Sending digest to telegram...")
                     send_to_telegram(url, subs.tlg_id, msg)

@@ -1210,15 +1210,9 @@ def get_and_merge_points_job():
     [year_tab,
      common_tab,
      tech_zones,
-     # vip_zones,
-     # oopt_zones,
-     # oopt_buffers,
      zones_types] = get_config("tables", ["year_tab",
                                          "common_tab",
                                          "tech_zones",
-                                         # "vip_zones",
-                                         # "oopt_zones",
-                                         # "oopt_buffers",
                                          "zones_types"])
     [data_root, firms_folder] = get_config("path", ["data_root",
                                                     "firms_folder"])

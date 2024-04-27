@@ -73,7 +73,7 @@ def get_config(node, param_names):
                             password=dbpass)
     cursor = conn.cursor()
 
-    if isinstance(param_names, list):
+    if type(param_names) is not list:
         param_names = [param_names]
 
     val_list = [None]*len(param_names)
@@ -83,17 +83,35 @@ def get_config(node, param_names):
 
         try:
             cursor.execute(
-                f"SELECT strval FROM {param_table} WHERE key = '{key}'")
+                f"""
+                 SELECT strval
+                 FROM {param_table}
+                 WHERE key = '{key}'""")
             result = cursor.fetchone()
-            strval = result[0]
+            if result is not None:
+                strval = result[0]
+            else:
+                strval = None
             cursor.execute(
-                f"SELECT intval FROM {param_table} WHERE key = '{key}'")
+                f"""
+                 SELECT intval
+                 FROM {param_table}
+                 WHERE key = '{key}'""")
             result = cursor.fetchone()
-            intval = result[0]
+            if result is not None:
+                intval = result[0]
+            else:
+                intval = None
             cursor.execute(
-                f"SELECT lstval FROM {param_table} WHERE key = '{key}'")
+                f"""
+                 SELECT lstval
+                 FROM {param_table}
+                 WHERE key = '{key}'""")
             result = cursor.fetchone()
-            lststr = result[0]
+            if result is not None:
+                lststr = result[0]
+            else:
+                lststr = None
             if lststr is not None:
                 lstval = str_to_lst(lststr)
             else:
@@ -114,7 +132,7 @@ def get_config(node, param_names):
 
         i += 1
 
-        if isinstance(param_names, list):
+        if type(param_names) is not list:
             val_list = val_list[0]
 
     cursor.close

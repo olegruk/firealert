@@ -482,15 +482,29 @@ def get_zone_ids_for_region(zones_tab, reglist):
     full_oopt_lst = ""
     for reg in reglist:
         logger.debug(f"Region: --{reg}--.")
-        cursor.execute(f"""SELECT id
-                           FROM {zones_tab}
-                           WHERE region LIKE '%{reg}%'""")
-        oopt_ids = cursor.fetchall()
-        oopt_lst = ""
-        for elem in oopt_ids:
-            oopt_lst += f"{str(elem[0])},"
-            # oopt_lst.append(elem[0])
-        full_oopt_lst += oopt_lst
+        if reg == "Россия":
+            cursor.execute(f"""
+                            SELECT id
+                            FROM {zones_tab}""")
+            oopt_ids = cursor.fetchall()
+            oopt_lst = ""
+            for elem in oopt_ids:
+                str_elem = str(elem[0])
+                oopt_lst += f"{str_elem},"
+            full_oopt_lst = oopt_lst
+            continue
+        else:
+            cursor.execute(f"""
+                            SELECT id
+                            FROM {zones_tab}
+                            WHERE region LIKE '%{reg}%'""")
+            oopt_ids = cursor.fetchall()
+            oopt_lst = ""
+            for elem in oopt_ids:
+                str_elem = str(elem[0])
+                oopt_lst += f"{str_elem},"
+                # oopt_lst.append(elem[0])
+            full_oopt_lst += oopt_lst
     full_oopt_lst = full_oopt_lst[0:-1]
     # logger.debug(f"Zones list: {full_oopt_lst}.")
     return full_oopt_lst
@@ -504,14 +518,28 @@ def get_zone_ids_for_fed_distr(zones_tab,fa_list):
     full_oopt_lst = ""
     for fa in fa_list:
         logger.debug(f"Region: --{fa}--.")
-        cursor.execute(f"""SELECT id
-                           FROM {zones_tab}
-                           WHERE atd_fo = int4({fa})""")
-        oopt_ids = cursor.fetchall()
-        oopt_lst = ""
-        for elem in oopt_ids:
-            oopt_lst += f"{str(elem[0])},"
-        full_oopt_lst += oopt_lst
+        if fa == 0:
+            cursor.execute(f"""
+                            SELECT id
+                            FROM {zones_tab}""")
+            oopt_ids = cursor.fetchall()
+            oopt_lst = ""
+            for elem in oopt_ids:
+                str_elem = str(elem[0])
+                oopt_lst += f"{str_elem},"
+            full_oopt_lst = oopt_lst
+            continue
+        else:
+            cursor.execute(f"""
+                            SELECT id
+                            FROM {zones_tab}
+                            WHERE atd_fo = int4({fa})""")
+            oopt_ids = cursor.fetchall()
+            oopt_lst = ""
+            for elem in oopt_ids:
+                str_elem = str(elem[0])
+                oopt_lst += f"{str_elem},"
+            full_oopt_lst += oopt_lst
     full_oopt_lst = full_oopt_lst[0:-1]
     return full_oopt_lst
 
