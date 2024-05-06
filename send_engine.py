@@ -44,7 +44,7 @@ from mylogger import init_logger
 logger = init_logger(loglevel="Debug")
 
 
-def count_crit_points(cursor, subs_tab, zone_id, limit):
+def count_crit_points(cursor, subs_tab, limit):
     """Check count of critical points for zonelist."""
     # logger.info("Getting statistic for %s..."%(reg))
     if limit is not None:
@@ -67,11 +67,12 @@ def count_crit_points(cursor, subs_tab, zone_id, limit):
     return critical_cnt
 
 
-def make_subs_table(conn, cursor, year_tab, zones_tab, buffers_tab, id_list,
-                    ch_buf, period, whom, filter_tech, zone_type):
+def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
+                    ch_buf, period, whom, filter_tech, st_lim, dl_lim):
     """Create table with points for subscriber with ID 'subs_id'."""
     logger.info(f"Creating table for subs_id: {whom}...")
     subs_tab = f"for_s{whom}"
+    zones_tab = zone_type + "_zones"
     marker = f"[s{whom}]"
     period = f"{period} hours"
 
@@ -332,34 +333,52 @@ def make_subs_table(conn, cursor, year_tab, zones_tab, buffers_tab, id_list,
         logger.error(f"Error creating subscribers tables: {err}")
     if zone_type != "full":
         cursor.execute(f"""SELECT
-                                {zone_type}_id,
-                                region,
-                                {zone_type}_name,
-                                count(*)
-                            FROM {subs_tab}
-                            GROUP BY {zone_type}_id, region, {zone_type}_name""")
+                                {subs_tab}.{zone_type}_id,
+                                {subs_tab}.region,
+                                {subs_tab}.{zone_type}_name,
+                                count(*),
+                                ST_XMin(ST_Extent({zones_tab}.geog::geometry))
+                                    AS x_min,
+                                ST_YMin(ST_Extent({zones_tab}.geog::geometry))
+                                    AS y_min,
+                                ST_XMax(ST_Extent({zones_tab}.geog::geometry))
+                                    AS x_max,
+                                ST_YMax(ST_Extent({zones_tab}.geog::geometry))
+                                    AS y_max
+                            FROM {subs_tab} 
+                                 LEFT JOIN {zones_tab} 
+                                 ON {subs_tab}.{zone_type}_id = {zones_tab}.id
+                            GROUP BY {subs_tab}.{zone_type}_id,
+                                     {subs_tab}.region,
+                                     {subs_tab}.{zone_type}_name""")
     else:
         cursor.execute(f"""SELECT 
-                                0 as full_id,
+                                0 AS full_id,
                                 region,
-                                '' as zone_name,
-                                count(*)
+                                '' AS zone_name,
+                                count(*),
+                                0 AS x_min,
+                                0 AS y_min,
+                                0 AS x_max,
+                                0 AS y_max
                             FROM {subs_tab}
                             GROUP BY region""")
 
     res_tab = cursor.fetchall()
     cursor.execute(f"""SELECT
-                            ST_XMax(ST_Extent(geog::geometry)) as x_max,
-                            ST_YMax(ST_Extent(geog::geometry)) as y_max,
-                            ST_XMin(ST_Extent(geog::geometry)) as x_min,
-                            ST_YMin(ST_Extent(geog::geometry)) as y_min,
+                            ST_XMax(ST_Extent(geog::geometry)) AS x_max,
+                            ST_YMax(ST_Extent(geog::geometry)) AS y_max,
+                            ST_XMin(ST_Extent(geog::geometry)) AS x_min,
+                            ST_YMin(ST_Extent(geog::geometry)) AS y_min,
                             ST_Extent(geog::geometry) AS subs_extent
                        FROM {subs_tab}""")
     points_extent = cursor.fetchone()
     num = 0
     for str in res_tab:
         num += str[3]
-    return num, res_tab, points_extent, subs_tab
+    stat_cr_count = count_crit_points(cursor, subs_tab, st_lim)
+    dnld_cr_count = count_crit_points(cursor, subs_tab, dl_lim)
+    return num, stat_cr_count, dnld_cr_count, res_tab, points_extent, subs_tab
 
 
 def drop_whom_table(conn, cursor, whom):
@@ -437,13 +456,13 @@ def set_name(conn, cursor, subs_tab, subs_id):
     logger.info("Setting name done.")
 
 
-def make_zone_msg(cursor, subs_tab, limit, stat, extent, zone_type):
+def make_zone_msg(crit_count, stat, extent, zone_type):
     """Generate a statistic message for zones to sending over telegram."""
     if zone_type == "oopt":
         intro = "ООПТ"
     elif zone_type == "peat":
         intro = "торфяниках"
-    elif zone_type == "ctrl":
+    elif zone_type == "attn":
         intro = "зонах особого контроля"
     elif zone_type == "full":
         intro = "регионе мониторинга"
@@ -464,32 +483,51 @@ def make_zone_msg(cursor, subs_tab, limit, stat, extent, zone_type):
         # msg += f"\r\n{st_str[1]} "\
         #        f"- {st_str[2]} ({st_str[0]}): {st_str[3]}"
         # Статистика без индексов ООПТ
-        msg += f"\r\n{st_str[1]} - {st_str[2]}: {st_str[3]}"
+        if (st_str[4] != st_str[6]) and (st_str[5] != st_str[7]):
+            zone_link = (f"<a href="
+                         f"'https://maps.natureconservation.kz/"
+                         f"portal/apps/mapviewer/"
+                         f"index.html?webmap=65d8526143c3479dbd510c37ccec6f42"
+                         f"&extent="
+                         f"{st_str[4]},{st_str[5]},{st_str[6]},{st_str[7]}'"
+                         f">{st_str[2]}</a>")
+        else:
+            zone_link = (f"<a href="
+                         f"'https://maps.natureconservation.kz/"
+                         f"portal/apps/mapviewer/"
+                         f"index.html?webmap=65d8526143c3479dbd510c37ccec6f42"
+                         f"&extent="
+                         f"{st_str[4]},{st_str[5]},{st_str[6]},{st_str[7]}"
+                         f"&level=9'"
+                         f">{st_str[2]}</a>")
+        # zone_link = st_str[2]
+        msg += f"\r\n{st_str[1]} - {zone_link}: {st_str[3]}"
         full_cnt += st_str[3]
     msg += f"\nВсего точек: {full_cnt}"
-    crit_count = count_crit_points(cursor, subs_tab, st_str[0], limit)
     if crit_count > 0:
         msg += f"\nВысокой опасности: {crit_count}"
-    """
     x_max = extent[0]
     y_max = extent[1]
     x_min = extent[2]
     y_min = extent[3]
     if (x_max != x_min) and (y_max != y_min):
-        msg += (f"\n\n"
-                f"<a href="
-                f"'https://maps.rumap.ru/portal/apps/webappviewer/"
-                f"index.html?id=b1d52f160ac54c3faefd4592da4cf8ba"
-                f"&extent={x_min},{y_min},{x_max},{y_max}'"
-                f">Посмотреть на карте...</a>")
+        res_link = (f"\n\n"
+                    f"<a href="
+                    f"'https://maps.natureconservation.kz/"
+                    f"portal/apps/mapviewer/"
+                    f"index.html?webmap=65d8526143c3479dbd510c37ccec6f42"
+                    f"&extent={x_min},{y_min},{x_max},{y_max}'"
+                    f">Посмотреть на карте...</a>")
     else:
-        msg += (f"\n\n"
-                f"<a href="
-                f"'https://maps.rumap.ru/portal/apps/webappviewer/"
-                f"index.html?id=b1d52f160ac54c3faefd4592da4cf8ba"
-                f"&extent={x_min},{y_min},{x_max},{y_max}&level=9'"
-                f">Посмотреть на карте...</a>")
-    """
+        res_link = (f"\n\n"
+                    f"<a href="
+                    f"'https://maps.natureconservation.kz/"
+                    f"portal/apps/mapviewer/"
+                    f"index.html?webmap=65d8526143c3479dbd510c37ccec6f42"
+                    f"&extent={x_min},{y_min},{x_max},{y_max}&level=9'"
+                    f">Посмотреть на карте...</a>")
+    # res_link = ''
+    msg += res_link
     return msg
 
 
@@ -633,7 +671,6 @@ def send_to_subscribers_job():
                 else:
                     zones = ''
                 zones_tab = zone_type + "_zones"
-                buffers_tab = zone_type + "_zones_buf"
                 if zone_type == 'full':
                     zone_list = ''
                 else:
@@ -657,20 +694,19 @@ def send_to_subscribers_job():
                 else:
                     filtered_zone_list = zone_list
                 logger.info(f"Check {zone_type} points now.")
-                num_points, stat, extent, s_tab = make_subs_table(conn,
+                num_p, st_cr, dl_cr, stat, extent, s_tab = make_subs_table(conn,
                                                         cursor,
                                                         year_tab,
-                                                        zones_tab,
-                                                        buffers_tab,
+                                                        zone_type,
                                                         filtered_zone_list,
                                                         subs.check_buffers,
                                                         subs.period,
                                                         subs.subs_id,
                                                         subs.filter_tech,
-                                                        zone_type)
-                if (num_points > 0) and (subs.teleg_stat or subs.email_stat):
-                    msg = make_zone_msg(cursor, s_tab, subs.stat_lim,
-                                        stat, extent, zone_type)
+                                                        subs.stat_lim,
+                                                        subs.dnld_lim)
+                if (num_p > 0) and (subs.teleg_stat or subs.email_stat):
+                    msg = make_zone_msg(st_cr, stat, extent, zone_type)
                     if subs.teleg_stat:
                         logger.info("Sending stat to telegram...")
                         send_to_telegram(url, subs.tlg_id, msg)
@@ -682,7 +718,7 @@ def send_to_subscribers_job():
                 else:
                     logger.info("Zero-point stat. Don`t sending.")
                 if (subs.email_point or subs.teleg_point):
-                    if (num_points > 0) or subs.send_empty:
+                    if (dl_cr > 0) or subs.send_empty:
                         dst_file = make_subs_kml(subs.period,
                                                  subs.subs_name,
                                                  subs.subs_id,
@@ -694,13 +730,13 @@ def send_to_subscribers_job():
                             send_email_to_subs(subs.emails,
                                                subs.period,
                                                date,
-                                               num_points,
+                                               dl_cr,
                                                dst_file)
                         if subs.teleg_point:
                             send_tlg_to_subs(subs.tlg_id,
                                              dst_file,
                                              url,
-                                             num_points)
+                                             dl_cr)
                         drop_temp_file(dst_file)
                     else:
                         logger.info(f"Don`t send zero-point {zone_type} file.")
