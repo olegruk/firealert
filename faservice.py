@@ -423,11 +423,10 @@ def send_email_message(maillist, subject, body_text):
 def points_tail(nump):
     """Make a word endins for numeral."""
     str_nump = str(nump)
-    if str_nump[-1] == "1":
+    if str_nump[-1] == "1" and str_nump[-2:] != "11":
         tail = "точка"
-    elif str_nump[-1] in ["2", "3", "4"] and nump > 10 and nump < 20:
-        tail = "точек"
-    elif str_nump[-1] in ["2", "3", "4"]:
+    elif (str_nump[-1] in ["2", "3", "4"]
+         and str_nump[-2:] not in ["12", "13", "14"]):
         tail = "точки"
     else:
         tail = "точек"

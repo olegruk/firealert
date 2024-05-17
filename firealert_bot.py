@@ -40,7 +40,8 @@ from faservice import (
     get_config,
     get_path,
     send_doc_to_telegram,
-    str_to_lst)
+    str_to_lst,
+    points_tail)
 from mylogger import init_logger
 
 logger = init_logger("Debug")
@@ -990,16 +991,10 @@ def get_r_reglist(update: Update, context: CallbackContext):
     # drop_temp_files(result_dir)
     doc = open(dst_file, "rb")
     send_doc_to_telegram(url, telegram_id, doc)
-    str_nump = str(nump)
-    if str_nump[-1] == "1":
-        tail = "точка"
-    elif str_nump[-1] in ["2", "3", "4"]:
-        tail = "точки"
-    else:
-        tail = "точек"
     reply_markup = InlineKeyboardMarkup(gm_keyboard)
+    tail = points_tail(nump)
     update.message.reply_text(
-        text=f"В файле {str_nump} {tail}.",
+        text=f"В файле {nump} {tail}.",
         reply_markup=reply_markup)
     return GET_MENU
 
@@ -1137,16 +1132,10 @@ def get_c_radius(update: Update, context: CallbackContext):
         drop_temp_files(result_dir)
         doc = open(dst_file, "rb")
         send_doc_to_telegram(url, telegram_id, doc)
-        str_nump = str(nump)
-        if str_nump[-1] == "1":
-            tail = "точка"
-        elif str_nump[-1] in ["2", "3", "4"]:
-            tail = "точки"
-        else:
-            tail = "точек"
         reply_markup = InlineKeyboardMarkup(gm_keyboard)
+        tail = points_tail(nump)
         update.message.reply_text(
-            text=f"В файле {str_nump} {tail}.",
+            text=f"В файле {nump} {tail}.",
             reply_markup=reply_markup)
     return GET_MENU
 
@@ -1364,8 +1353,9 @@ def manual_get_data(update: Update, _):
     # drop_temp_files(result_dir)
     doc = open(dst_file, "rb")
     send_doc_to_telegram(url, telegram_id, doc)
+    tail = points_tail(nump)
     update.message.reply_text(
-        text=f"В файле {nump} точек.")
+        text=f"В файле {nump} {tail}.")
 
 
 def manual_get_around(update: Update, _):
@@ -1395,15 +1385,9 @@ def manual_get_around(update: Update, _):
         drop_temp_files(result_dir)
         doc = open(dst_file, "rb")
         send_doc_to_telegram(url, telegram_id, doc)
-        str_nump = str(nump)
-        if str_nump[-1] == "1":
-            tail = "точка"
-        elif str_nump[-1] in ["2", "3", "4"]:
-            tail = "точки"
-        else:
-            tail = "точек"
+        tail = points_tail(nump)
         update.message.reply_text(
-            text=f"В файле {str_nump} {tail}.")
+            text=f"В файле {nump} {tail}.")
 
 
 def manual_help(update: Update, _):
