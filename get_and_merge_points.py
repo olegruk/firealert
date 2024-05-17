@@ -131,14 +131,13 @@ def read_csv_from_site_with_retries(url, sourcepath):
     return errcode
 
 
-def GetPoints(pointset, dst_folder, aDate):
-    """Get csv-file from NASA site."""
-    logger.info(f"Getting points for {pointset}...")
-    [period] = get_config("NASA", ["load_period"])
-    [src_url] = get_config("NASA", [f"{pointset}_src_{period}"])
+def GetPoints_from_urt(pointset, dst_folder, aDate):
+    """Get csv-file from ultra realtime source at NASA site."""
+    logger.info(f"Getting urt points for {pointset}...")
+    [src_url] = get_config("NASA", [f"{pointset}_src_urt"])
     dst_file = f"{pointset}_{aDate}.csv"
     dst_file = os.path.join(dst_folder, dst_file)
-    errcode = read_csv_from_site(src_url, dst_file)
+    errcode = read_csv_from_site_with_retries(src_url, dst_file)
     if errcode == 0:
         logger.info(f"Download complete: {dst_file}")
     else:
@@ -1227,7 +1226,7 @@ def get_and_merge_points_job():
     conn, cursor = get_cursor()
 
     for pointset in pointsets:
-        errcode = GetPoints_with_retries(pointset, firms_path, date)
+        errcode = GetPoints_from_urt(pointset, firms_path, date)
         if errcode == 0:
             drop_today_tables(conn, cursor, pointset)
             count = upload_points_to_db(cursor, firms_path, pointset, date)
