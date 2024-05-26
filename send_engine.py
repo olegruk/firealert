@@ -159,12 +159,14 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     longitude,
                     region,
                     {zone_type}_id,
+                    {zone_type}_dist as dist,
                     critical,
                     geog
                 FROM {year_tab}
                 WHERE
                     date_time >= TIMESTAMP 'now' - INTERVAL '{period}'
                     AND {zone_type}_id IN ({id_list})
+                    AND {zone_type}_dist = 0
                     AND (
                         whom is Null
                         OR POSITION('{marker}' in whom) = 0
@@ -221,7 +223,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                         'Дата: ' || date || '\n' ||
                         'Время: ' || time || '\n' ||
                         'Широта: ' || latitude || '\n' ||
-                        'Долгота (ID): ' || longitude || '\n' ||
+                        'Долгота: ' || longitude || '\n' ||
                         'Регион: ' || region || '\n' ||
                         'Территория: ' || {zone_type}_name
             """
@@ -240,6 +242,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     longitude,
                     region,
                     {zone_type}_id,
+                    {zone_type}_dist as dist,
                     critical,
                     {zone_type}_dist AS distance,
                     geog
@@ -303,7 +306,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                         'Дата: ' || date || '\n' ||
                         'Время: ' || time || '\n' ||
                         'Широта: ' || latitude || '\n' ||
-                        'Долгота (ID): ' || longitude || '\n' ||
+                        'Долгота: ' || longitude || '\n' ||
                         'Регион: ' || region || '\n' ||
                         'Территория: ' || {zone_type}_name
             """

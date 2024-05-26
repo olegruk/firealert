@@ -364,7 +364,13 @@ def make_common_table(conn, cursor, dst_tab, pointsets):
                 l_code INTEGER,
                 peat_dist INTEGER,
                 attn_dist INTEGER,
-                oopt_dist INTEGER
+                oopt_dist INTEGER,
+                str_peat_dist VARCHAR,
+                str_attn_dist VARCHAR,
+                str_oopt_dist VARCHAR,
+                arr_peat_dist VARCHAR,
+                arr_attn_dist VARCHAR,
+                arr_oopt_dist VARCHAR
         )
         """
     )
@@ -768,7 +774,7 @@ def check_tech_zones(conn, cursor, src_tab, tech_zones):
         conn.rollback()
         logger.error(f"'Error intersecting points with tech-zones: {err}")
 
-
+'''
 def check_vip_zones(conn, cursor, src_tab, vip_zones):
     """Check if a points in vip-zone."""
     logger.info("Checking vip-zones...")
@@ -901,38 +907,6 @@ def check_control_zones(conn, cursor, src_tab, control_zones):
         logger.error(f"Error checking control zones: {err}")
 
 
-def check_monitored_zones(conn, cursor, src_tab, zones_type):
-    """Check if a points in monitored zones."""
-    monitored_zones = zones_type + '_zones'
-    logger.info(f"Checking {monitored_zones}...")
-    sql_stat = f"""
-        UPDATE {src_tab}
-            SET
-                {zones_type}_id = {monitored_zones}.id,
-                l_code = {monitored_zones}.l_code
-            FROM {monitored_zones}
-            WHERE
-                ST_Intersects({monitored_zones}.geog, {src_tab}.geog);
-        """
-    count_stat = f"""
-        SELECT
-            count(*)
-        FROM
-            {src_tab}
-        WHERE
-            {zones_type}_id IS NOT NULL
-        """
-    try:
-        cursor.execute(sql_stat)
-        conn.commit()
-        cursor.execute(count_stat)
-        points_count = cursor.fetchone()[0]
-        logger.info(f"Zones checked. {points_count} points detected.")
-    except psycopg2.Error as err:
-        conn.rollback()
-        logger.error(f"Error checking zones: {err}")
-
-
 def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
     """Check if a points in a control zones buffers."""
     logger.info("Checking control zones buffers...")
@@ -1029,6 +1003,39 @@ def check_control_buffers(conn, cursor, src_tab, control_zones, buffers):
     except psycopg2.Error as err:
         conn.rollback()
         logger.error(f"Error checking control buffers: {err}")
+'''
+
+
+def check_monitored_zones(conn, cursor, src_tab, zones_type):
+    """Check if a points in monitored zones."""
+    monitored_zones = zones_type + '_zones'
+    logger.info(f"Checking {monitored_zones}...")
+    sql_stat = f"""
+        UPDATE {src_tab}
+            SET
+                {zones_type}_id = {monitored_zones}.id,
+                l_code = {monitored_zones}.l_code
+            FROM {monitored_zones}
+            WHERE
+                ST_Intersects({monitored_zones}.geog, {src_tab}.geog);
+        """
+    count_stat = f"""
+        SELECT
+            count(*)
+        FROM
+            {src_tab}
+        WHERE
+            {zones_type}_id IS NOT NULL
+        """
+    try:
+        cursor.execute(sql_stat)
+        conn.commit()
+        cursor.execute(count_stat)
+        points_count = cursor.fetchone()[0]
+        logger.info(f"Zones checked. {points_count} points detected.")
+    except psycopg2.Error as err:
+        conn.rollback()
+        logger.error(f"Error checking zones: {err}")
 
 
 def check_monitored_buffers(conn, cursor, src_tab, zones_type):
@@ -1068,9 +1075,10 @@ def check_monitored_buffers(conn, cursor, src_tab, zones_type):
             {zones_type}_dist IS NOT NULL
         """
     try:
-        for sql_stat in statements:
-            cursor.execute(sql_stat)
-            conn.commit()
+        # for sql_stat in statements:
+        #     cursor.execute(sql_stat)
+        #     conn.commit()
+        cursor.execute(f"SELECT sp_calc_{zones_type}_dist()")
         cursor.execute(count_stat)
         points_count = cursor.fetchone()[0]
         logger.info(f"Buff checked. {points_count} points detected.")
@@ -1126,7 +1134,13 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                                 l_code,
                                 peat_dist,
                                 attn_dist,
-                                oopt_dist)
+                                oopt_dist,
+                                str_peat_dist,
+                                str_attn_dist,
+                                str_oopt_dist,
+                                arr_peat_dist,
+                                arr_attn_dist,
+                                arr_oopt_dist)
             SELECT
                 name,
                 acq_date,
@@ -1171,7 +1185,13 @@ def copy_to_common_table(conn, cursor, today_tab, year_tab):
                 l_code,
                 peat_dist,
                 attn_dist,
-                oopt_dist
+                oopt_dist,
+                str_peat_dist,
+                str_attn_dist,
+                str_oopt_dist,
+                arr_peat_dist,
+                arr_attn_dist,
+                arr_oopt_dist
             FROM {today_tab}
             WHERE NOT EXISTS(
                 SELECT ident FROM {year_tab}
