@@ -1014,7 +1014,8 @@ def check_monitored_zones(conn, cursor, src_tab, zones_type):
         UPDATE {src_tab}
             SET
                 {zones_type}_id = {monitored_zones}.id,
-                l_code = {monitored_zones}.l_code
+                l_code = {monitored_zones}.l_code,
+                {zones_type}_dist = 0
             FROM {monitored_zones}
             WHERE
                 ST_Intersects({monitored_zones}.geog, {src_tab}.geog);
@@ -1025,7 +1026,7 @@ def check_monitored_zones(conn, cursor, src_tab, zones_type):
         FROM
             {src_tab}
         WHERE
-            {zones_type}_id IS NOT NULL
+            {zones_type}_dist = 0
         """
     try:
         cursor.execute(sql_stat)
@@ -1072,7 +1073,7 @@ def check_monitored_buffers(conn, cursor, src_tab, zones_type):
         FROM
             {src_tab}
         WHERE
-            {zones_type}_dist IS NOT NULL
+            {zones_type}_dist > 0
         """
     try:
         # for sql_stat in statements:

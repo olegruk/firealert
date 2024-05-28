@@ -158,7 +158,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     latitude,
                     longitude,
                     region,
-                    {zone_type}_id,
+                    {zone_type}_id as zone_id,
                     {zone_type}_dist as dist,
                     critical,
                     geog
@@ -183,7 +183,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     whom = whom || '{marker}'
                 WHERE
                     date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                    AND {zone_type}_id IN ({id_list})
+                    AND zone_id IN ({id_list})
                     AND POSITION('{marker}' in whom) = 0
                     AND NOT (
                         {filter_tech}
@@ -196,7 +196,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     whom = '{marker}'
                 WHERE
                     date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                    AND {zone_type}_id IN ({id_list})
+                    AND zone_id IN ({id_list})
                     AND whom is Null
                     AND NOT (
                         {filter_tech}
@@ -214,7 +214,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     {zone_type}_name = {zones_tab}.name
                 FROM {zones_tab}
                 WHERE
-                    {subs_tab}.{zone_type}_id = {zones_tab}.id
+                    {subs_tab}.zone_id = {zones_tab}.id
             """,
             f"""
             UPDATE {subs_tab}
@@ -241,7 +241,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     latitude,
                     longitude,
                     region,
-                    {zone_type}_id,
+                    {zone_type}_id as zone_id,
                     {zone_type}_dist as dist,
                     critical,
                     {zone_type}_dist AS distance,
@@ -266,7 +266,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     whom = whom || '{marker}'
                 WHERE
                     date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                    AND {zone_type}_id IN ({id_list})
+                    AND zone_id IN ({id_list})
                     AND POSITION('{marker}' in whom) = 0
                     AND NOT (
                         {filter_tech}
@@ -279,7 +279,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     whom = '{marker}'
                 WHERE
                     date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                    AND {zone_type}_id IN ({id_list})
+                    AND zone_id IN ({id_list})
                     AND whom is Null
                     AND NOT (
                         {filter_tech}
@@ -297,7 +297,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     {zone_type}_name = {zones_tab}.name
                 FROM {zones_tab}
                 WHERE
-                    {subs_tab}.{zone_type}_id = {zones_tab}.id
+                    {subs_tab}.zone_id = {zones_tab}.id
             """,
             f"""
             UPDATE {subs_tab}
@@ -336,7 +336,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
         logger.error(f"Error creating subscribers tables: {err}")
     if zone_type != "full":
         cursor.execute(f"""SELECT
-                                {subs_tab}.{zone_type}_id,
+                                {subs_tab}.zone_id,
                                 {subs_tab}.region,
                                 {subs_tab}.{zone_type}_name,
                                 count(*),
@@ -347,11 +347,17 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                                 ST_XMax(ST_Extent({zones_tab}.geog::geometry))
                                     AS x_max,
                                 ST_YMax(ST_Extent({zones_tab}.geog::geometry))
-                                    AS y_max
+                                    AS y_max,
+                                sp_count_firms_in_zone('{subs_tab}',
+                                                        {subs_tab}.zone_id)
+                                    AS zone_count,
+                                sp_count_firms_in_buffer('{subs_tab}',
+                                                        {subs_tab}.zone_id)
+                                    AS buffer_count
                             FROM {subs_tab} 
                                  LEFT JOIN {zones_tab} 
-                                 ON {subs_tab}.{zone_type}_id = {zones_tab}.id
-                            GROUP BY {subs_tab}.{zone_type}_id,
+                                 ON {subs_tab}.zone_id = {zones_tab}.id
+                            GROUP BY {subs_tab}.zone_id,
                                      {subs_tab}.region,
                                      {subs_tab}.{zone_type}_name""")
     else:
@@ -363,7 +369,9 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                                 0 AS x_min,
                                 0 AS y_min,
                                 0 AS x_max,
-                                0 AS y_max
+                                0 AS y_max,
+                                count(*) AS zone_count,
+                                0 AS buffer_count
                             FROM {subs_tab}
                             GROUP BY region""")
 
@@ -504,7 +512,8 @@ def make_zone_msg(crit_count, stat, extent, zone_type):
                          f"&level=9'"
                          f">{st_str[2]}</a>")
         # zone_link = st_str[2]
-        msg += f"\r\n{st_str[1]} - {zone_link}: {st_str[3]}"
+        msg += (f"\r\n{st_str[1]} - {zone_link}: "
+                f"{st_str[3]} ({st_str[8]}, {st_str[9]})")
         full_cnt += st_str[3]
     msg += f"\nВсего точек: {full_cnt}"
     if crit_count > 0:
