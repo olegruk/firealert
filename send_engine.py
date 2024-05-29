@@ -183,7 +183,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     whom = whom || '{marker}'
                 WHERE
                     date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                    AND zone_id IN ({id_list})
+                    AND {zone_type}_id IN ({id_list})
                     AND POSITION('{marker}' in whom) = 0
                     AND NOT (
                         {filter_tech}
@@ -196,7 +196,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     whom = '{marker}'
                 WHERE
                     date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                    AND zone_id IN ({id_list})
+                    AND {zone_type}_id IN ({id_list})
                     AND whom is Null
                     AND NOT (
                         {filter_tech}
@@ -266,7 +266,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     whom = whom || '{marker}'
                 WHERE
                     date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                    AND zone_id IN ({id_list})
+                    AND {zone_type}_id IN ({id_list})
                     AND POSITION('{marker}' in whom) = 0
                     AND NOT (
                         {filter_tech}
@@ -279,7 +279,7 @@ def make_subs_table(conn, cursor, year_tab, zone_type, id_list,
                     whom = '{marker}'
                 WHERE
                     date_time > TIMESTAMP 'now' - INTERVAL '{period}'
-                    AND zone_id IN ({id_list})
+                    AND {zone_type}_id IN ({id_list})
                     AND whom is Null
                     AND NOT (
                         {filter_tech}

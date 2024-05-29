@@ -1247,7 +1247,8 @@ def get_and_merge_points_job():
     conn, cursor = get_cursor()
 
     for pointset in pointsets:
-        errcode = GetPoints_from_urt(pointset, firms_path, date)
+        # errcode = GetPoints_from_urt(pointset, firms_path, date)
+        errcode = GetPoints_with_retries(pointset, firms_path, date)
         if errcode == 0:
             drop_today_tables(conn, cursor, pointset)
             count = upload_points_to_db(cursor, firms_path, pointset, date)
@@ -1284,9 +1285,9 @@ def get_and_merge_points_job():
     for zones_type in zones_types:
         # zones_tab = zones_type + '_zones'
         # zones_buf_tab = zones_tab + '_buf'
-        check_monitored_zones(conn, cursor, common_tab, zones_type)
         check_monitored_buffers(conn, cursor, common_tab,
                                 zones_type)
+        check_monitored_zones(conn, cursor, common_tab, zones_type)
     copy_to_common_table(conn, cursor, common_tab, year_tab)
     for pointset in pointsets:
         drop_temp_tables(conn, cursor, pointset)
